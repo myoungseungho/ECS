@@ -68,6 +68,13 @@ enum class MsgType : uint16_t {
     GATE_ROUTE_REQ  = 70,  // 클라이언트→게이트: 게임서버 배정 요청 (빈 페이로드)
     GATE_ROUTE_RESP = 71,  // 게이트→클라이언트: 서버 배정 [result(1) port(2) ip_len(1) ip(N)]
 
+    // Session 11: Infrastructure (EventBus + Timer + Config)
+    TIMER_ADD       = 80,  // C→S: timer_id(4) duration_ms(4) interval_ms(4)
+    TIMER_INFO      = 81,  // S→C: active_timer_count(4) total_events_fired(4)
+    CONFIG_QUERY    = 82,  // C→S: table_name_len(1) table_name(N) key_col(1) key(N)
+    CONFIG_RESP     = 83,  // S→C: found(1) data_len(2) data(N) (CSV row as "k=v|k=v")
+    EVENT_SUB_COUNT = 84,  // S→C: subscriber_count(4) queue_size(4)
+
     STATS       = 99,  // 내부 진단
 };
 

@@ -14,6 +14,10 @@
 #include "../../Components/GhostComponents.h"      // Session 8
 #include "../../Systems/GhostSystem.h"             // Session 8
 #include "../../Components/LoginComponents.h"      // Session 9
+#include "../../Components/TimerComponents.h"      // Session 11
+#include "../../Core/EventBus.h"                   // Session 11
+#include "../../Core/ConfigLoader.h"               // Session 11
+#include "../../Systems/TimerSystem.h"             // Session 11
 
 #include <cstdio>
 #include <cstdlib>
@@ -28,8 +32,11 @@ constexpr int WORKER_THREADS = 2;
 constexpr float TICK_RATE = 30.0f;  // 초당 30틱
 constexpr float TICK_INTERVAL = 1.0f / TICK_RATE;
 
-// 전역 네트워크 포인터 (핸들러에서 접근용)
+// 전역 포인터 (핸들러에서 접근용)
 IOCPServer* g_network = nullptr;
+EventBus* g_eventBus = nullptr;           // Session 11
+ConfigLoader* g_config = nullptr;         // Session 11
+int g_total_events_fired = 0;             // Session 11: 이벤트 발행 카운터
 
 // ━━━ 메시지 핸들러 ━━━
 
@@ -753,6 +760,155 @@ void OnGhostQuery(World& world, Entity entity, const char* payload, int len) {
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
 }
 
+// ━━━ Session 11: Infrastructure 핸들러 ━━━
+
+// TIMER_ADD: 타이머 추가
+// 페이로드: [timer_id(4 int)] [duration_ms(4 int)] [interval_ms(4 int)]
+void OnTimerAdd(World& world, Entity entity, const char* payload, int len) {
+    if (len < 12) return;
+
+    int32_t timer_id, dur_ms, int_ms;
+    std::memcpy(&timer_id, payload, 4);
+    std::memcpy(&dur_ms, payload + 4, 4);
+    std::memcpy(&int_ms, payload + 8, 4);
+
+    float duration = dur_ms / 1000.0f;
+    float interval = int_ms / 1000.0f;
+
+    if (!world.HasComponent<TimerComponent>(entity)) {
+        world.AddComponent(entity, TimerComponent{});
+    }
+
+    auto& tc = world.GetComponent<TimerComponent>(entity);
+    tc.AddTimer(timer_id, duration, interval);
+
+    printf("[Timer] Entity %llu: added timer %d (%.1fs, interval=%.1fs)\n",
+           entity, timer_id, duration, interval);
+}
+
+// TIMER_INFO: 타이머 정보 조회
+// 응답: [active_timer_count(4)] [total_events_fired(4)]
+void OnTimerInfo(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    int32_t active_count = 0;
+    if (world.HasComponent<TimerComponent>(entity)) {
+        active_count = static_cast<int32_t>(
+            world.GetComponent<TimerComponent>(entity).timers.size());
+    }
+
+    char resp[8];
+    std::memcpy(resp, &active_count, 4);
+    std::memcpy(resp + 4, &g_total_events_fired, 4);
+    auto pkt = BuildPacket(MsgType::TIMER_INFO, resp, 8);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// CONFIG_QUERY: 설정 조회
+// 페이로드: [table_name_len(1)] [table_name(N)] [key_len(1)] [key(N)]
+// 응답: CONFIG_RESP [found(1)] [data_len(2)] [data(N)]
+void OnConfigQuery(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    if (len < 2 || !g_config) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    int off = 0;
+    uint8_t tname_len = static_cast<uint8_t>(payload[off++]);
+    if (off + tname_len > len) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+    std::string table_name(payload + off, tname_len);
+    off += tname_len;
+
+    uint8_t key_len = (off < len) ? static_cast<uint8_t>(payload[off++]) : 0;
+    std::string key_val;
+    if (key_len > 0 && off + key_len <= len) {
+        key_val = std::string(payload + off, key_len);
+    }
+
+    // 테이블 검색
+    auto* table = g_config->GetTable(table_name);
+    if (!table) {
+        // JSON 설정 검색
+        auto* settings = g_config->GetSettings(table_name);
+        if (settings && !key_val.empty()) {
+            std::string val = settings->GetString(key_val);
+            if (!val.empty()) {
+                std::string data = key_val + "=" + val;
+                uint16_t dlen = static_cast<uint16_t>(data.size());
+                std::vector<char> resp(3 + dlen);
+                resp[0] = 1;  // found
+                std::memcpy(resp.data() + 1, &dlen, 2);
+                std::memcpy(resp.data() + 3, data.c_str(), dlen);
+                auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp.data(), static_cast<int>(resp.size()));
+                g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+                return;
+            }
+        }
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // CSV에서 id로 검색
+    const ConfigRow* row = nullptr;
+    if (!key_val.empty()) {
+        row = table->FindByKey("id", key_val);
+        if (!row) row = table->FindByKey("name", key_val);
+    }
+
+    if (!row && table->GetRowCount() > 0) {
+        // 키 없으면 첫 행
+        row = &table->GetRow(0);
+    }
+
+    if (!row) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // row를 "k=v|k=v" 포맷으로 직렬화
+    std::string data;
+    for (auto& [k, v] : row->GetAll()) {
+        if (!data.empty()) data += "|";
+        data += k + "=" + v;
+    }
+
+    uint16_t dlen = static_cast<uint16_t>(data.size());
+    std::vector<char> resp(3 + dlen);
+    resp[0] = 1;  // found
+    std::memcpy(resp.data() + 1, &dlen, 2);
+    std::memcpy(resp.data() + 3, data.c_str(), dlen);
+    auto pkt = BuildPacket(MsgType::CONFIG_RESP, resp.data(), static_cast<int>(resp.size()));
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// EVENT_SUB_COUNT: EventBus 상태 조회
+// 응답: [subscriber_count_for_test(4)] [queue_size(4)]
+void OnEventSubCount(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    int32_t sub_count = g_eventBus ? g_eventBus->GetSubscriberCount(EventType::TEST_EVENT) : 0;
+    int32_t queue_size = g_eventBus ? g_eventBus->GetQueueSize() : 0;
+
+    char resp[8];
+    std::memcpy(resp, &sub_count, 4);
+    std::memcpy(resp + 4, &queue_size, 4);
+    auto pkt = BuildPacket(MsgType::EVENT_SUB_COUNT, resp, 8);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
 int main(int argc, char* argv[]) {
     // Session 10: 커맨드라인으로 포트 지정 가능 (기본 7777)
     uint16_t port = SERVER_PORT;
@@ -761,8 +917,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 10\n");
-    printf("  Full Pipeline (Gate+Login+Game)\n");
+    printf("  ECS Field Server - Session 11\n");
+    printf("  Infrastructure (Event+Timer+Config)\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -774,8 +930,33 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // ━━━ 2. ECS World 생성 ━━━
+    // ━━━ 2. ECS World + Infrastructure 생성 ━━━
     World world;
+    EventBus eventBus;
+    g_eventBus = &eventBus;
+
+    ConfigLoader config;
+    g_config = &config;
+
+    // 기본 설정 로드 (테스트용 인메모리 데이터)
+    config.LoadCSVFromString("monsters",
+        "id,name,hp,attack,defense\n"
+        "1,Goblin,100,15,5\n"
+        "2,Wolf,200,25,10\n"
+        "3,Dragon,5000,200,100\n");
+    config.LoadJSONFromString("server",
+        "{\"tick_rate\": 30, \"max_players\": 200, \"server_name\": \"Field-1\"}");
+
+    // EventBus 구독: TIMER_EXPIRED 이벤트 카운트
+    eventBus.Subscribe(EventType::TIMER_EXPIRED, [](const Event& e) {
+        g_total_events_fired++;
+        printf("[Event] TIMER_EXPIRED: entity=%llu, timer_id=%d\n", e.source, e.param1);
+    });
+
+    // 테스트 이벤트 구독 (테스트 검증용)
+    eventBus.Subscribe(EventType::TEST_EVENT, [](const Event& e) {
+        printf("[Event] TEST_EVENT: source=%llu, param1=%d\n", e.source, e.param1);
+    });
 
     // ━━━ 3. System 등록 (실행 순서가 곧 게임 루프) ━━━
     //
@@ -804,10 +985,15 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::LOGIN, OnLogin);                     // Session 9
     dispatch.RegisterHandler(MsgType::CHAR_LIST_REQ, OnCharListReq);       // Session 9
     dispatch.RegisterHandler(MsgType::CHAR_SELECT, OnCharSelect);          // Session 9
+    dispatch.RegisterHandler(MsgType::TIMER_ADD, OnTimerAdd);              // Session 11
+    dispatch.RegisterHandler(MsgType::TIMER_INFO, OnTimerInfo);            // Session 11
+    dispatch.RegisterHandler(MsgType::CONFIG_QUERY, OnConfigQuery);        // Session 11
+    dispatch.RegisterHandler(MsgType::EVENT_SUB_COUNT, OnEventSubCount);   // Session 11
 
     world.AddSystem<InterestSystem>(network);
     world.AddSystem<BroadcastSystem>(network);
     world.AddSystem<GhostSystem>(network);          // Session 8
+    world.AddSystem<TimerSystem>(eventBus);          // Session 11
 
     printf("\n[Main] Server running. Press Ctrl+C to stop.\n");
     printf("[Main] Listening on port %d, tick rate: %.0f/s\n\n", port, TICK_RATE);
@@ -835,5 +1021,7 @@ int main(int argc, char* argv[]) {
 
     printf("[Main] Server shutting down...\n");
     g_network = nullptr;
+    g_eventBus = nullptr;
+    g_config = nullptr;
     return 0;
 }
