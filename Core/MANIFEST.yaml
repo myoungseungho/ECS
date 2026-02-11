@@ -1,0 +1,30 @@
+module: Core
+purpose: "ECS 프레임워크 코어. Entity(ID), Component(데이터 저장소), System(로직 인터페이스), World(컨테이너)를 정의"
+owner: session_1
+
+files:
+  - name: Entity.h
+    purpose: "Entity 타입 정의 (uint64_t ID). 데이터도 로직도 없는 순수 식별자"
+    lines: 10
+
+  - name: Component.h
+    purpose: "타입별 Component 저장소. IComponentArray(타입소거) + ComponentArray<T>(실제 저장)"
+    lines: 50
+
+  - name: System.h
+    purpose: "System 인터페이스. Update(World&, float dt) 하나만 정의"
+    lines: 15
+
+  - name: World.h
+    purpose: "ECS 컨테이너. Entity 생성/삭제, Component CRUD, ForEach 쿼리, System 실행"
+    lines: 115
+
+  - name: World.cpp
+    purpose: "World 구현. CreateEntity, DestroyEntity, Update(모든 System 순차 실행)"
+    lines: 30
+
+dependencies: []
+
+constraints:
+  - "이 모듈은 다른 모듈에 의존하지 않음 (최하위 레이어)"
+  - "World.ForEach가 ECS 쿼리의 핵심 — 특정 Component 조합을 가진 Entity만 순회"

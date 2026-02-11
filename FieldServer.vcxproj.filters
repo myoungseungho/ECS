@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Filter (폴더) 정의 -->
+  <ItemGroup>
+    <Filter Include="Core">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="NetworkEngine">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Systems">
+      <UniqueIdentifier>{72F5C2A0-1234-4567-89AB-CDEF01234567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Servers">
+      <UniqueIdentifier>{A1B2C3D4-5678-90AB-CDEF-112233445566}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+
+  <!-- Header files -->
+  <ItemGroup>
+    <ClInclude Include="Core\Entity.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\Component.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\System.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Core\World.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="NetworkEngine\IOCPServer.h">
+      <Filter>NetworkEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="NetworkEngine\Session.h">
+      <Filter>NetworkEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="Components\NetworkComponents.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Systems\NetworkSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+  </ItemGroup>
+
+  <!-- Source files -->
+  <ItemGroup>
+    <ClCompile Include="Core\World.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="NetworkEngine\IOCPServer.cpp">
+      <Filter>NetworkEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="NetworkEngine\Session.cpp">
+      <Filter>NetworkEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="Systems\NetworkSystem.cpp">
+      <Filter>Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="Servers\FieldServer\main.cpp">
+      <Filter>Servers</Filter>
+    </ClCompile>
+  </ItemGroup>
+
+</Project>

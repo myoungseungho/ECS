@@ -1,0 +1,35 @@
+{
+  "session_id": 2,
+  "timestamp": "2026-02-11T15:20:45.796807",
+  "elapsed_seconds": 13.9,
+  "all_passed": true,
+  "passed": 5,
+  "total": 5,
+  "results": [
+    {
+      "id": "S2-BUILD",
+      "passed": true,
+      "detail": "Setting up MSVC environment...\nOK\n[1/6] Core\\World.cpp\nWorld.cpp\n[2/6] NetworkEngine\\IOCPServer.cpp\nIOCPServer.cpp\n[3/6] NetworkEngine\\Session.cpp\nSession.cpp\n[4/6] Systems\\NetworkSystem.cpp\nNetworkSystem.cpp\n[5/6] Systems\\MessageDispatchSystem.cpp\nMessageDispatchSystem.cpp\n[6/6] Servers\\FieldServer\\main.cpp\nmain.cpp\n[LINK] FieldServer.exe\n\n\nBUILD SUCCESS: C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton\\build\\FieldServer.exe\n"
+    },
+    {
+      "id": "S2-PACKET-ASSEMBLE",
+      "passed": true,
+      "detail": "Verified by test_session2.py"
+    },
+    {
+      "id": "S2-PACKET-MULTI",
+      "passed": true,
+      "detail": "Verified by test_session2.py"
+    },
+    {
+      "id": "S2-DISPATCH",
+      "passed": true,
+      "detail": "Verified by test_session2.py"
+    },
+    {
+      "id": "S2-UNKNOWN-TYPE",
+      "passed": true,
+      "detail": "Verified by test_session2.py"
+    }
+  ]
+}

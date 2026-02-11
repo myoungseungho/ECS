@@ -1,0 +1,34 @@
+module: Systems
+purpose: "ECS System 모음. 각 System은 특정 Component 조합을 쿼리하여 로직 처리"
+owner: session_2
+
+files:
+  - name: NetworkSystem.h/cpp
+    purpose: "IOCP 이벤트를 ECS 세계로 변환. 접속→Entity 생성, 수신→버퍼 적재, 끊김→Entity 파괴"
+    reads: []
+    writes: [SessionComponent, RecvBufferComponent]
+    created: session_1
+    updated: session_2
+
+  - name: MessageDispatchSystem.h/cpp
+    purpose: "RecvBuffer에서 완성 패킷 조립 + 메시지 타입별 핸들러 디스패치"
+    reads: [SessionComponent, RecvBufferComponent]
+    writes: []
+    side_effects: ["핸들러 콜백 호출 (에코, 핑 등)", "잘못된 패킷 시 연결 끊기"]
+    created: session_2
+
+execution_order:
+  1: NetworkSystem     # IOCP → RecvBuffer 적재
+  2: MessageDispatchSystem  # RecvBuffer → 패킷 조립 → 핸들러
+
+dependencies:
+  - ../NetworkEngine/IOCPServer.h
+  - ../Core/World.h
+  - ../Components/NetworkComponents.h
+  - ../Components/PacketComponents.h
+
+constraints:
+  - "System에 상태(멤버 변수) 금지 — 단, ECS 바깥 인프라(IOCPServer) 참조는 예외"
+  - "System 간 직접 호출 금지"
+  - "파일당 500줄 이하"
+  - "Update() 함수 100줄 이하"

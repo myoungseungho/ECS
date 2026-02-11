@@ -1,0 +1,24 @@
+# Build output
+build/
+*.exe
+*.obj
+*.pdb
+*.ilk
+
+# VS files
+*.user
+.vs/
+Debug/
+Release/
+x64/
+
+# Python
+__pycache__/
+*.pyc
+
+# Test artifacts
+nul
+
+# OS
+Thumbs.db
+desktop.ini

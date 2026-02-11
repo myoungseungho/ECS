@@ -1,0 +1,45 @@
+{
+  "session_id": 1,
+  "timestamp": "2026-02-11T15:09:51.818052",
+  "elapsed_seconds": 5.4,
+  "all_passed": false,
+  "passed": 0,
+  "total": 7,
+  "results": [
+    {
+      "id": "S1-BUILD",
+      "passed": false,
+      "detail": "Build succeeded but 27 warnings found"
+    },
+    {
+      "id": "S1-ECHO",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    },
+    {
+      "id": "S1-ECS-ENTITY",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    },
+    {
+      "id": "S1-ECS-COMPONENT",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    },
+    {
+      "id": "S1-LIFECYCLE",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    },
+    {
+      "id": "S1-MULTI",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    },
+    {
+      "id": "S1-CLEAN",
+      "passed": false,
+      "detail": "Build failed, cannot run"
+    }
+  ]
+}

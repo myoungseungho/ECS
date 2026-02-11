@@ -1,0 +1,521 @@
+{
+  "project": "GameServerSkeleton",
+  "description": "Lost Ark 스타일 MMORPG 서버 - ECS + IOCP 아키텍처",
+  "total_sessions": 10,
+  "verification_policy": {
+    "rule": "Session N+1 시작 전, Session N 검증 필수 통과",
+    "evidence": "모든 검증 결과는 _lostark_edu/evidence/ 에 JSON으로 저장",
+    "logs": "서버 로그는 _lostark_edu/logs/ 에 저장"
+  },
+  "sessions": [
+    {
+      "id": 1,
+      "title": "ECS Core + IOCP Echo",
+      "subtitle": "뼈대 세우기 - Entity-Component-System 기반 네트워크 서버",
+      "goal": "TCP 접속 시 ECS Entity 자동 생성, 데이터 에코, 접속해제 시 Entity 파괴",
+      "what_you_build": [
+        "World (Entity 생성/파괴/Component 관리)",
+        "IOCPServer (Windows IOCP 기반 비동기 네트워크)",
+        "NetworkSystem (IOCP 이벤트 → ECS Entity/Component 변환)",
+        "SessionComponent, RecvBufferComponent (네트워크 데이터 구조)"
+      ],
+      "when_done_you_can": "클라이언트가 접속하면 ECS Entity가 생기고, 데이터를 보내면 그대로 돌려받고, 끊으면 Entity가 사라지는 것을 직접 확인할 수 있다.",
+      "files": [
+        "Core/World.h", "Core/World.cpp",
+        "NetworkEngine/IOCPServer.h", "NetworkEngine/IOCPServer.cpp",
+        "NetworkEngine/Session.h", "NetworkEngine/Session.cpp",
+        "Components/NetworkComponents.h",
+        "Systems/ISystem.h",
+        "Systems/NetworkSystem.h", "Systems/NetworkSystem.cpp",
+        "Servers/FieldServer/main.cpp"
+      ],
+      "acceptance_criteria": [
+        {
+          "id": "S1-BUILD",
+          "name": "빌드 성공 (0 errors, 0 warnings)",
+          "type": "build",
+          "verify": "MSBuild 또는 cl/link로 빌드 시 에러/경고 0개",
+          "how_to_check": "build.py 실행 → 'BUILD SUCCESS' 출력 확인"
+        },
+        {
+          "id": "S1-ECHO",
+          "name": "TCP 에코 동작",
+          "type": "network_test",
+          "verify": "클라이언트가 보낸 데이터를 서버가 그대로 돌려줌",
+          "how_to_check": "test_echo.py 실행 → 'ECHO TEST PASSED' 확인"
+        },
+        {
+          "id": "S1-ECS-ENTITY",
+          "name": "접속 시 ECS Entity 생성",
+          "type": "ecs_test",
+          "verify": "__STATS__ 명령으로 entity_count=1 확인",
+          "how_to_check": "서버에 접속 후 __STATS__ 전송 → entity_count=1 응답"
+        },
+        {
+          "id": "S1-ECS-COMPONENT",
+          "name": "SessionComponent + RecvBufferComponent 부착",
+          "type": "ecs_test",
+          "verify": "__STATS__ 응답에서 has_session_comp=1, has_recv_comp=1",
+          "how_to_check": "__STATS__ 응답 파싱하여 두 컴포넌트 모두 1인지 확인"
+        },
+        {
+          "id": "S1-LIFECYCLE",
+          "name": "접속해제 시 Entity 파괴",
+          "type": "ecs_test",
+          "verify": "2명 접속 → 1명 끊기 → entity_count=1로 감소",
+          "how_to_check": "2명 접속 후 __STATS__로 2 확인 → 1명 끊기 → __STATS__로 1 확인"
+        },
+        {
+          "id": "S1-MULTI",
+          "name": "멀티 클라이언트 독립성",
+          "type": "ecs_test",
+          "verify": "5명 동시 접속, 각각 독립 에코, 일부 끊어도 나머지 정상",
+          "how_to_check": "5명 접속 → 각각 다른 메시지 에코 → 2명 끊기 → 나머지 3명 에코 정상"
+        },
+        {
+          "id": "S1-CLEAN",
+          "name": "메모리 누수 없음 (Entity 정리)",
+          "type": "ecs_test",
+          "verify": "전원 접속해제 후 새 접속 → entity_count=1 (잔여 Entity 없음)",
+          "how_to_check": "모두 끊기 → 새 접속 → __STATS__로 entity_count=1 확인"
+        }
+      ],
+      "verification_test": "test_session1.py",
+      "success_criteria_summary": "7/7 PASSED → Session 1 완료"
+    },
+    {
+      "id": 2,
+      "title": "Packet Protocol + Message Dispatch",
+      "subtitle": "패킷 프로토콜 정의 + 메시지 라우팅 시스템",
+      "goal": "길이 프리픽스 패킷 프로토콜, 패킷 조립/분해, 메시지 타입별 핸들러 디스패치",
+      "what_you_build": [
+        "PacketHeader (길이+타입 헤더 구조)",
+        "PacketAssembler (스트림 → 완성 패킷 조립)",
+        "MessageDispatchSystem (타입별 핸들러 라우팅)",
+        "핸들러 등록/호출 구조"
+      ],
+      "when_done_you_can": "클라이언트가 {타입, 데이터} 형태의 패킷을 보내면 타입별로 다른 핸들러가 호출되는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S2-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "새 파일 추가 후 빌드 에러/경고 0개",
+          "how_to_check": "build.py 실행 → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S2-PACKET-ASSEMBLE",
+          "name": "패킷 조립 정상",
+          "type": "protocol_test",
+          "verify": "분할 전송된 데이터가 올바른 패킷으로 조립됨",
+          "how_to_check": "100바이트 패킷을 10바이트씩 나눠 전송 → 서버가 완성 패킷으로 처리"
+        },
+        {
+          "id": "S2-PACKET-MULTI",
+          "name": "연속 패킷 분리 정상",
+          "type": "protocol_test",
+          "verify": "한 번에 3개 패킷을 붙여 전송 → 서버가 3개를 개별 처리",
+          "how_to_check": "3개 패킷을 하나의 send()로 전송 → 3개 응답 수신"
+        },
+        {
+          "id": "S2-DISPATCH",
+          "name": "메시지 타입별 핸들러 호출",
+          "type": "dispatch_test",
+          "verify": "타입 1=ECHO, 타입 2=PING 등 서로 다른 응답",
+          "how_to_check": "타입 1 패킷 → 에코 응답, 타입 2 패킷 → PONG 응답"
+        },
+        {
+          "id": "S2-UNKNOWN-TYPE",
+          "name": "미등록 타입 안전 처리",
+          "type": "dispatch_test",
+          "verify": "등록되지 않은 메시지 타입이 와도 서버가 크래시하지 않음",
+          "how_to_check": "타입 999 패킷 전송 → 서버 정상 동작 (에러 로그 + 연결 유지)"
+        }
+      ],
+      "verification_test": "test_session2.py",
+      "success_criteria_summary": "5/5 PASSED → Session 2 완료"
+    },
+    {
+      "id": 3,
+      "title": "Movement + Broadcast",
+      "subtitle": "이동 처리 + 주변 플레이어에게 브로드캐스트",
+      "goal": "PositionComponent로 위치 관리, 이동 패킷 처리, 같은 영역 플레이어에게 위치 브로드캐스트",
+      "what_you_build": [
+        "PositionComponent (x, y, z 좌표)",
+        "MovementSystem (이동 패킷 → 위치 갱신)",
+        "BroadcastSystem (변경된 위치를 주변에 전파)"
+      ],
+      "when_done_you_can": "2명이 접속한 상태에서 한 명이 이동하면 다른 한 명이 이동 정보를 받는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S3-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S3-POSITION",
+          "name": "이동 후 위치 갱신",
+          "type": "movement_test",
+          "verify": "이동 패킷 전송 후 __STATS__로 좌표 변경 확인",
+          "how_to_check": "이동 패킷(x=100,y=200) → __POS__ 쿼리 → x=100,y=200"
+        },
+        {
+          "id": "S3-BROADCAST",
+          "name": "이동 브로드캐스트",
+          "type": "broadcast_test",
+          "verify": "A가 이동 → B가 A의 이동 패킷 수신",
+          "how_to_check": "클라이언트 A 이동 → 클라이언트 B가 수신한 패킷에 A의 새 좌표 포함"
+        },
+        {
+          "id": "S3-SELF-NO-ECHO",
+          "name": "자기 자신에게 브로드캐스트 안 함",
+          "type": "broadcast_test",
+          "verify": "A가 이동 시 A에게는 자기 이동이 오지 않음 (옵션에 따라)",
+          "how_to_check": "A 이동 → A는 브로드캐스트 미수신"
+        },
+        {
+          "id": "S3-MULTI-MOVE",
+          "name": "다수 동시 이동",
+          "type": "movement_test",
+          "verify": "3명이 동시에 이동 → 각각 다른 2명의 이동을 수신",
+          "how_to_check": "3명 접속 → 각각 이동 → 수신한 이동 패킷 2개씩"
+        }
+      ],
+      "verification_test": "test_session3.py",
+      "success_criteria_summary": "5/5 PASSED → Session 3 완료"
+    },
+    {
+      "id": 4,
+      "title": "Interest Management (AOI)",
+      "subtitle": "관심 영역 기반 브로드캐스트 최적화",
+      "goal": "Grid 기반 AOI로 '가까운 플레이어'에게만 브로드캐스트, 먼 플레이어는 무시",
+      "what_you_build": [
+        "InterestSystem (Grid 기반 AOI 관리)",
+        "GridComponent 또는 Grid 자료구조",
+        "BroadcastSystem 개선 (AOI 필터링)"
+      ],
+      "when_done_you_can": "A와 B가 가까이 있으면 서로 이동을 보고, C가 멀리 있으면 A/B의 이동을 못 받는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S4-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S4-AOI-IN",
+          "name": "AOI 내 브로드캐스트 정상",
+          "type": "aoi_test",
+          "verify": "같은 그리드 셀 안의 플레이어끼리 이동 수신",
+          "how_to_check": "A(0,0)와 B(10,10) → A 이동 → B 수신 확인"
+        },
+        {
+          "id": "S4-AOI-OUT",
+          "name": "AOI 밖 브로드캐스트 차단",
+          "type": "aoi_test",
+          "verify": "먼 그리드 셀의 플레이어에게는 이동 패킷 안 감",
+          "how_to_check": "A(0,0)와 C(9999,9999) → A 이동 → C 미수신 (타임아웃)"
+        },
+        {
+          "id": "S4-AOI-ENTER",
+          "name": "AOI 진입 시 상대방 정보 수신",
+          "type": "aoi_test",
+          "verify": "C가 먼 곳에서 A 근처로 이동 → C가 A 정보 수신",
+          "how_to_check": "C 이동하여 A 그리드 진입 → appear 패킷 수신"
+        },
+        {
+          "id": "S4-AOI-LEAVE",
+          "name": "AOI 이탈 시 상대방 정보 제거",
+          "type": "aoi_test",
+          "verify": "A가 B 근처에서 멀리 이동 → B에게 disappear 알림",
+          "how_to_check": "A 먼 곳으로 이동 → B가 disappear 패킷 수신"
+        }
+      ],
+      "verification_test": "test_session4.py",
+      "success_criteria_summary": "5/5 PASSED → Session 4 완료"
+    },
+    {
+      "id": 5,
+      "title": "Channel System",
+      "subtitle": "채널 기반 플레이어 분리",
+      "goal": "같은 맵이라도 채널이 다르면 서로 안 보이는 시스템",
+      "what_you_build": [
+        "ChannelComponent (채널 ID)",
+        "ChannelSystem (채널 배정/이동)",
+        "브로드캐스트에 채널 필터 추가"
+      ],
+      "when_done_you_can": "채널 1의 플레이어와 채널 2의 플레이어가 같은 좌표에 있어도 서로 안 보이는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S5-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S5-SAME-CH",
+          "name": "같은 채널 → 서로 보임",
+          "type": "channel_test",
+          "verify": "채널 1의 A, B → A 이동 시 B 수신",
+          "how_to_check": "A,B 모두 채널 1 → A 이동 → B 수신 확인"
+        },
+        {
+          "id": "S5-DIFF-CH",
+          "name": "다른 채널 → 서로 안 보임",
+          "type": "channel_test",
+          "verify": "채널 1의 A, 채널 2의 C → A 이동 시 C 미수신",
+          "how_to_check": "A 채널 1, C 채널 2 → A 이동 → C 타임아웃"
+        },
+        {
+          "id": "S5-CH-SWITCH",
+          "name": "채널 이동 가능",
+          "type": "channel_test",
+          "verify": "A가 채널 1→2로 이동 후 채널 2의 C에게 보임",
+          "how_to_check": "채널 이동 패킷 → A가 채널 2 → C가 A 보임"
+        }
+      ],
+      "verification_test": "test_session5.py",
+      "success_criteria_summary": "4/4 PASSED → Session 5 완료"
+    },
+    {
+      "id": 6,
+      "title": "Zone (Map) System",
+      "subtitle": "맵/존 관리 - 맵 전환, 스폰 포인트",
+      "goal": "여러 맵 존재, 맵 간 이동, 맵별 독립적인 AOI/채널",
+      "what_you_build": [
+        "ZoneComponent (현재 맵 ID)",
+        "ZoneSystem (맵 관리, 맵 전환)",
+        "스폰 포인트 시스템"
+      ],
+      "when_done_you_can": "플레이어가 맵 1에서 맵 2로 이동하면 맵 1의 플레이어에게 사라지고 맵 2의 플레이어에게 나타나는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S6-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S6-ZONE-ISOLATE",
+          "name": "다른 맵은 서로 격리",
+          "type": "zone_test",
+          "verify": "맵 1의 A, 맵 2의 B → A 이동해도 B 미수신",
+          "how_to_check": "A 맵1, B 맵2 → A 이동 → B 타임아웃"
+        },
+        {
+          "id": "S6-ZONE-TRANSFER",
+          "name": "맵 전환 시 올바른 처리",
+          "type": "zone_test",
+          "verify": "A가 맵1→맵2 이동 시 맵1의 C에게 사라짐, 맵2의 B에게 나타남",
+          "how_to_check": "A 맵 전환 → C disappear, B appear 패킷 수신"
+        },
+        {
+          "id": "S6-SPAWN",
+          "name": "맵 진입 시 스폰 포인트 배정",
+          "type": "zone_test",
+          "verify": "맵 전환 후 A의 좌표가 맵 2 스폰 포인트와 일치",
+          "how_to_check": "맵 전환 → __POS__ 쿼리 → 스폰 좌표 확인"
+        }
+      ],
+      "verification_test": "test_session6.py",
+      "success_criteria_summary": "4/4 PASSED → Session 6 완료"
+    },
+    {
+      "id": 7,
+      "title": "Handoff System (서버 간 이동)",
+      "subtitle": "게임서버 간 캐릭터 이관",
+      "goal": "캐릭터가 서버 A에서 서버 B로 이동할 때 상태를 직렬화하여 전달",
+      "what_you_build": [
+        "Serializer (Component 직렬화/역직렬화)",
+        "HandoffSystem (서버 간 캐릭터 이관)",
+        "핸드오프 프로토콜"
+      ],
+      "when_done_you_can": "서버 A에서 캐릭터 상태를 직렬화 → 서버 B에서 복원하면 모든 Component가 정확히 복원되는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S7-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S7-SERIALIZE",
+          "name": "Component 직렬화/역직렬화",
+          "type": "serialize_test",
+          "verify": "Entity의 모든 Component를 바이트로 변환 → 복원 시 원본과 동일",
+          "how_to_check": "직렬화 → 역직렬화 → 모든 필드 일치 확인"
+        },
+        {
+          "id": "S7-HANDOFF",
+          "name": "서버 간 이관 동작",
+          "type": "handoff_test",
+          "verify": "서버 A에서 직렬화 데이터 송신 → 서버 B에서 Entity 복원",
+          "how_to_check": "핸드오프 시뮬레이션 → 복원 Entity의 좌표/상태 확인"
+        }
+      ],
+      "verification_test": "test_session7.py",
+      "success_criteria_summary": "3/3 PASSED → Session 7 완료"
+    },
+    {
+      "id": 8,
+      "title": "Ghost Entity (크로스서버 동기화)",
+      "subtitle": "인접 서버의 캐릭터를 Ghost로 표현",
+      "goal": "서버 경계에서 다른 서버의 캐릭터가 Ghost Entity로 보임",
+      "what_you_build": [
+        "GhostComponent (원본 서버/Entity 참조)",
+        "GhostSystem (Ghost 생성/갱신/파괴)",
+        "서버 경계 동기화 프로토콜"
+      ],
+      "when_done_you_can": "서버 A의 플레이어가 경계 근처에 있을 때 서버 B에 Ghost가 생기고, 멀어지면 Ghost가 사라지는 것을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S8-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S8-GHOST-CREATE",
+          "name": "서버 경계 접근 시 Ghost 생성",
+          "type": "ghost_test",
+          "verify": "A가 경계 근처 → 인접 서버에 GhostComponent가 있는 Entity 생성",
+          "how_to_check": "__STATS__ 쿼리 → ghost_count=1"
+        },
+        {
+          "id": "S8-GHOST-SYNC",
+          "name": "Ghost 위치 동기화",
+          "type": "ghost_test",
+          "verify": "원본 Entity 이동 → Ghost Entity 좌표도 갱신",
+          "how_to_check": "원본 이동 → 인접 서버의 Ghost 좌표 확인"
+        },
+        {
+          "id": "S8-GHOST-DESTROY",
+          "name": "경계 이탈 시 Ghost 파괴",
+          "type": "ghost_test",
+          "verify": "A가 경계에서 멀어짐 → Ghost Entity 파괴",
+          "how_to_check": "__STATS__ → ghost_count=0"
+        }
+      ],
+      "verification_test": "test_session8.py",
+      "success_criteria_summary": "4/4 PASSED → Session 8 완료"
+    },
+    {
+      "id": 9,
+      "title": "Login + Character Select",
+      "subtitle": "로그인 서버 + 캐릭터 선택 흐름",
+      "goal": "로그인 인증, 캐릭터 목록 조회, 캐릭터 선택 후 게임서버 진입",
+      "what_you_build": [
+        "LoginServer (인증 처리)",
+        "캐릭터 선택 프로토콜",
+        "게임서버 진입 흐름"
+      ],
+      "when_done_you_can": "ID/PW로 로그인 → 캐릭터 목록 확인 → 캐릭터 선택 → 게임서버에 해당 캐릭터로 진입하는 전체 흐름을 확인할 수 있다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S9-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S9-LOGIN-OK",
+          "name": "정상 로그인",
+          "type": "login_test",
+          "verify": "올바른 ID/PW → 로그인 성공 응답",
+          "how_to_check": "로그인 패킷 전송 → 성공 응답 수신"
+        },
+        {
+          "id": "S9-LOGIN-FAIL",
+          "name": "잘못된 인증 거부",
+          "type": "login_test",
+          "verify": "틀린 PW → 로그인 실패 응답",
+          "how_to_check": "잘못된 패킷 전송 → 실패 코드 수신"
+        },
+        {
+          "id": "S9-CHAR-LIST",
+          "name": "캐릭터 목록 조회",
+          "type": "login_test",
+          "verify": "로그인 후 캐릭터 목록 응답",
+          "how_to_check": "목록 요청 → 캐릭터 정보 배열 수신"
+        },
+        {
+          "id": "S9-ENTER-GAME",
+          "name": "게임서버 진입 성공",
+          "type": "login_test",
+          "verify": "캐릭터 선택 → 게임서버에 Entity 생성됨",
+          "how_to_check": "캐릭터 선택 패킷 → 게임서버 __STATS__ 확인"
+        }
+      ],
+      "verification_test": "test_session9.py",
+      "success_criteria_summary": "5/5 PASSED → Session 9 완료"
+    },
+    {
+      "id": 10,
+      "title": "Gate Server (로드밸런싱)",
+      "subtitle": "게이트 서버 - 클라이언트 연결 분배",
+      "goal": "클라이언트가 게이트에 접속 → 적절한 게임서버로 연결 분배",
+      "what_you_build": [
+        "GateServer (접속 분배)",
+        "서버 상태 모니터링",
+        "로드밸런싱 알고리즘"
+      ],
+      "when_done_you_can": "게이트 서버에 접속하면 가장 여유있는 게임서버로 자동 배정되는 것을 확인할 수 있다. 전체 Client→Gate→Login→Game 파이프라인이 동작한다.",
+      "files": [],
+      "acceptance_criteria": [
+        {
+          "id": "S10-BUILD",
+          "name": "빌드 성공",
+          "type": "build",
+          "verify": "빌드 에러/경고 0개",
+          "how_to_check": "build.py → 'BUILD SUCCESS'"
+        },
+        {
+          "id": "S10-GATE-CONNECT",
+          "name": "게이트 서버 접속",
+          "type": "gate_test",
+          "verify": "클라이언트 → 게이트 서버 접속 성공",
+          "how_to_check": "게이트 서버에 TCP 접속 → 응답 확인"
+        },
+        {
+          "id": "S10-ROUTE",
+          "name": "게임서버 라우팅",
+          "type": "gate_test",
+          "verify": "게이트가 게임서버 IP/Port 응답 → 클라이언트가 게임서버에 재접속",
+          "how_to_check": "게이트 접속 → 라우팅 응답 수신 → 게임서버 접속 → 에코 동작"
+        },
+        {
+          "id": "S10-BALANCE",
+          "name": "로드밸런싱 동작",
+          "type": "gate_test",
+          "verify": "여러 클라이언트가 접속 시 게임서버 간 분배",
+          "how_to_check": "10명 접속 → 2개 게임서버에 5:5 또는 유사 비율 분배"
+        },
+        {
+          "id": "S10-FULL-PIPE",
+          "name": "전체 파이프라인 동작",
+          "type": "integration_test",
+          "verify": "Gate→Login→CharSelect→Game 전체 흐름 동작",
+          "how_to_check": "클라이언트가 전체 흐름 통과하여 게임서버에서 이동까지 성공"
+        }
+      ],
+      "verification_test": "test_session10.py",
+      "success_criteria_summary": "5/5 PASSED → Session 10 완료 (프로젝트 완성)"
+    }
+  ]
+}

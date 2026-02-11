@@ -1,0 +1,25 @@
+module: NetworkEngine
+purpose: "IOCP 기반 비동기 네트워크 엔진. ECS 바깥에 존재하며, NetworkSystem이 이벤트를 ECS 세계로 가져옴"
+owner: session_1
+
+files:
+  - name: Session.h/cpp
+    purpose: "네트워크 세션. 소켓 래핑 + WSARecv/WSASend 비동기 I/O"
+    lines: 80/80
+
+  - name: IOCPServer.h/cpp
+    purpose: "IOCP 서버. Accept/Worker 스레드 관리 + 이벤트 큐(워커→메인)"
+    lines: 65/180
+
+dependencies:
+  - "ws2_32.lib (Windows Socket API)"
+
+constraints:
+  - "ECS와 직접 연결하지 않음. IOCPEvent로만 외부와 소통"
+  - "IOCPEvent 타입: CONNECTED, DISCONNECTED, DATA_RECEIVED"
+  - "메인 스레드에서 PollEvents()로 이벤트를 꺼내는 방식 (폴링)"
+
+why_outside_ecs: >
+  IOCP는 OS 수준 비동기 I/O 메커니즘.
+  워커 스레드가 여러 개 돌아가므로 ECS의 싱글스레드 루프에 직접 넣을 수 없음.
+  대신 이벤트 큐로 메인 스레드와 소통하고, NetworkSystem이 이 이벤트를 ECS 세계로 변환.

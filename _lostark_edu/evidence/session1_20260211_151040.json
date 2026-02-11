@@ -1,0 +1,45 @@
+{
+  "session_id": 1,
+  "timestamp": "2026-02-11T15:10:40.879364",
+  "elapsed_seconds": 13.0,
+  "all_passed": true,
+  "passed": 7,
+  "total": 7,
+  "results": [
+    {
+      "id": "S1-BUILD",
+      "passed": true,
+      "detail": "Setting up MSVC environment...\nOK\n[1/5] Core\\World.cpp\nWorld.cpp\n[2/5] NetworkEngine\\IOCPServer.cpp\nIOCPServer.cpp\n[3/5] NetworkEngine\\Session.cpp\nSession.cpp\n[4/5] Systems\\NetworkSystem.cpp\nNetworkSystem.cpp\n[5/5] Servers\\FieldServer\\main.cpp\nmain.cpp\n[LINK] FieldServer.exe\n\n\nBUILD SUCCESS: C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton\\build\\FieldServer.exe\n"
+    },
+    {
+      "id": "S1-ECHO",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    },
+    {
+      "id": "S1-ECS-ENTITY",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    },
+    {
+      "id": "S1-ECS-COMPONENT",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    },
+    {
+      "id": "S1-LIFECYCLE",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    },
+    {
+      "id": "S1-MULTI",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    },
+    {
+      "id": "S1-CLEAN",
+      "passed": true,
+      "detail": "Verified by test_session1.py"
+    }
+  ]
+}

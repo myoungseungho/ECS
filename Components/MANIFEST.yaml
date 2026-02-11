@@ -1,0 +1,38 @@
+module: Components
+purpose: "ECS Component 모음. 순수 데이터(struct)만. 함수 없음."
+owner: session_2
+
+files:
+  - name: NetworkComponents.h
+    purpose: "네트워크 관련 Component"
+    components:
+      - name: SessionComponent
+        fields: [session_id, connected]
+        description: "이 Entity에 네트워크 연결이 있음을 표시. IOCPServer의 세션 ID와 매핑"
+      - name: RecvBufferComponent
+        fields: [buffer]
+        description: "아직 처리하지 않은 수신 데이터. NetworkSystem이 적재, MessageDispatchSystem이 소비"
+    created: session_1
+
+  - name: PacketComponents.h
+    purpose: "패킷 프로토콜 정의 + 빌드 유틸리티"
+    components:
+      - name: PacketHeader
+        fields: [length, msg_type]
+        description: "네트워크 패킷 헤더. 4바이트 길이 + 2바이트 메시지 타입"
+      - name: MsgType
+        description: "메시지 타입 enum (ECHO=1, PING=2, STATS=99)"
+    utilities:
+      - BuildPacket()
+    created: session_2
+
+dependencies:
+  - "<cstdint>"
+  - "<vector>"
+  - "<cstring>"
+
+constraints:
+  - "struct만 사용, class 금지"
+  - "멤버 함수 없음 (생성자/소멸자 제외)"
+  - "다른 Component를 참조하지 않음"
+  - "기본값 초기화 필수"

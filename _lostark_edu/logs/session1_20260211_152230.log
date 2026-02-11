@@ -1,0 +1,71 @@
+Session 1 Verification Log
+Time: 2026-02-11T15:22:30.461957
+Result: 7/7
+============================================================
+
+=== BUILD ===
+Setting up MSVC environment...
+OK
+[1/6] Core\World.cpp
+World.cpp
+[2/6] NetworkEngine\IOCPServer.cpp
+IOCPServer.cpp
+[3/6] NetworkEngine\Session.cpp
+Session.cpp
+[4/6] Systems\NetworkSystem.cpp
+NetworkSystem.cpp
+[5/6] Systems\MessageDispatchSystem.cpp
+MessageDispatchSystem.cpp
+[6/6] Servers\FieldServer\main.cpp
+main.cpp
+[LINK] FieldServer.exe
+
+
+BUILD SUCCESS: C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\build\FieldServer.exe
+
+
+=== TEST_SESSION1 ===
+============================================================
+  Session 1 Validation Test
+  ECS + IOCP System Verification
+============================================================
+
+Server started (PID: 89312)
+
+--- Level 1: ECS Internal State ---
+  (STATS packet -> ECS World internals)
+
+  [PASS] Entity count = 1
+  [PASS] SessionComponent attached
+  [PASS] RecvBufferComponent attached
+  [PASS] Echo via packet protocol
+
+--- Level 2: Entity Lifecycle ---
+  (connect -> Entity create, disconnect -> Entity destroy)
+
+  [PASS] 2 connections -> Entity count = 2
+  [PASS] 1 disconnect -> Entity count = 1
+  [PASS] Reconnect -> Entity count = 2
+
+--- Level 3: Multi-client Independence ---
+  (5 clients, independent echo, partial disconnect)
+
+  [PASS] 5 connections -> Entity count = 5
+  [PASS] 5 clients independent echo
+  [PASS] 2 disconnects -> Entity count = 3
+  [PASS] Remaining 3 clients echo OK
+  [PASS] Full disconnect + reconnect -> Entity count = 1
+
+
+============================================================
+  Result: 12/12 PASSED, 0 FAILED
+
+  +-------------------------------------------+
+  | SESSION 1 VALIDATION: ALL TESTS PASSED    |
+  |                                           |
+  | [O] ECS internal state OK                 |
+  | [O] Entity lifecycle OK                   |
+  | [O] Multi-client independence OK          |
+  +-------------------------------------------+
+============================================================
+

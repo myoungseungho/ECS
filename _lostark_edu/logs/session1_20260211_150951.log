@@ -1,0 +1,50 @@
+Session 1 Verification Log
+Time: 2026-02-11T15:09:51.820620
+Result: 0/7
+============================================================
+
+=== BUILD ===
+Setting up MSVC environment...
+OK
+[1/5] Core\World.cpp
+World.cpp
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\World.cpp(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\World.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\Entity.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\Component.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\System.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+[2/5] NetworkEngine\IOCPServer.cpp
+IOCPServer.cpp
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\IOCPServer.cpp(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\IOCPServer.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\Session.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+[3/5] NetworkEngine\Session.cpp
+Session.cpp
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\Session.cpp(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\Session.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+[4/5] Systems\NetworkSystem.cpp
+NetworkSystem.cpp
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\NetworkSystem.cpp(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\NetworkSystem.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\../Core/Entity.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\../Core/System.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\../NetworkEngine/IOCPServer.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\Session.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\../Core/World.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\Component.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Systems\../Components/NetworkComponents.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+[5/5] Servers\FieldServer\main.cpp
+main.cpp
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Servers\FieldServer\main.cpp(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Servers\FieldServer\../../Core/World.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\Entity.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\Component.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Core\System.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Servers\FieldServer\../../NetworkEngine/IOCPServer.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\NetworkEngine\Session.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\Servers\FieldServer\../../Systems/NetworkSystem.h(1): warning C4819: 현재 코드 페이지(949)에서 표시할 수 없는 문자가 파일에 들어 있습니다. 데이터가 손실되지 않게 하려면 해당 파일을 유니코드 형식으로 저장하십시오.
+[LINK] FieldServer.exe
+
+
+BUILD SUCCESS: C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\build\FieldServer.exe
+

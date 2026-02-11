@@ -1,0 +1,72 @@
+Session 1 Verification Log
+Time: 2026-02-11T15:10:40.886135
+Result: 7/7
+============================================================
+
+=== BUILD ===
+Setting up MSVC environment...
+OK
+[1/5] Core\World.cpp
+World.cpp
+[2/5] NetworkEngine\IOCPServer.cpp
+IOCPServer.cpp
+[3/5] NetworkEngine\Session.cpp
+Session.cpp
+[4/5] Systems\NetworkSystem.cpp
+NetworkSystem.cpp
+[5/5] Servers\FieldServer\main.cpp
+main.cpp
+[LINK] FieldServer.exe
+
+
+BUILD SUCCESS: C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\build\FieldServer.exe
+
+
+=== TEST_SESSION1 ===
+============================================================
+  Session 1 Validation Test
+  ECS + IOCP 시스템 검증
+============================================================
+
+서버 시작 (PID: 47240)
+
+━━━ Level 1: ECS 내부 상태 확인 ━━━
+  (서버에 __STATS__ 명령 → ECS World 내부 상태 응답)
+
+  [PASS] Entity가 1개 생성됨
+  [PASS] session_to_entity 매핑 1개
+  [PASS] SessionComponent 부착됨
+  [PASS] RecvBufferComponent 부착됨
+  [PASS] Entity 수 == 세션 매핑 수 (일관성)
+
+━━━ Level 2: Entity 생명주기 (생성/파괴) ━━━
+  (접속→Entity 생성, 접속해제→Entity 파괴 확인)
+
+  [PASS] 2명 접속 → Entity 2개
+  [PASS] 1명 접속해제 → Entity 1개로 감소
+  [PASS] 세션 매핑도 1개로 감소
+  [PASS] 재접속 → Entity 다시 2개
+
+━━━ Level 3: 멀티 클라이언트 독립성 ━━━
+  (5명 동시 접속, 각각 독립 에코, 1명 끊어도 나머지 정상)
+
+  [PASS] 5명 접속 → Entity 5개
+  [PASS] 5명 각각 독립 에코 성공
+  [PASS] 2명 접속해제 → Entity 3개
+  [PASS] 나머지 3명 에코 정상
+  [PASS] 2KB 대용량 에코 정상
+  [PASS] 전원 접속해제 후 새 접속 → Entity 1개 (메모리 누수 없음)
+
+
+============================================================
+  결과: 15/15 PASSED, 0 FAILED
+
+  +-------------------------------------------+
+  | SESSION 1 VALIDATION: ALL TESTS PASSED    |
+  |                                           |
+  | [O] ECS internal state OK                 |
+  | [O] Entity lifecycle OK                   |
+  | [O] Multi-client independence OK          |
+  +-------------------------------------------+
+============================================================
+

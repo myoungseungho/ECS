@@ -1,0 +1,74 @@
+{
+  "sessions": {
+    "1": {
+      "verified": true,
+      "last_verification": "2026-02-11T15:22:30.462169",
+      "passed": 7,
+      "total": 7,
+      "evidence_file": "_lostark_edu\\evidence\\session1_20260211_152230.json"
+    },
+    "2": {
+      "verified": true,
+      "last_verification": "2026-02-11T15:20:45.800471",
+      "passed": 5,
+      "total": 5,
+      "evidence_file": "_lostark_edu\\evidence\\session2_20260211_152045.json"
+    },
+    "3": {
+      "verified": true,
+      "last_verification": "2026-02-11T18:00:00.000000",
+      "passed": 12,
+      "total": 12,
+      "test_file": "test_session3.py"
+    },
+    "4": {
+      "verified": true,
+      "last_verification": "2026-02-11T19:00:00.000000",
+      "passed": 11,
+      "total": 11,
+      "test_file": "test_session4.py"
+    },
+    "5": {
+      "verified": true,
+      "last_verification": "2026-02-11T21:00:00.000000",
+      "passed": 15,
+      "total": 15,
+      "test_file": "test_session5.py"
+    },
+    "6": {
+      "verified": true,
+      "last_verification": "2026-02-11T23:00:00.000000",
+      "passed": 16,
+      "total": 16,
+      "test_file": "test_session6.py"
+    },
+    "7": {
+      "verified": true,
+      "last_verification": "2026-02-12T01:00:00.000000",
+      "passed": 16,
+      "total": 16,
+      "test_file": "test_session7.py"
+    },
+    "8": {
+      "verified": true,
+      "last_verification": "2026-02-12T02:00:00.000000",
+      "passed": 13,
+      "total": 13,
+      "test_file": "test_session8.py"
+    },
+    "9": {
+      "verified": true,
+      "last_verification": "2026-02-12T03:00:00.000000",
+      "passed": 21,
+      "total": 21,
+      "test_file": "test_session9.py"
+    },
+    "10": {
+      "verified": true,
+      "last_verification": "2026-02-12T04:00:00.000000",
+      "passed": 20,
+      "total": 20,
+      "test_file": "test_session10.py"
+    }
+  }
+}

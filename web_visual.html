@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Game Server - Live Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #e0e0e0;
+    font-family: 'Consolas', 'Monaco', monospace;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 18px 0 10px;
+    background: linear-gradient(180deg, #12122a, #0a0a1a);
+    border-bottom: 1px solid #2a2a4a;
+  }
+  .header h1 {
+    font-size: 22px;
+    color: #7aa2f7;
+    letter-spacing: 2px;
+  }
+  .header .sub {
+    font-size: 12px;
+    color: #565f89;
+    margin-top: 4px;
+  }
+
+  .phase-bar {
+    text-align: center;
+    padding: 8px;
+    font-size: 14px;
+    color: #9ece6a;
+    background: #1a1a2e;
+  }
+
+  /* Load Balancing */
+  .lb-section {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 14px 20px;
+    background: #11112a;
+    border-bottom: 1px solid #1a1a3a;
+  }
+  .lb-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .lb-label { font-size: 13px; color: #7aa2f7; width: 80px; }
+  .lb-track {
+    width: 200px; height: 18px;
+    background: #1a1a3a;
+    border-radius: 9px;
+    overflow: hidden;
+  }
+  .lb-fill {
+    height: 100%;
+    border-radius: 9px;
+    transition: width 0.3s ease;
+  }
+  .lb-fill.s1 { background: linear-gradient(90deg, #7aa2f7, #3d59a1); }
+  .lb-fill.s2 { background: linear-gradient(90deg, #bb9af7, #7c3aed); }
+  .lb-val { font-size: 13px; color: #a9b1d6; width: 100px; }
+
+  /* Maps Grid */
+  .maps-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px 16px;
+  }
+  .map-box {
+    background: #11112a;
+    border: 1px solid #1a1a3a;
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .map-title {
+    font-size: 12px;
+    color: #565f89;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .map-title .count { color: #9ece6a; }
+  canvas {
+    width: 100%;
+    border-radius: 4px;
+    background: #0d0d20;
+  }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 10px 16px;
+  }
+  .stat-card {
+    background: #11112a;
+    border: 1px solid #1a1a3a;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-card .label {
+    font-size: 10px;
+    color: #565f89;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .stat-card .value {
+    font-size: 22px;
+    font-weight: bold;
+    margin-top: 4px;
+  }
+  .stat-card .value.blue { color: #7aa2f7; }
+  .stat-card .value.green { color: #9ece6a; }
+  .stat-card .value.purple { color: #bb9af7; }
+  .stat-card .value.orange { color: #ff9e64; }
+  .stat-card .value.red { color: #f7768e; }
+  .stat-card .value.cyan { color: #7dcfff; }
+
+  .stats-row2 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    padding: 0 16px 10px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 6px;
+    font-size: 12px;
+    color: #565f89;
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot.explorer { background: #7aa2f7; box-shadow: 0 0 6px #7aa2f7; }
+  .dot.homebody { background: #9ece6a; box-shadow: 0 0 6px #9ece6a; }
+  .dot.boundary { background: #ff9e64; box-shadow: 0 0 6px #ff9e64; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ECS GAME SERVER - LIVE DASHBOARD</h1>
+  <div class="sub">Real C++ IOCP Servers + Autonomous Bot Stress Test</div>
+</div>
+
+<div class="phase-bar" id="phase">Connecting...</div>
+
+<div class="lb-section">
+  <div class="lb-bar">
+    <div class="lb-label">Server 7777</div>
+    <div class="lb-track"><div class="lb-fill s1" id="lb1" style="width:0%"></div></div>
+    <div class="lb-val" id="lb1-val">0 (0%)</div>
+  </div>
+  <div class="lb-bar">
+    <div class="lb-label">Server 7778</div>
+    <div class="lb-track"><div class="lb-fill s2" id="lb2" style="width:0%"></div></div>
+    <div class="lb-val" id="lb2-val">0 (0%)</div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="dot explorer"></span> Explorer (zone traversal)</span>
+  <span><span class="dot homebody"></span> Homebody (local patrol)</span>
+  <span><span class="dot boundary"></span> Boundary (ghost trigger)</span>
+</div>
+
+<div class="maps-grid">
+  <div class="map-box">
+    <div class="map-title">
+      <span>Server 7777 / Zone 1</span>
+      <span class="count" id="cnt-7777-1">0 bots</span>
+    </div>
+    <canvas id="map-7777-1" width="480" height="300"></canvas>
+  </div>
+  <div class="map-box">
+    <div class="map-title">
+      <span>Server 7777 / Zone 2</span>
+      <span class="count" id="cnt-7777-2">0 bots</span>
+    </div>
+    <canvas id="map-7777-2" width="480" height="300"></canvas>
+  </div>
+  <div class="map-box">
+    <div class="map-title">
+      <span>Server 7778 / Zone 1</span>
+      <span class="count" id="cnt-7778-1">0 bots</span>
+    </div>
+    <canvas id="map-7778-1" width="480" height="300"></canvas>
+  </div>
+  <div class="map-box">
+    <div class="map-title">
+      <span>Server 7778 / Zone 2</span>
+      <span class="count" id="cnt-7778-2">0 bots</span>
+    </div>
+    <canvas id="map-7778-2" width="480" height="300"></canvas>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Connected</div>
+    <div class="value blue" id="st-connected">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">In Game</div>
+    <div class="value green" id="st-ingame">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Moves</div>
+    <div class="value purple" id="st-moves">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Errors</div>
+    <div class="value red" id="st-errors">0</div>
+  </div>
+</div>
+<div class="stats-row2">
+  <div class="stat-card">
+    <div class="label">Zone Changes</div>
+    <div class="value cyan" id="st-zones">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">APPEAR</div>
+    <div class="value green" id="st-appear">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">DISAPPEAR</div>
+    <div class="value orange" id="st-disappear">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">BROADCAST</div>
+    <div class="value purple" id="st-bcast">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Moves/sec</div>
+    <div class="value blue" id="st-mps">0</div>
+  </div>
+</div>
+
+<script>
+// Bot positions with interpolation
+let currentBots = {};   // {id: {port, zone, x, y, profile, tx, ty}}
+let serverDist = {};
+let lastMoves = 0;
+let lastMoveTime = Date.now();
+
+const COLORS = {
+  explorer:  { fill: '#7aa2f7', glow: 'rgba(122,162,247,0.4)' },
+  homebody:  { fill: '#9ece6a', glow: 'rgba(158,206,106,0.4)' },
+  boundary:  { fill: '#ff9e64', glow: 'rgba(255,158,100,0.4)' },
+};
+
+const WORLD = 1000;
+const BOUNDARY = 300;
+
+function drawMap(canvasId, bots) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Clear
+  ctx.fillStyle = '#0d0d20';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#1a1a3a';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 10; i++) {
+    const gx = (i / 10) * W;
+    const gy = (i / 10) * H;
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+  }
+
+  // Boundary lines (x=300, y=300)
+  const bx = (BOUNDARY / WORLD) * W;
+  const by = (BOUNDARY / WORLD) * H;
+
+  // Ghost zone highlight
+  ctx.fillStyle = 'rgba(255,158,100,0.03)';
+  // Near x=300 band
+  ctx.fillRect(bx - 40, 0, 80, H);
+  // Near y=300 band
+  ctx.fillRect(0, by - 25, W, 50);
+
+  ctx.strokeStyle = '#f7768e44';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, by); ctx.lineTo(W, by); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Boundary label
+  ctx.fillStyle = '#f7768e44';
+  ctx.font = '9px monospace';
+  ctx.fillText('boundary=300', bx + 3, 12);
+
+  // Draw bots
+  for (const bot of bots) {
+    const sx = (bot.x / WORLD) * W;
+    const sy = (bot.y / WORLD) * H;
+    const color = COLORS[bot.profile] || COLORS.explorer;
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = color.glow;
+    ctx.fill();
+
+    // Dot
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color.fill;
+    ctx.fill();
+  }
+
+  // Bot count watermark
+  ctx.fillStyle = '#2a2a4a';
+  ctx.font = 'bold 40px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(bots.length, W - 10, H - 10);
+  ctx.textAlign = 'left';
+}
+
+function updateUI(data) {
+  if (!data) return;
+
+  // Phase
+  document.getElementById('phase').textContent = data.stats.phase || '';
+
+  // Load balancing
+  const dist = data.server_dist || {};
+  const total = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
+  const ports = Object.keys(dist).sort();
+
+  if (ports.length >= 1) {
+    const v1 = dist[ports[0]] || 0;
+    const p1 = (v1 / total * 100);
+    document.getElementById('lb1').style.width = p1 + '%';
+    document.getElementById('lb1-val').textContent = `${v1} (${p1.toFixed(0)}%)`;
+  }
+  if (ports.length >= 2) {
+    const v2 = dist[ports[1]] || 0;
+    const p2 = (v2 / total * 100);
+    document.getElementById('lb2').style.width = p2 + '%';
+    document.getElementById('lb2-val').textContent = `${v2} (${p2.toFixed(0)}%)`;
+  }
+
+  // Update bot targets for interpolation
+  const newBots = {};
+  for (const b of (data.bots || [])) {
+    const key = b.id;
+    if (currentBots[key]) {
+      currentBots[key].tx = b.x;
+      currentBots[key].ty = b.y;
+      currentBots[key].port = b.port;
+      currentBots[key].zone = b.zone;
+      currentBots[key].profile = b.profile;
+    } else {
+      currentBots[key] = { ...b, tx: b.x, ty: b.y };
+    }
+    newBots[key] = true;
+  }
+  // Remove dead bots
+  for (const key in currentBots) {
+    if (!newBots[key]) delete currentBots[key];
+  }
+
+  // Stats
+  const s = data.stats;
+  document.getElementById('st-connected').textContent = (s.gate_ok || 0).toLocaleString();
+  document.getElementById('st-ingame').textContent = (s.enter_ok || 0).toLocaleString();
+  document.getElementById('st-moves').textContent = (s.moves_sent || 0).toLocaleString();
+  document.getElementById('st-errors').textContent = s.errors || 0;
+  document.getElementById('st-zones').textContent = s.zone_changes || 0;
+  document.getElementById('st-appear').textContent = (s.appear_count || 0).toLocaleString();
+  document.getElementById('st-disappear').textContent = (s.disappear_count || 0).toLocaleString();
+  document.getElementById('st-bcast').textContent = (s.bcast_count || 0).toLocaleString();
+
+  // Moves/sec
+  const now = Date.now();
+  const dt = (now - lastMoveTime) / 1000;
+  if (dt > 0.5) {
+    const mps = Math.round((s.moves_sent - lastMoves) / dt);
+    document.getElementById('st-mps').textContent = mps >= 0 ? mps : 0;
+    lastMoves = s.moves_sent;
+    lastMoveTime = now;
+  }
+}
+
+function renderFrame() {
+  // Interpolate positions
+  for (const key in currentBots) {
+    const b = currentBots[key];
+    b.x += (b.tx - b.x) * 0.15;
+    b.y += (b.ty - b.y) * 0.15;
+  }
+
+  // Group bots by server+zone
+  const groups = {};
+  for (const key in currentBots) {
+    const b = currentBots[key];
+    const gk = `${b.port}-${b.zone}`;
+    if (!groups[gk]) groups[gk] = [];
+    groups[gk].push(b);
+  }
+
+  // Draw each map
+  for (const port of [7777, 7778]) {
+    for (const zone of [1, 2]) {
+      const gk = `${port}-${zone}`;
+      const bots = groups[gk] || [];
+      drawMap(`map-${port}-${zone}`, bots);
+      document.getElementById(`cnt-${port}-${zone}`).textContent = `${bots.length} bots`;
+    }
+  }
+
+  requestAnimationFrame(renderFrame);
+}
+
+// Polling
+async function poll() {
+  try {
+    const resp = await fetch('/api/state');
+    const data = await resp.json();
+    updateUI(data);
+  } catch (e) {}
+  setTimeout(poll, 200);
+}
+
+poll();
+renderFrame();
+</script>
+</body>
+</html>

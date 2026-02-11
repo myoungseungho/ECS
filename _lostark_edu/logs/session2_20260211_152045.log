@@ -1,0 +1,78 @@
+Session 2 Verification Log
+Time: 2026-02-11T15:20:45.800250
+Result: 5/5
+============================================================
+
+=== BUILD ===
+Setting up MSVC environment...
+OK
+[1/6] Core\World.cpp
+World.cpp
+[2/6] NetworkEngine\IOCPServer.cpp
+IOCPServer.cpp
+[3/6] NetworkEngine\Session.cpp
+Session.cpp
+[4/6] Systems\NetworkSystem.cpp
+NetworkSystem.cpp
+[5/6] Systems\MessageDispatchSystem.cpp
+MessageDispatchSystem.cpp
+[6/6] Servers\FieldServer\main.cpp
+main.cpp
+[LINK] FieldServer.exe
+
+
+BUILD SUCCESS: C:\Users\gnidev0095\OneDrive\바탕 화면\Lost\GameServerSkeleton\build\FieldServer.exe
+
+
+=== TEST_SESSION2 ===
+============================================================
+  Session 2 Validation Test
+  Packet Protocol + Message Dispatch
+============================================================
+
+Server started (PID: 68232)
+
+--- Level 1: Basic Packet Echo ---
+  (packet protocol: send ECHO packet, get ECHO response)
+
+  [PASS] ECHO packet round-trip
+  [PASS] Empty payload ECHO
+  [PASS] 2KB payload ECHO
+
+--- Level 2: Packet Assembly ---
+  (split send, concatenated packets)
+
+  [PASS] Split send (1 byte at a time) reassembled
+  [PASS] 3 concatenated packets separated correctly
+  [PASS] All 3 payloads match
+  [PASS] 100-byte payload in 10-byte chunks
+
+--- Level 3: Message Dispatch ---
+  (different types get different handlers)
+
+  [PASS] PING -> PONG response
+  [PASS] STATS response received
+  [PASS] STATS contains entity_count
+  [PASS] Interleaved ECHO/PING/ECHO dispatch
+
+--- Level 4: Safety ---
+  (unknown type, server stability)
+
+  [PASS] Unknown type ignored, server alive
+  [PASS] Server process still running
+  [PASS] New connection after unknown type works
+
+
+============================================================
+  Result: 14/14 PASSED, 0 FAILED
+
+  +-------------------------------------------+
+  | SESSION 2 VALIDATION: ALL TESTS PASSED    |
+  |                                           |
+  | [O] Basic packet echo OK                  |
+  | [O] Packet assembly (split/concat) OK     |
+  | [O] Message dispatch (type routing) OK    |
+  | [O] Safety (unknown type handling) OK     |
+  +-------------------------------------------+
+============================================================
+
