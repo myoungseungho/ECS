@@ -38,3 +38,7 @@ UnityClient/**/*.sln
 *.pidb
 *.pdb.meta
 *.mdb.meta
+
+# Client validation artifacts
+UnityClient/GameClient/_validation/evidence/*.json
+UnityClient/GameClient/_validation/logs/*.log

@@ -1,0 +1,291 @@
+# Unity Client — Manager 간 상호작용 맵
+# AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
+# Manager 추가/수정 시 반드시 이 파일도 갱신
+
+version: session_13
+
+# ━━━ Manager 목록 및 의존 관계 ━━━
+
+managers:
+
+  - name: NetworkManager
+    namespace: Network
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "Gate→Field TCP 연결 관리 + 패킷 수신/발송 + 이벤트 디스패치"
+    reads:
+      - TCPClient._recvQueue (메인 스레드에서 DequeueAll)
+    writes:
+      - ConnectionState (State 프로퍼티)
+      - MyEntityId, CurrentZone, CurrentChannel
+    fires_events:
+      - OnLoginResult(LoginResult, uint)
+      - OnCharacterList(CharacterInfo[])
+      - OnEnterGame(EnterGameResult)
+      - OnEntityAppear(ulong, float, float, float)
+      - OnEntityDisappear(ulong)
+      - OnEntityMove(ulong, float, float, float)
+      - OnZoneChanged(int)
+      - OnChannelChanged(int)
+      - OnStatSync(StatSyncData)
+      - OnAttackResult(AttackResultData)
+      - OnCombatDied(CombatDiedData)
+      - OnRespawnResult(RespawnResultData)
+      - OnError(string)
+      - OnDisconnected()
+    subscribes_to: []
+    public_api:
+      - ConnectToGate()
+      - ConnectDirect(string, int)
+      - Login(string, string)
+      - RequestCharList()
+      - SelectCharacter(uint)
+      - JoinChannel(int)
+      - SendMove(float, float, float)
+      - EnterZone(int)
+      - RequestStatSync()
+      - SendAttack(ulong)
+      - RequestRespawn()
+      - DisconnectAll()
+
+  - name: GameManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "게임 상태 머신 (Login → CharSelect → InGame)"
+    reads: []
+    writes:
+      - CurrentState (GameState enum)
+    fires_events: []
+    subscribes_to:
+      - NetworkManager.OnLoginResult → CharSelect 전이
+      - NetworkManager.OnEnterGame → InGame 전이
+      - NetworkManager.OnDisconnected → Login 리셋
+
+  - name: EntityManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "엔티티 생명주기 관리 (생성/파괴/이동)"
+    reads:
+      - EntityPool.Instance (오브젝트 풀 접근)
+    writes:
+      - _entityMap (Dictionary<ulong, GameObject>)
+      - _localPlayer (GameObject)
+    fires_events: []
+    subscribes_to:
+      - NetworkManager.OnEnterGame → 로컬 플레이어 생성
+      - NetworkManager.OnEntityAppear → 리모트 플레이어 생성
+      - NetworkManager.OnEntityDisappear → 리모트 플레이어 제거
+      - NetworkManager.OnEntityMove → 리모트 플레이어 위치 업데이트
+      - NetworkManager.OnDisconnected → 전체 엔티티 정리
+    serialized_fields:
+      - localPlayerPrefab: GameObject (LocalPlayer.prefab)
+      - remotePlayerPrefab: GameObject (RemotePlayer.prefab)
+      - usePooling: bool (default true)
+
+  - name: EntityPool
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "RemotePlayer 오브젝트 풀링"
+    reads: []
+    writes:
+      - _pool (Queue<GameObject>)
+    fires_events: []
+    subscribes_to: []
+    serialized_fields:
+      - prefab: GameObject (RemotePlayer.prefab)
+      - preloadCount: int (default 50)
+
+  - name: StatsManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "내 캐릭터 스탯 동기화 및 관리"
+    reads: []
+    writes:
+      - Level, HP, MaxHP, MP, MaxMP, ATK, DEF, EXP, EXPNext
+    fires_events:
+      - OnStatsChanged()
+    subscribes_to:
+      - NetworkManager.OnStatSync → 스탯 데이터 갱신
+      - NetworkManager.OnEnterGame → 자동 STAT_QUERY 전송
+    public_api: []
+    computed_properties:
+      - IsAlive (HP > 0)
+      - HpRatio (HP / MaxHP)
+      - MpRatio (MP / MaxMP)
+      - ExpRatio (EXP / EXPNext)
+
+  - name: CombatManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "전투 관리 — 공격, 사망, 부활 처리"
+    reads:
+      - NetworkManager.Instance.MyEntityId (사망 판정)
+    writes:
+      - IsDead, SelectedTarget
+    fires_events:
+      - OnAttackFeedback(AttackResultData)
+      - OnEntityDied(CombatDiedData)
+      - OnRespawnComplete(RespawnResultData)
+    subscribes_to:
+      - NetworkManager.OnAttackResult → 공격 결과 전달
+      - NetworkManager.OnCombatDied → 사망 처리
+      - NetworkManager.OnRespawnResult → 부활 처리
+    public_api:
+      - SelectTarget(ulong)
+      - Attack(ulong)
+      - Respawn()
+
+# ━━━ Entity 컴포넌트 ━━━
+
+entities:
+
+  - name: LocalPlayer
+    namespace: (global)
+    attached_to: LocalPlayer.prefab
+    purpose: "내 캐릭터 — 입력 처리 + 카메라 추적 + 이동 전송"
+    reads:
+      - Input (WASD / GetAxis)
+      - Camera.main
+    writes:
+      - transform.position, transform.rotation
+      - Camera.main.transform (카메라 추적)
+    calls:
+      - NetworkManager.Instance.SendMove() (sendInterval 간격)
+      - CoordConverter.UnityToServer()
+    serialized_fields:
+      - moveSpeed: float (default 5)
+      - sendInterval: float (default 0.1)
+      - cameraOffset: Vector3 (default 0,15,-10)
+      - cameraSmoothSpeed: float (default 5)
+
+  - name: RemotePlayer
+    namespace: (global)
+    attached_to: RemotePlayer.prefab
+    purpose: "다른 플레이어 — 서버 위치로 보간 이동"
+    reads:
+      - _targetPos (SetTargetPosition으로 설정됨)
+    writes:
+      - transform.position, transform.rotation
+    calls: []
+    serialized_fields:
+      - lerpSpeed: float (default 10)
+
+# ━━━ 유틸리티 ━━━
+
+utilities:
+
+  - name: TCPClient
+    namespace: Network
+    purpose: "TCP 소켓 래퍼 — 백그라운드 수신 + 메인 스레드 디큐"
+    threading: "수신=백그라운드 스레드, 디큐=메인 스레드(Update)"
+    used_by: [NetworkManager]
+
+  - name: PacketBuilder
+    namespace: Network
+    purpose: "패킷 직렬화/역직렬화 (static 유틸리티)"
+    packet_format: "[4B Length LE][2B MsgType LE][Payload]"
+    used_by: [NetworkManager]
+
+  - name: CoordConverter
+    namespace: (global)
+    purpose: "서버↔Unity 좌표 변환"
+    conversion:
+      server_to_unity: "Vector3(sx * 0.1, 0, sy * 0.1)"
+      unity_to_server: "(pos.x * 10, pos.z * 10)"
+      server_range: "0~1000 x 0~1000 (2D)"
+      unity_range: "0~100 x 0~100 (3D, y=0)"
+    used_by: [EntityManager, LocalPlayer]
+
+  - name: ConnectionTest
+    namespace: (global)
+    purpose: "자동화된 접속 테스트 (Gate→Login→CharSelect→InGame)"
+    test_flow:
+      - ConnectToGate
+      - Login("hero", "pass123") after 1s
+      - SelectCharacter(1) on login success
+      - JoinChannel(1) on enter game
+      - Spacebar → random SendMove
+
+# ━━━ 데이터 흐름 ━━━
+
+data_flows:
+
+  - from: Server (TCP)
+    to: TCPClient
+    via: "TCP socket (background thread)"
+    description: "서버 바이트 스트림 수신 → ReceivedPacket 큐에 적재"
+
+  - from: TCPClient
+    to: NetworkManager
+    via: "DequeueAll() in Update()"
+    description: "메인 스레드에서 패킷 디큐 → 타입별 핸들러 호출"
+
+  - from: NetworkManager
+    to: GameManager
+    via: "C# events (OnLoginResult, OnEnterGame, OnDisconnected)"
+    description: "게임 상태 전이 트리거"
+
+  - from: NetworkManager
+    to: EntityManager
+    via: "C# events (OnEnterGame, OnEntityAppear/Disappear/Move)"
+    description: "엔티티 생명주기 관리"
+
+  - from: EntityManager
+    to: EntityPool
+    via: "Get()/Return() 직접 호출"
+    description: "RemotePlayer 오브젝트 풀링"
+
+  - from: NetworkManager
+    to: StatsManager
+    via: "C# events (OnStatSync, OnEnterGame)"
+    description: "스탯 동기화 + 게임 진입 시 자동 STAT_QUERY"
+
+  - from: NetworkManager
+    to: CombatManager
+    via: "C# events (OnAttackResult, OnCombatDied, OnRespawnResult)"
+    description: "전투 결과, 사망, 부활 이벤트 전달"
+
+  - from: StatsManager
+    to: HUDManager
+    via: "C# event (OnStatsChanged)"
+    description: "HP/MP/EXP/Level UI 갱신"
+
+  - from: CombatManager
+    to: CombatUI
+    via: "C# event (OnAttackFeedback)"
+    description: "데미지 텍스트 + 타겟 HP바 갱신"
+
+  - from: CombatManager
+    to: DeathUI
+    via: "C# events (OnEntityDied, OnRespawnComplete)"
+    description: "사망 패널 표시/숨김"
+
+  - from: LocalPlayer
+    to: NetworkManager
+    via: "SendMove() 직접 호출"
+    description: "WASD 입력 → 서버 이동 패킷 전송 (0.1초 간격)"
+
+  - from: EntityManager
+    to: RemotePlayer
+    via: "SetTargetPosition() 직접 호출"
+    description: "서버 위치 → 보간 타겟 설정"
+
+# ━━━ 좌표 변환 파이프라인 ━━━
+
+coordinate_pipeline:
+  description: "서버(2D 0~1000) ↔ Unity(3D 0~100) 변환"
+  steps:
+    - name: "서버 → Unity (수신)"
+      trigger: "OnEntityAppear, OnEntityMove, OnEnterGame"
+      function: "CoordConverter.ServerToUnity(sx, sy)"
+      mapping: "x=sx*0.1, y=0, z=sy*0.1"
+    - name: "Unity → 서버 (송신)"
+      trigger: "LocalPlayer.HandleMovement()"
+      function: "CoordConverter.UnityToServer(pos)"
+      mapping: "sx=pos.x*10, sy=pos.z*10"
+  warning: "서버 Y축 → Unity Z축 매핑에 주의"
