@@ -24,10 +24,17 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# Unity (UnityClient 폴더가 Unity 프로젝트가 되면 추가)
-# Library/
-# Temp/
-# Logs/
-# UserSettings/
-# *.csproj
-# *.sln (Unity 자동생성)
+# Unity
+**/Library/
+**/Temp/
+**/Logs/
+**/UserSettings/
+**/obj/
+*.csproj
+*.unityproj
+# Unity .sln은 무시 (서버 .sln은 이름이 다르므로 충돌 없음)
+UnityClient/**/*.sln
+# Unity 캐시
+*.pidb
+*.pdb.meta
+*.mdb.meta
