@@ -75,6 +75,13 @@ enum class MsgType : uint16_t {
     CONFIG_RESP     = 83,  // S→C: found(1) data_len(2) data(N) (CSV row as "k=v|k=v")
     EVENT_SUB_COUNT = 84,  // S→C: subscriber_count(4) queue_size(4)
 
+    // Session 12: Stats System
+    STAT_QUERY      = 90,  // C→S: 빈 페이로드 → 내 스탯 조회
+    STAT_SYNC       = 91,  // S→C: level(4) hp(4) max_hp(4) mp(4) max_mp(4) atk(4) def(4) exp(4) exp_next(4) = 36바이트
+    STAT_ADD_EXP    = 92,  // C→S: exp_amount(4) → EXP 추가 (테스트용)
+    STAT_TAKE_DMG   = 93,  // C→S: raw_damage(4) → 데미지 받기 (테스트용)
+    STAT_HEAL       = 94,  // C→S: heal_amount(4) → 힐 (테스트용)
+
     STATS       = 99,  // 내부 진단
 };
 

@@ -18,6 +18,8 @@
 #include "../../Core/EventBus.h"                   // Session 11
 #include "../../Core/ConfigLoader.h"               // Session 11
 #include "../../Systems/TimerSystem.h"             // Session 11
+#include "../../Components/StatsComponents.h"      // Session 12
+#include "../../Systems/StatsSystem.h"             // Session 12
 
 #include <cstdio>
 #include <cstdlib>
@@ -705,6 +707,15 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
     // 게임 진입: Component 부착
     login.state = LoginState::IN_GAME;
 
+    // Stats (Session 12)
+    auto job = static_cast<JobClass>(found->job_class);
+    auto stats = CreateStats(job, found->level);
+    if (!world.HasComponent<StatsComponent>(entity)) {
+        world.AddComponent(entity, stats);
+    } else {
+        world.GetComponent<StatsComponent>(entity) = stats;
+    }
+
     // Position
     if (!world.HasComponent<PositionComponent>(entity)) {
         world.AddComponent(entity, PositionComponent{});
@@ -758,6 +769,132 @@ void OnGhostQuery(World& world, Entity entity, const char* payload, int len) {
     std::memcpy(resp, &ghost_count, 4);
     auto pkt = BuildPacket(MsgType::GHOST_INFO, resp, 4);
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ━━━ Session 12: Stats System 핸들러 ━━━
+
+// 스탯 동기화 패킷 전송 헬퍼
+void SendStatSync(World& world, Entity entity) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+
+    // STAT_SYNC: level(4) hp(4) max_hp(4) mp(4) max_mp(4) atk(4) def(4) exp(4) exp_next(4) = 36바이트
+    char buf[36];
+    std::memcpy(buf,      &stats.level, 4);
+    std::memcpy(buf + 4,  &stats.hp, 4);
+    std::memcpy(buf + 8,  &stats.max_hp, 4);
+    std::memcpy(buf + 12, &stats.mp, 4);
+    std::memcpy(buf + 16, &stats.max_mp, 4);
+    std::memcpy(buf + 20, &stats.attack, 4);
+    std::memcpy(buf + 24, &stats.defense, 4);
+    std::memcpy(buf + 28, &stats.exp, 4);
+    std::memcpy(buf + 32, &stats.exp_to_next, 4);
+    auto pkt = BuildPacket(MsgType::STAT_SYNC, buf, 36);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    stats.stats_dirty = false;
+}
+
+// STAT_QUERY: 내 스탯 조회 (빈 페이로드)
+void OnStatQuery(World& world, Entity entity, const char* payload, int len) {
+    if (!world.HasComponent<StatsComponent>(entity)) {
+        // StatsComponent가 없으면 → 로그인 상태에 따라 자동 부착
+        if (world.HasComponent<LoginComponent>(entity)) {
+            auto& login = world.GetComponent<LoginComponent>(entity);
+            if (login.state >= LoginState::IN_GAME) {
+                // 계정DB에서 직업/레벨 가져오기
+                std::string uname(login.username);
+                auto& db = GetAccountDB();
+                auto it = db.find(uname);
+                JobClass job = JobClass::WARRIOR;
+                int32_t level = 1;
+                if (it != db.end() && !it->second.characters.empty()) {
+                    auto& c = it->second.characters[0];
+                    job = static_cast<JobClass>(c.job_class);
+                    level = c.level;
+                }
+                world.AddComponent(entity, CreateStats(job, level));
+            }
+        }
+    }
+    SendStatSync(world, entity);
+}
+
+// STAT_ADD_EXP: EXP 추가 (테스트용)
+// 페이로드: [exp_amount(4 int)]
+void OnStatAddExp(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) return;
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+
+    int32_t amount;
+    std::memcpy(&amount, payload, 4);
+
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+    int old_level = stats.level;
+    bool leveled = stats.AddExp(amount);
+
+    if (leveled) {
+        printf("[Stats] Entity %llu: LEVEL UP %d -> %d\n", entity, old_level, stats.level);
+        // EventBus에 이벤트 발행 (미래 시스템용)
+        if (g_eventBus) {
+            Event evt;
+            evt.type = EventType::CUSTOM_1;  // LEVEL_UP 용도
+            evt.source = entity;
+            evt.param1 = old_level;
+            evt.param2 = stats.level;
+            g_eventBus->Publish(evt);
+        }
+    }
+
+    SendStatSync(world, entity);
+    printf("[Stats] Entity %llu: +%d EXP (total %d/%d, lv%d)\n",
+           entity, amount, stats.exp, stats.exp_to_next, stats.level);
+}
+
+// STAT_TAKE_DMG: 데미지 받기 (테스트용)
+// 페이로드: [raw_damage(4 int)]
+void OnStatTakeDmg(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) return;
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+
+    int32_t raw_damage;
+    std::memcpy(&raw_damage, payload, 4);
+
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+    int actual = stats.TakeDamage(raw_damage);
+
+    printf("[Stats] Entity %llu: took %d damage (raw %d), HP=%d/%d\n",
+           entity, actual, raw_damage, stats.hp, stats.max_hp);
+
+    if (!stats.IsAlive()) {
+        printf("[Stats] Entity %llu: DIED!\n", entity);
+        if (g_eventBus) {
+            Event evt;
+            evt.type = EventType::ENTITY_DIED;
+            evt.source = entity;
+            g_eventBus->Publish(evt);
+        }
+    }
+
+    SendStatSync(world, entity);
+}
+
+// STAT_HEAL: 힐 (테스트용)
+// 페이로드: [heal_amount(4 int)]
+void OnStatHeal(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) return;
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+
+    int32_t heal_amount;
+    std::memcpy(&heal_amount, payload, 4);
+
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+    int actual = stats.Heal(heal_amount);
+
+    printf("[Stats] Entity %llu: healed %d (requested %d), HP=%d/%d\n",
+           entity, actual, heal_amount, stats.hp, stats.max_hp);
+
+    SendStatSync(world, entity);
 }
 
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
@@ -917,8 +1054,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 11\n");
-    printf("  Infrastructure (Event+Timer+Config)\n");
+    printf("  ECS Field Server - Session 12\n");
+    printf("  Stats System (HP/MP/ATK/DEF/EXP)\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -989,11 +1126,16 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::TIMER_INFO, OnTimerInfo);            // Session 11
     dispatch.RegisterHandler(MsgType::CONFIG_QUERY, OnConfigQuery);        // Session 11
     dispatch.RegisterHandler(MsgType::EVENT_SUB_COUNT, OnEventSubCount);   // Session 11
+    dispatch.RegisterHandler(MsgType::STAT_QUERY, OnStatQuery);            // Session 12
+    dispatch.RegisterHandler(MsgType::STAT_ADD_EXP, OnStatAddExp);         // Session 12
+    dispatch.RegisterHandler(MsgType::STAT_TAKE_DMG, OnStatTakeDmg);       // Session 12
+    dispatch.RegisterHandler(MsgType::STAT_HEAL, OnStatHeal);              // Session 12
 
     world.AddSystem<InterestSystem>(network);
     world.AddSystem<BroadcastSystem>(network);
     world.AddSystem<GhostSystem>(network);          // Session 8
     world.AddSystem<TimerSystem>(eventBus);          // Session 11
+    world.AddSystem<StatsSystem>(eventBus);          // Session 12
 
     printf("\n[Main] Server running. Press Ctrl+C to stop.\n");
     printf("[Main] Listening on port %d, tick rate: %.0f/s\n\n", port, TICK_RATE);
