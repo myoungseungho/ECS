@@ -22,3 +22,12 @@ nul
 # OS
 Thumbs.db
 desktop.ini
+.DS_Store
+
+# Unity (UnityClient 폴더가 Unity 프로젝트가 되면 추가)
+# Library/
+# Temp/
+# Logs/
+# UserSettings/
+# *.csproj
+# *.sln (Unity 자동생성)
