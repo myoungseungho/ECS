@@ -74,6 +74,23 @@ def drain(sock, wait=0.2):
         pass
     sock.settimeout(5.0)
 
+def recv_my_attack_result(sock, my_eid, timeout=5.0):
+    """내 공격 결과(ATTACK_RESULT)만 필터링 (Session 14 몬스터 공격 101 무시)"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        try:
+            msg_type, payload = recv_packet(sock, timeout=remaining)
+            if msg_type == 101:
+                r = parse_attack_result(payload)
+                if r and r['attacker'] == my_eid:
+                    return msg_type, payload
+        except (socket.timeout, OSError):
+            break
+    raise TimeoutError("Timed out waiting for my ATTACK_RESULT")
+
 def connect_and_login(host='127.0.0.1', field_port=7777, username='hero',
                       password='pass123', char_id=1):
     """FieldServer 직접 연결 → Login → CharSelect → Channel Join"""
@@ -269,9 +286,11 @@ def test_kill_and_exp():
         assert exp_gained == 200, f"Expected +200 EXP, got +{exp_gained}"
 
         # 사망한 타겟 재공격 → TARGET_DEAD
+        # (몬스터 공격 101이 섞일 수 있으므로 attacker 필터링)
         time.sleep(1.6)  # 쿨타임 대기
+        drain(sock_a, wait=0.3)  # 대기 중 도착한 몬스터 공격 정리
         sock_a.sendall(build_packet(100, struct.pack('<Q', eid_b)))
-        msg_type, payload = recv_packet_type(sock_a, 101)
+        msg_type, payload = recv_my_attack_result(sock_a, eid_a)
         r = parse_attack_result(payload)
         assert r['result'] == 2, f"Expected TARGET_DEAD(2), got {r['result']}"
     finally:

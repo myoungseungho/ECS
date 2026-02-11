@@ -22,6 +22,8 @@
 #include "../../Systems/StatsSystem.h"             // Session 12
 #include "../../Components/CombatComponents.h"     // Session 13
 #include "../../Systems/CombatSystem.h"            // Session 13
+#include "../../Components/MonsterComponents.h"    // Session 14
+#include "../../Systems/MonsterAISystem.h"         // Session 14
 
 #include <cstdio>
 #include <cstdlib>
@@ -41,6 +43,10 @@ IOCPServer* g_network = nullptr;
 EventBus* g_eventBus = nullptr;           // Session 11
 ConfigLoader* g_config = nullptr;         // Session 11
 int g_total_events_fired = 0;             // Session 11: 이벤트 발행 카운터
+
+// Session 14: 전방 선언
+void SpawnMonsters(World& world);
+void SendZoneMonsters(World& world, Entity player_entity);
 
 // ━━━ 메시지 핸들러 ━━━
 
@@ -760,6 +766,9 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
 
     printf("[CharSelect] Entity %llu: selected char '%s' (id=%u, zone=%d, pos=%.0f,%.0f)\n",
            entity, found->name, char_id, found->zone_id, found->x, found->y);
+
+    // Session 14: 같은 존의 몬스터 정보 전송
+    SendZoneMonsters(world, entity);
 }
 
 // GHOST_QUERY 핸들러 (Session 8): Ghost 수 조회
@@ -904,6 +913,77 @@ void OnStatHeal(World& world, Entity entity, const char* payload, int len) {
     SendStatSync(world, entity);
 }
 
+// ━━━ Session 14: Monster Spawning ━━━
+
+void SpawnMonsters(World& world) {
+    for (int i = 0; i < MONSTER_SPAWN_COUNT; i++) {
+        auto& spawn = MONSTER_SPAWNS[i];
+        Entity e = world.CreateEntity();
+
+        MonsterComponent mc{};
+        mc.monster_id = spawn.monster_id;
+        std::strncpy(mc.name, spawn.name, 31);
+        mc.state = MonsterState::IDLE;
+        mc.spawn_x = spawn.x;
+        mc.spawn_y = spawn.y;
+        mc.spawn_z = spawn.z;
+        mc.aggro_range = spawn.aggro_range;
+        mc.respawn_time = spawn.respawn_time;
+        mc.target_entity = 0;
+        world.AddComponent(e, mc);
+
+        StatsComponent stats = CreateMonsterStats(spawn.level, spawn.hp, spawn.attack, spawn.defense);
+        world.AddComponent(e, stats);
+
+        CombatComponent combat;
+        combat.attack_range = 200.0f;
+        combat.attack_cooldown = 2.0f;
+        world.AddComponent(e, combat);
+
+        PositionComponent pos;
+        pos.x = spawn.x;
+        pos.y = spawn.y;
+        pos.z = spawn.z;
+        world.AddComponent(e, pos);
+
+        world.AddComponent(e, ZoneComponent{spawn.zone_id});
+
+        printf("[Spawn] Monster '%s' (id=%u, lv%d) at (%.0f, %.0f) zone %d -> Entity %llu\n",
+               spawn.name, spawn.monster_id, spawn.level, spawn.x, spawn.y, spawn.zone_id, e);
+    }
+}
+
+void SendZoneMonsters(World& world, Entity player_entity) {
+    if (!world.HasComponent<SessionComponent>(player_entity)) return;
+    if (!world.HasComponent<ZoneComponent>(player_entity)) return;
+
+    auto& session = world.GetComponent<SessionComponent>(player_entity);
+    int player_zone = world.GetComponent<ZoneComponent>(player_entity).zone_id;
+
+    world.ForEach<MonsterComponent, StatsComponent, PositionComponent>(
+        [&](Entity monster, MonsterComponent& mc, StatsComponent& ms,
+            PositionComponent& mp) {
+            if (!world.HasComponent<ZoneComponent>(monster)) return;
+            if (world.GetComponent<ZoneComponent>(monster).zone_id != player_zone) return;
+            if (mc.state == MonsterState::DEAD) return;
+
+            // MONSTER_SPAWN: entity(8) monster_id(4) level(4) hp(4) max_hp(4) x(4) y(4) z(4)
+            char buf[36];
+            std::memcpy(buf, &monster, 8);
+            std::memcpy(buf + 8, &mc.monster_id, 4);
+            std::memcpy(buf + 12, &ms.level, 4);
+            std::memcpy(buf + 16, &ms.hp, 4);
+            std::memcpy(buf + 20, &ms.max_hp, 4);
+            std::memcpy(buf + 24, &mp.x, 4);
+            std::memcpy(buf + 28, &mp.y, 4);
+            std::memcpy(buf + 32, &mp.z, 4);
+            auto pkt = BuildPacket(MsgType::MONSTER_SPAWN, buf, 36);
+            g_network->SendTo(session.session_id,
+                              pkt.data(), static_cast<int>(pkt.size()));
+        }
+    );
+}
+
 // ━━━ Session 13: Combat System 핸들러 ━━━
 
 // 공격 결과 전송 헬퍼
@@ -953,8 +1033,10 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
         return;
     }
 
-    // 타겟 존재 확인
-    if (!world.HasComponent<SessionComponent>(target) ||
+    // 타겟 존재 확인 (플레이어 또는 몬스터)
+    bool target_is_player = world.HasComponent<SessionComponent>(target);
+    bool target_is_monster = world.HasComponent<MonsterComponent>(target);
+    if ((!target_is_player && !target_is_monster) ||
         !world.HasComponent<StatsComponent>(target)) {
         SendAttackResult(world, entity, target, AttackResult::TARGET_NOT_FOUND, 0, 0, 0);
         return;
@@ -1010,27 +1092,39 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
     SendAttackResult(world, entity, target, AttackResult::SUCCESS,
                      damage, tgt_stats.hp, tgt_stats.max_hp);
 
-    // 피격자에게 스탯 동기화
-    SendStatSync(world, target);
+    // 피격자가 플레이어면 스탯 동기화
+    if (target_is_player) {
+        SendStatSync(world, target);
+    }
 
     // 사망 처리
     if (!tgt_stats.IsAlive()) {
         printf("[Combat] Entity %llu killed by Entity %llu!\n", target, entity);
 
-        // COMBAT_DIED 전송 (공격자 + 피격자)
+        // COMBAT_DIED 전송
         char died_buf[16];
         std::memcpy(died_buf, &target, 8);
         std::memcpy(died_buf + 8, &entity, 8);
         auto died_pkt = BuildPacket(MsgType::COMBAT_DIED, died_buf, 16);
 
+        // 공격자에게 전송
         auto& atk_session = world.GetComponent<SessionComponent>(entity);
         g_network->SendTo(atk_session.session_id,
                           died_pkt.data(), static_cast<int>(died_pkt.size()));
 
-        if (world.HasComponent<SessionComponent>(target)) {
+        // 피격자가 플레이어면 피격자에게도 전송
+        if (target_is_player) {
             auto& tgt_session = world.GetComponent<SessionComponent>(target);
             g_network->SendTo(tgt_session.session_id,
                               died_pkt.data(), static_cast<int>(died_pkt.size()));
+        }
+
+        // 몬스터 사망: 상태 변경 + 리스폰 타이머
+        if (target_is_monster) {
+            auto& monster = world.GetComponent<MonsterComponent>(target);
+            monster.state = MonsterState::DEAD;
+            monster.death_timer = monster.respawn_time;
+            monster.target_entity = 0;
         }
 
         // EXP 보상
@@ -1272,8 +1366,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 13\n");
-    printf("  Combat System (Attack/Kill/Respawn)\n");
+    printf("  ECS Field Server - Session 14\n");
+    printf("  Monster/NPC System (PvE Combat)\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -1351,12 +1445,16 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::ATTACK_REQ, OnAttackReq);            // Session 13
     dispatch.RegisterHandler(MsgType::RESPAWN_REQ, OnRespawnReq);          // Session 13
 
+    world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);
     world.AddSystem<BroadcastSystem>(network);
     world.AddSystem<GhostSystem>(network);          // Session 8
     world.AddSystem<TimerSystem>(eventBus);          // Session 11
     world.AddSystem<StatsSystem>(eventBus);          // Session 12
     world.AddSystem<CombatSystem>();                  // Session 13
+
+    // Session 14: 몬스터 스폰
+    SpawnMonsters(world);
 
     printf("\n[Main] Server running. Press Ctrl+C to stop.\n");
     printf("[Main] Listening on port %d, tick rate: %.0f/s\n\n", port, TICK_RATE);

@@ -89,6 +89,10 @@ enum class MsgType : uint16_t {
     RESPAWN_REQ     = 103, // C→S: 빈 페이로드
     RESPAWN_RESULT  = 104, // S→C: [result(1) hp(4) mp(4) x(4) y(4) z(4)] = 21바이트
 
+    // Session 14: Monster/NPC System
+    MONSTER_SPAWN   = 110, // S→C: [entity(8) monster_id(4) level(4) hp(4) max_hp(4) x(4) y(4) z(4)] = 36바이트
+    MONSTER_RESPAWN = 113, // S→C: [entity(8) hp(4) max_hp(4) x(4) y(4) z(4)] = 28바이트
+
     STATS       = 99,  // 내부 진단
 };
 
