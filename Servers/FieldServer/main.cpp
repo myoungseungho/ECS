@@ -20,6 +20,8 @@
 #include "../../Systems/TimerSystem.h"             // Session 11
 #include "../../Components/StatsComponents.h"      // Session 12
 #include "../../Systems/StatsSystem.h"             // Session 12
+#include "../../Components/CombatComponents.h"     // Session 13
+#include "../../Systems/CombatSystem.h"            // Session 13
 
 #include <cstdio>
 #include <cstdlib>
@@ -716,6 +718,11 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
         world.GetComponent<StatsComponent>(entity) = stats;
     }
 
+    // Combat (Session 13)
+    if (!world.HasComponent<CombatComponent>(entity)) {
+        world.AddComponent(entity, CombatComponent{});
+    }
+
     // Position
     if (!world.HasComponent<PositionComponent>(entity)) {
         world.AddComponent(entity, PositionComponent{});
@@ -897,6 +904,217 @@ void OnStatHeal(World& world, Entity entity, const char* payload, int len) {
     SendStatSync(world, entity);
 }
 
+// ━━━ Session 13: Combat System 핸들러 ━━━
+
+// 공격 결과 전송 헬퍼
+void SendAttackResult(World& world, Entity attacker, Entity target,
+                      AttackResult result, int32_t damage,
+                      int32_t target_hp, int32_t target_max_hp) {
+    auto& session = world.GetComponent<SessionComponent>(attacker);
+    char buf[29];
+    buf[0] = static_cast<uint8_t>(result);
+    std::memcpy(buf + 1, &attacker, 8);
+    std::memcpy(buf + 9, &target, 8);
+    std::memcpy(buf + 17, &damage, 4);
+    std::memcpy(buf + 21, &target_hp, 4);
+    std::memcpy(buf + 25, &target_max_hp, 4);
+    auto pkt = BuildPacket(MsgType::ATTACK_RESULT, buf, 29);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ATTACK_REQ 핸들러: 타겟 공격
+// 페이로드: [target_entity(8)]
+void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
+    if (len < 8) return;
+
+    Entity target;
+    std::memcpy(&target, payload, 8);
+
+    // 자기 자신 공격 불가
+    if (target == entity) {
+        SendAttackResult(world, entity, target, AttackResult::SELF_ATTACK, 0, 0, 0);
+        return;
+    }
+
+    // CombatComponent 자동 부착
+    if (!world.HasComponent<CombatComponent>(entity)) {
+        world.AddComponent(entity, CombatComponent{});
+    }
+    auto& combat = world.GetComponent<CombatComponent>(entity);
+
+    // 공격자 상태 확인
+    if (!world.HasComponent<StatsComponent>(entity)) {
+        SendAttackResult(world, entity, target, AttackResult::ATTACKER_DEAD, 0, 0, 0);
+        return;
+    }
+    auto& atk_stats = world.GetComponent<StatsComponent>(entity);
+    if (!atk_stats.IsAlive()) {
+        SendAttackResult(world, entity, target, AttackResult::ATTACKER_DEAD, 0, 0, 0);
+        return;
+    }
+
+    // 타겟 존재 확인
+    if (!world.HasComponent<SessionComponent>(target) ||
+        !world.HasComponent<StatsComponent>(target)) {
+        SendAttackResult(world, entity, target, AttackResult::TARGET_NOT_FOUND, 0, 0, 0);
+        return;
+    }
+    auto& tgt_stats = world.GetComponent<StatsComponent>(target);
+
+    // 타겟 사망 확인
+    if (!tgt_stats.IsAlive()) {
+        SendAttackResult(world, entity, target, AttackResult::TARGET_DEAD, 0, 0, 0);
+        return;
+    }
+
+    // 사거리 확인
+    if (world.HasComponent<PositionComponent>(entity) &&
+        world.HasComponent<PositionComponent>(target)) {
+        auto& atk_pos = world.GetComponent<PositionComponent>(entity);
+        auto& tgt_pos = world.GetComponent<PositionComponent>(target);
+
+        float dist = DistanceBetween(atk_pos, tgt_pos);
+        if (dist > combat.attack_range) {
+            SendAttackResult(world, entity, target, AttackResult::OUT_OF_RANGE,
+                             0, tgt_stats.hp, tgt_stats.max_hp);
+            return;
+        }
+    }
+
+    // 존 확인 (같은 존에서만 공격 가능)
+    if (world.HasComponent<ZoneComponent>(entity) &&
+        world.HasComponent<ZoneComponent>(target)) {
+        if (world.GetComponent<ZoneComponent>(entity).zone_id !=
+            world.GetComponent<ZoneComponent>(target).zone_id) {
+            SendAttackResult(world, entity, target, AttackResult::OUT_OF_RANGE,
+                             0, tgt_stats.hp, tgt_stats.max_hp);
+            return;
+        }
+    }
+
+    // 쿨타임 확인
+    if (combat.cooldown_remaining > 0) {
+        SendAttackResult(world, entity, target, AttackResult::COOLDOWN_NOT_READY,
+                         0, tgt_stats.hp, tgt_stats.max_hp);
+        return;
+    }
+
+    // ━━━ 전투 실행 ━━━
+    int32_t damage = tgt_stats.TakeDamage(atk_stats.attack);
+    combat.cooldown_remaining = combat.attack_cooldown;
+
+    printf("[Combat] Entity %llu attacked Entity %llu: %d damage (HP: %d/%d)\n",
+           entity, target, damage, tgt_stats.hp, tgt_stats.max_hp);
+
+    // 공격 결과 전송
+    SendAttackResult(world, entity, target, AttackResult::SUCCESS,
+                     damage, tgt_stats.hp, tgt_stats.max_hp);
+
+    // 피격자에게 스탯 동기화
+    SendStatSync(world, target);
+
+    // 사망 처리
+    if (!tgt_stats.IsAlive()) {
+        printf("[Combat] Entity %llu killed by Entity %llu!\n", target, entity);
+
+        // COMBAT_DIED 전송 (공격자 + 피격자)
+        char died_buf[16];
+        std::memcpy(died_buf, &target, 8);
+        std::memcpy(died_buf + 8, &entity, 8);
+        auto died_pkt = BuildPacket(MsgType::COMBAT_DIED, died_buf, 16);
+
+        auto& atk_session = world.GetComponent<SessionComponent>(entity);
+        g_network->SendTo(atk_session.session_id,
+                          died_pkt.data(), static_cast<int>(died_pkt.size()));
+
+        if (world.HasComponent<SessionComponent>(target)) {
+            auto& tgt_session = world.GetComponent<SessionComponent>(target);
+            g_network->SendTo(tgt_session.session_id,
+                              died_pkt.data(), static_cast<int>(died_pkt.size()));
+        }
+
+        // EXP 보상
+        int32_t exp_reward = CalcKillExp(tgt_stats.level);
+        int old_level = atk_stats.level;
+        bool leveled = atk_stats.AddExp(exp_reward);
+
+        printf("[Combat] Entity %llu: +%d EXP from kill\n", entity, exp_reward);
+
+        if (leveled) {
+            printf("[Combat] Entity %llu: LEVEL UP %d -> %d\n",
+                   entity, old_level, atk_stats.level);
+        }
+
+        // 공격자 스탯 동기화 (EXP 변경)
+        SendStatSync(world, entity);
+
+        // ENTITY_DIED 이벤트
+        if (g_eventBus) {
+            Event evt;
+            evt.type = EventType::ENTITY_DIED;
+            evt.source = target;
+            evt.target = entity;  // killer
+            g_eventBus->Publish(evt);
+        }
+    }
+}
+
+// RESPAWN_REQ 핸들러: 부활 요청
+// 빈 페이로드
+void OnRespawnReq(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    if (!world.HasComponent<StatsComponent>(entity)) {
+        char resp[21] = {};
+        resp[0] = 1;  // 에러
+        auto pkt = BuildPacket(MsgType::RESPAWN_RESULT, resp, 21);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+
+    if (stats.IsAlive()) {
+        char resp[21] = {};
+        resp[0] = 1;  // 살아있음 → 부활 불필요
+        auto pkt = BuildPacket(MsgType::RESPAWN_RESULT, resp, 21);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // HP/MP 전회복
+    stats.hp = stats.max_hp;
+    stats.mp = stats.max_mp;
+    stats.stats_dirty = true;
+
+    // 스폰 위치로 이동
+    float spawn_x = 100.0f, spawn_y = 100.0f, spawn_z = 0.0f;
+    if (world.HasComponent<PositionComponent>(entity)) {
+        auto& pos = world.GetComponent<PositionComponent>(entity);
+        pos.x = spawn_x;
+        pos.y = spawn_y;
+        pos.z = spawn_z;
+        pos.position_dirty = true;
+    }
+
+    // 응답: [result(1) hp(4) mp(4) x(4) y(4) z(4)]
+    char resp[21];
+    resp[0] = 0;  // 성공
+    std::memcpy(resp + 1, &stats.hp, 4);
+    std::memcpy(resp + 5, &stats.mp, 4);
+    std::memcpy(resp + 9, &spawn_x, 4);
+    std::memcpy(resp + 13, &spawn_y, 4);
+    std::memcpy(resp + 17, &spawn_z, 4);
+    auto pkt = BuildPacket(MsgType::RESPAWN_RESULT, resp, 21);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    // 스탯 동기화
+    SendStatSync(world, entity);
+
+    printf("[Combat] Entity %llu: RESPAWNED at (%.0f, %.0f)\n",
+           entity, spawn_x, spawn_y);
+}
+
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
 
 // TIMER_ADD: 타이머 추가
@@ -1054,8 +1272,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 12\n");
-    printf("  Stats System (HP/MP/ATK/DEF/EXP)\n");
+    printf("  ECS Field Server - Session 13\n");
+    printf("  Combat System (Attack/Kill/Respawn)\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -1130,12 +1348,15 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::STAT_ADD_EXP, OnStatAddExp);         // Session 12
     dispatch.RegisterHandler(MsgType::STAT_TAKE_DMG, OnStatTakeDmg);       // Session 12
     dispatch.RegisterHandler(MsgType::STAT_HEAL, OnStatHeal);              // Session 12
+    dispatch.RegisterHandler(MsgType::ATTACK_REQ, OnAttackReq);            // Session 13
+    dispatch.RegisterHandler(MsgType::RESPAWN_REQ, OnRespawnReq);          // Session 13
 
     world.AddSystem<InterestSystem>(network);
     world.AddSystem<BroadcastSystem>(network);
     world.AddSystem<GhostSystem>(network);          // Session 8
     world.AddSystem<TimerSystem>(eventBus);          // Session 11
     world.AddSystem<StatsSystem>(eventBus);          // Session 12
+    world.AddSystem<CombatSystem>();                  // Session 13
 
     printf("\n[Main] Server running. Press Ctrl+C to stop.\n");
     printf("[Main] Listening on port %d, tick rate: %.0f/s\n\n", port, TICK_RATE);

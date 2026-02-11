@@ -82,6 +82,13 @@ enum class MsgType : uint16_t {
     STAT_TAKE_DMG   = 93,  // C→S: raw_damage(4) → 데미지 받기 (테스트용)
     STAT_HEAL       = 94,  // C→S: heal_amount(4) → 힐 (테스트용)
 
+    // Session 13: Combat System
+    ATTACK_REQ      = 100, // C→S: [target_entity(8)]
+    ATTACK_RESULT   = 101, // S→C: [result(1) attacker(8) target(8) damage(4) target_hp(4) target_max_hp(4)] = 29바이트
+    COMBAT_DIED     = 102, // S→C: [dead_entity(8) killer_entity(8)] = 16바이트
+    RESPAWN_REQ     = 103, // C→S: 빈 페이로드
+    RESPAWN_RESULT  = 104, // S→C: [result(1) hp(4) mp(4) x(4) y(4) z(4)] = 21바이트
+
     STATS       = 99,  // 내부 진단
 };
 

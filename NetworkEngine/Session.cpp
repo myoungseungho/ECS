@@ -21,11 +21,14 @@ void NetSession::Init(SOCKET sock, uint64_t id) {
 }
 
 void NetSession::Close() {
+    // atomic CAS로 한 번만 실행 보장 (다중 워커 스레드 안전)
+    bool expected = true;
+    if (!connected_.compare_exchange_strong(expected, false)) return;
+
     if (socket_ != INVALID_SOCKET) {
         closesocket(socket_);
         socket_ = INVALID_SOCKET;
     }
-    connected_ = false;
 }
 
 bool NetSession::PostRecv() {

@@ -134,18 +134,37 @@ void IOCPServer::WorkerThread() {
         if (!ok && ov == nullptr) break;
         if (key == 0 && ov == nullptr) break;
 
-        NetSession* session = reinterpret_cast<NetSession*>(key);
+        // key = session ID (raw pointer 아님 — use-after-free 방지)
+        uint64_t session_id = static_cast<uint64_t>(key);
         OverlappedEx* ov_ex = reinterpret_cast<OverlappedEx*>(ov);
 
+        // 세션을 ID로 안전하게 조회
+        NetSession* session = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(session_mutex_);
+            auto it = sessions_.find(session_id);
+            if (it != sessions_.end() && it->second->IsConnected()) {
+                session = it->second.get();
+            }
+        }
+
         if (!ok || bytes == 0) {
-            // 연결 종료
+            // 연결 종료 또는 I/O 실패
             if (ov_ex && ov_ex->io_type == IOType::SEND) {
-                // 송신 완료 + 정리
                 delete[] ov_ex->wsa_buf.buf;
                 delete ov_ex;
             }
             if (session) {
                 OnDisconnect(session);
+            }
+            continue;
+        }
+
+        // 세션이 이미 정리된 경우 (다른 워커가 먼저 처리)
+        if (!session) {
+            if (ov_ex && ov_ex->io_type == IOType::SEND) {
+                delete[] ov_ex->wsa_buf.buf;
+                delete ov_ex;
             }
             continue;
         }
@@ -170,11 +189,11 @@ void IOCPServer::OnAccept(SOCKET client_sock) {
     auto session = std::make_unique<NetSession>();
     session->Init(client_sock, sid);
 
-    // IOCP에 소켓 등록
+    // IOCP에 소켓 등록 (session ID를 키로 사용 — raw pointer 대신)
     HANDLE h = CreateIoCompletionPort(
         reinterpret_cast<HANDLE>(client_sock),
         iocp_,
-        reinterpret_cast<ULONG_PTR>(session.get()),
+        static_cast<ULONG_PTR>(sid),
         0);
 
     if (!h) {
@@ -222,14 +241,18 @@ void IOCPServer::OnSend(OverlappedEx* ov) {
 
 void IOCPServer::OnDisconnect(NetSession* session) {
     if (!session) return;
+    // connected_ 플래그로 이중 호출 방지 (atomic)
+    if (!session->IsConnected()) return;
+
     uint64_t sid = session->GetId();
+    session->Close();  // 소켓 닫기 + connected_ = false
 
     printf("[IOCP] Client disconnected: session %llu\n", sid);
 
     PushEvent({IOCPEvent::Type::DISCONNECTED, sid, {}});
 
-    std::lock_guard<std::mutex> lock(session_mutex_);
-    sessions_.erase(sid);
+    // sessions_에서 즉시 제거하지 않음 — 다른 워커 스레드가 아직 포인터를 쓸 수 있음
+    // PollEvents에서 정리
 }
 
 void IOCPServer::PushEvent(IOCPEvent event) {
@@ -238,6 +261,18 @@ void IOCPServer::PushEvent(IOCPEvent event) {
 }
 
 std::vector<IOCPEvent> IOCPServer::PollEvents() {
+    // 연결 해제된 세션 정리 (메인 스레드에서 안전하게)
+    {
+        std::lock_guard<std::mutex> lock(session_mutex_);
+        for (auto it = sessions_.begin(); it != sessions_.end(); ) {
+            if (!it->second->IsConnected()) {
+                it = sessions_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
     std::lock_guard<std::mutex> lock(event_mutex_);
     std::vector<IOCPEvent> events;
     events.swap(event_queue_);
@@ -247,7 +282,7 @@ std::vector<IOCPEvent> IOCPServer::PollEvents() {
 bool IOCPServer::SendTo(uint64_t session_id, const char* data, int len) {
     std::lock_guard<std::mutex> lock(session_mutex_);
     auto it = sessions_.find(session_id);
-    if (it == sessions_.end()) return false;
+    if (it == sessions_.end() || !it->second->IsConnected()) return false;
     return it->second->PostSend(data, len);
 }
 
