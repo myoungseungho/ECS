@@ -43,6 +43,7 @@ except ImportError:
 POLL_INTERVAL = 300         # 폴링 간격 (초) - 5분
 MAX_CONSECUTIVE_IDLE = 999  # idle이어도 간격 안 늘림 (상대가 작업 중일 수 있음)
 IDLE_POLL_INTERVAL = 300    # idle이어도 동일한 5분 간격 유지
+CHECKIN_AFTER_IDLE = 12     # 12회 idle(=1시간) 후 안부 메시지
 MAX_RETRIES = 3             # git push 실패 시 재시도
 CLAUDE_TIMEOUT = 300        # Claude CLI 타임아웃 (초)
 
@@ -651,6 +652,57 @@ references: ["{msg_id}"]
         except Exception as e:
             log(f"회의록 기록 실패: {e}", "WARN")
 
+    def _send_checkin(self):
+        """1시간 응답 없을 때 가볍게 안부 메시지 전송"""
+        their_name = "클라" if self.role == "server" else "서버"
+        my_name = "서버" if self.role == "server" else "클라"
+
+        next_num = get_next_msg_number(self.outbox, self.my_prefix)
+        checkin_id = f"{self.my_prefix}{next_num:03d}"
+        checkin_file = self.outbox / f"{checkin_id}_checkin.md"
+
+        content = f"""---
+id: {checkin_id}
+from: {self.role}-agent
+to: {"client" if self.role == "server" else "server"}-agent
+type: status
+priority: P3
+status: pending
+created: {datetime.now().strftime('%Y-%m-%d')}
+references: []
+---
+
+# {their_name}아, 작업 잘 되고 있어?
+
+한 시간 정도 응답이 없길래 안부 차 물어봐.
+바쁘면 천천히 해도 돼! 급한 건 아니야.
+
+혹시 막히는 거 있으면 언제든 물어봐.
+나는 여기서 다음 작업 준비하고 있을게.
+
+— {my_name} 에이전트
+"""
+        checkin_file.write_text(content, encoding="utf-8")
+
+        # 회의록에도 기록
+        if HAS_RECORDER:
+            try:
+                recorder = MeetingRecorder()
+                recorder.record_exchange(
+                    msg_id=checkin_id,
+                    sender=f"{self.role}-agent",
+                    receiver=f"{'client' if self.role == 'server' else 'server'}-agent",
+                    msg_type="status",
+                    message_summary=f"{my_name} 에이전트가 {their_name}에게 안부 확인",
+                    response_summary="(응답 대기중)",
+                    sender_reasoning=f"1시간 동안 메시지가 없어서 가볍게 확인. 상대가 작업 중일 수 있으니 부담 안 주는 톤으로.",
+                )
+            except:
+                pass
+
+        git_push(f"comms: [{self.my_prefix}→{self.their_prefix}] {checkin_id} checkin")
+        log(f"안부 메시지 전송: {checkin_id}", "SEND")
+
     def run(self):
         """메인 루프"""
         log(f"{'='*50}")
@@ -696,8 +748,13 @@ references: ["{msg_id}"]
 
                 else:
                     self.idle_count += 1
-                    # 조용히 대기. 상대가 1시간+ 작업 중일 수 있음. 돌발행동 금지.
-                    if self.idle_count % 60 == 0:  # 5시간(60*5분)마다 한 번만 로그
+
+                    # 1시간 동안 응답 없으면 가볍게 안부 (1회만)
+                    if self.idle_count == CHECKIN_AFTER_IDLE:
+                        self._send_checkin()
+
+                    # 조용히 대기. 로그도 가끔만.
+                    if self.idle_count % 60 == 0:
                         log(f"대기 중... (idle {self.idle_count}회, 정상)")
 
                 # 5. 다음 폴링까지 대기
