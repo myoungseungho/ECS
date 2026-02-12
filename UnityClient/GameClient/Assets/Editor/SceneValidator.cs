@@ -114,6 +114,7 @@ public static class SceneValidator
         Check("GameScene: EntityPool 존재", objectNames.Contains("EntityPool"));
         Check("GameScene: StatsManager 존재", objectNames.Contains("StatsManager"));
         Check("GameScene: CombatManager 존재", objectNames.Contains("CombatManager"));
+        Check("GameScene: MonsterManager 존재", objectNames.Contains("MonsterManager"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인
