@@ -569,13 +569,26 @@ void OnLogin(World& world, Entity entity, const char* payload, int len) {
     auto it = db.find(username);
 
     if (it == db.end()) {
-        // 계정 없음
-        char resp[5] = {};
-        resp[0] = 1;  // 계정 없음
-        auto pkt = BuildPacket(MsgType::LOGIN_RESULT, resp, 5);
-        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
-        printf("[Login] FAIL: account not found '%s'\n", username.c_str());
-        return;
+        // Session 15: Auto-registration (봇/테스트 계정 자동 생성)
+        static uint32_t next_auto_id = 2000;
+        AccountData newAcc;
+        newAcc.account_id = next_auto_id++;
+        newAcc.username = username;
+        newAcc.password = password;
+        CharacterInfo c;
+        c.char_id = newAcc.account_id;
+        std::snprintf(c.name, 31, "Bot_%s", username.c_str());
+        c.level = 10;
+        c.job_class = 0;  // Warrior
+        c.zone_id = 1;
+        c.x = 100.0f + static_cast<float>(rand() % 400);
+        c.y = 100.0f + static_cast<float>(rand() % 400);
+        c.z = 0.0f;
+        newAcc.characters.push_back(c);
+        db[username] = newAcc;
+        it = db.find(username);
+        printf("[Login] Auto-register: '%s' (id=%u, pos=%.0f,%.0f)\n",
+               username.c_str(), newAcc.account_id, c.x, c.y);
     }
 
     if (it->second.password != password) {
@@ -1366,7 +1379,7 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 14\n");
+    printf("  ECS Field Server - Session 15\n");
     printf("  Monster/NPC System (PvE Combat)\n");
     printf("======================================\n\n");
 
