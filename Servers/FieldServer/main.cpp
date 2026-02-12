@@ -35,6 +35,7 @@
 #include "../../Components/LootComponents.h"         // Session 27
 #include "../../Components/QuestComponents.h"        // Session 28
 #include "../../Components/ChatComponents.h"          // Session 30
+#include "../../Components/ShopComponents.h"          // Session 32
 
 #include <cstdio>
 #include <cstdlib>
@@ -878,6 +879,11 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
         world.AddComponent(entity, nc);
     } else {
         world.GetComponent<NameComponent>(entity).SetName(found->name);
+    }
+
+    // Currency (Session 32: 상점용)
+    if (!world.HasComponent<CurrencyComponent>(entity)) {
+        world.AddComponent(entity, CurrencyComponent{});
     }
 
     // Stats (Session 12)
@@ -2914,6 +2920,190 @@ void BroadcastSystemMessage(World& world, const char* message, uint8_t msg_len) 
     printf("[Chat] [SYSTEM] %s\n", msg_text.c_str());
 }
 
+// ━━━ Session 32: NPC Shop 핸들러 ━━━
+
+// SHOP_OPEN 핸들러: NPC 상점 열기 → 상점 아이템 목록 전송
+// 페이로드: [npc_id(4)]
+void OnShopOpen(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) return;
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    int32_t npc_id;
+    std::memcpy(&npc_id, payload, 4);
+
+    auto* shop = FindShopTemplate(npc_id);
+    if (!shop) {
+        // SHOP_RESULT: 상점 없음
+        char resp[12] = {};
+        resp[0] = static_cast<uint8_t>(ShopResult::SHOP_NOT_FOUND);
+        auto pkt = BuildPacket(MsgType::SHOP_RESULT, resp, 12);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // SHOP_LIST: [npc_id(4) count(1) {item_id(4) price(4) stock(2)}...]
+    uint8_t count = static_cast<uint8_t>(shop->entry_count);
+    int payload_size = 4 + 1 + count * 10;  // npc_id(4)+count(1) + N*(item_id(4)+price(4)+stock(2))
+    std::vector<char> resp(payload_size, 0);
+    std::memcpy(resp.data(), &npc_id, 4);
+    resp[4] = count;
+
+    for (int i = 0; i < count; i++) {
+        int offset = 5 + i * 10;
+        std::memcpy(resp.data() + offset, &shop->items[i].item_id, 4);
+        std::memcpy(resp.data() + offset + 4, &shop->items[i].buy_price, 4);
+        std::memcpy(resp.data() + offset + 8, &shop->items[i].stock, 2);
+    }
+
+    auto pkt = BuildPacket(MsgType::SHOP_LIST, resp.data(), payload_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Shop] Entity %llu opened shop NPC %d '%s' (%d items)\n",
+           entity, npc_id, shop->name, count);
+}
+
+// SHOP_BUY 핸들러: 아이템 구매
+// 페이로드: [npc_id(4) item_id(4) count(2)]
+void OnShopBuy(World& world, Entity entity, const char* payload, int len) {
+    if (len < 10) return;
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    int32_t npc_id, item_id;
+    int16_t count;
+    std::memcpy(&npc_id, payload, 4);
+    std::memcpy(&item_id, payload + 4, 4);
+    std::memcpy(&count, payload + 8, 2);
+
+    auto send_result = [&](ShopResult result) {
+        char resp[12] = {};
+        resp[0] = static_cast<uint8_t>(result);
+        resp[1] = static_cast<uint8_t>(ShopAction::BUY);
+        std::memcpy(resp + 2, &item_id, 4);
+        std::memcpy(resp + 6, &count, 2);
+        int32_t gold = world.HasComponent<CurrencyComponent>(entity)
+                       ? world.GetComponent<CurrencyComponent>(entity).gold : 0;
+        std::memcpy(resp + 8, &gold, 4);
+        auto pkt = BuildPacket(MsgType::SHOP_RESULT, resp, 12);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    };
+
+    if (count <= 0) { send_result(ShopResult::INVALID_COUNT); return; }
+
+    auto* shop = FindShopTemplate(npc_id);
+    if (!shop) { send_result(ShopResult::SHOP_NOT_FOUND); return; }
+
+    // 상점에서 아이템 찾기
+    const ShopItemEntry* entry = nullptr;
+    for (int i = 0; i < shop->entry_count; i++) {
+        if (shop->items[i].item_id == item_id) { entry = &shop->items[i]; break; }
+    }
+    if (!entry) { send_result(ShopResult::ITEM_NOT_FOUND); return; }
+
+    // 골드 확인
+    if (!world.HasComponent<CurrencyComponent>(entity)) {
+        world.AddComponent(entity, CurrencyComponent{});
+    }
+    auto& currency = world.GetComponent<CurrencyComponent>(entity);
+    int32_t total_cost = entry->buy_price * count;
+    if (!currency.CanAfford(total_cost)) { send_result(ShopResult::NOT_ENOUGH_GOLD); return; }
+
+    // 인벤토리에 추가
+    if (!world.HasComponent<InventoryComponent>(entity)) {
+        world.AddComponent(entity, InventoryComponent{});
+    }
+    int slot = world.GetComponent<InventoryComponent>(entity).AddItem(item_id, count);
+    if (slot < 0) { send_result(ShopResult::INVENTORY_FULL); return; }
+
+    // 골드 차감
+    currency.Spend(total_cost);
+
+    // 성공 응답
+    send_result(ShopResult::SUCCESS);
+
+    printf("[Shop] Entity %llu bought %dx item %d for %d gold (remaining: %d)\n",
+           entity, count, item_id, total_cost, currency.gold);
+}
+
+// SHOP_SELL 핸들러: 인벤토리 아이템 판매
+// 페이로드: [slot(1) count(2)]
+void OnShopSell(World& world, Entity entity, const char* payload, int len) {
+    if (len < 3) return;
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    uint8_t slot = static_cast<uint8_t>(payload[0]);
+    int16_t count;
+    std::memcpy(&count, payload + 1, 2);
+
+    int32_t item_id = 0;
+
+    auto send_result = [&](ShopResult result) {
+        char resp[12] = {};
+        resp[0] = static_cast<uint8_t>(result);
+        resp[1] = static_cast<uint8_t>(ShopAction::SELL);
+        std::memcpy(resp + 2, &item_id, 4);
+        std::memcpy(resp + 6, &count, 2);
+        int32_t gold = world.HasComponent<CurrencyComponent>(entity)
+                       ? world.GetComponent<CurrencyComponent>(entity).gold : 0;
+        std::memcpy(resp + 8, &gold, 4);
+        auto pkt = BuildPacket(MsgType::SHOP_RESULT, resp, 12);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    };
+
+    if (count <= 0) { send_result(ShopResult::INVALID_COUNT); return; }
+
+    if (!world.HasComponent<InventoryComponent>(entity)) { send_result(ShopResult::EMPTY_SLOT); return; }
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+
+    if (slot >= MAX_INVENTORY_SLOTS || inv.slots[slot].item_id == 0) {
+        send_result(ShopResult::EMPTY_SLOT); return;
+    }
+    if (inv.slots[slot].count < count) {
+        send_result(ShopResult::INVALID_COUNT); return;
+    }
+
+    item_id = inv.slots[slot].item_id;
+
+    // 판매 가격 계산
+    auto* tmpl = FindItemTemplate(item_id);
+    int32_t sell_price = 10;  // 기본 판매가
+    if (tmpl) {
+        // 상점에서 구매가 찾기 (아무 상점이든)
+        for (int s = 0; s < SHOP_COUNT; s++) {
+            for (int i = 0; i < SHOP_TEMPLATES[s].entry_count; i++) {
+                if (SHOP_TEMPLATES[s].items[i].item_id == item_id) {
+                    sell_price = static_cast<int32_t>(SHOP_TEMPLATES[s].items[i].buy_price * SELL_PRICE_RATIO);
+                    goto found_price;
+                }
+            }
+        }
+        found_price:;
+    }
+    if (sell_price <= 0) sell_price = 1;  // 최소 1골드
+
+    int32_t total_earn = sell_price * count;
+
+    // 골드 추가
+    if (!world.HasComponent<CurrencyComponent>(entity)) {
+        world.AddComponent(entity, CurrencyComponent{});
+    }
+    auto& currency = world.GetComponent<CurrencyComponent>(entity);
+    currency.Earn(total_earn);
+
+    // 인벤토리에서 제거
+    inv.RemoveItem(slot, count);
+
+    // 장비 보너스 재계산 (장착 중인 아이템이 판매됐을 수 있음)
+    RecalculateEquipmentBonus(world, entity);
+
+    send_result(ShopResult::SUCCESS);
+
+    printf("[Shop] Entity %llu sold %dx item %d for %d gold (total: %d)\n",
+           entity, count, item_id, total_earn, currency.gold);
+}
+
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
 
 // TIMER_ADD: 타이머 추가
@@ -3239,6 +3429,9 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::QUEST_COMPLETE, OnQuestComplete);     // Session 28
     dispatch.RegisterHandler(MsgType::CHAT_SEND, OnChatSend);               // Session 30
     dispatch.RegisterHandler(MsgType::WHISPER_SEND, OnWhisperSend);          // Session 30
+    dispatch.RegisterHandler(MsgType::SHOP_OPEN, OnShopOpen);                // Session 32
+    dispatch.RegisterHandler(MsgType::SHOP_BUY, OnShopBuy);                  // Session 32
+    dispatch.RegisterHandler(MsgType::SHOP_SELL, OnShopSell);                // Session 32
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);

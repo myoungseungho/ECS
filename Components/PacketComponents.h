@@ -189,6 +189,13 @@ enum class MsgType : uint16_t {
     WHISPER_RESULT  = 243, // S→C: [result(1) direction(1) other_name(32) msg_len(1) message(N)]
     SYSTEM_MESSAGE  = 244, // S→C: [msg_len(1) message(N)]
 
+    // Session 32: NPC Shop
+    SHOP_OPEN       = 250, // C→S: [npc_id(4)]
+    SHOP_LIST       = 251, // S→C: [npc_id(4) count(1) {item_id(4) price(4) stock(2)}...]
+    SHOP_BUY        = 252, // C→S: [npc_id(4) item_id(4) count(2)]
+    SHOP_SELL       = 253, // C→S: [slot(1) count(2)]
+    SHOP_RESULT     = 254, // S→C: [result(1) action(1) item_id(4) count(2) gold(4)]
+
     STATS       = 99,  // 내부 진단
 };
 

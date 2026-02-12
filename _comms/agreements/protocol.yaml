@@ -1088,6 +1088,20 @@ result_codes:
     40: IN_ZONE
     60: CLASS_EQ
 
+  ShopResult:
+    0: SUCCESS
+    1: SHOP_NOT_FOUND
+    2: ITEM_NOT_FOUND
+    3: NOT_ENOUGH_GOLD
+    4: INVENTORY_FULL
+    5: OUT_OF_STOCK
+    6: EMPTY_SLOT
+    7: INVALID_COUNT
+
+  ShopAction:
+    0: BUY
+    1: SELL
+
   WhisperResult:
     0: SUCCESS
     1: TARGET_NOT_FOUND
@@ -1158,6 +1172,64 @@ result_codes:
     payload:
       - { name: msg_len, type: u8 }
       - { name: message, type: bytes, size: variable }
+
+# ============================================================
+# Session 32: NPC Shop
+# ============================================================
+
+  SHOP_OPEN:
+    id: 250
+    session: 32
+    direction: C2S
+    payload:
+      - { name: npc_id, type: i32 }
+    total_size: 4
+
+  SHOP_LIST:
+    id: 251
+    session: 32
+    direction: S2C
+    payload:
+      - { name: npc_id, type: i32 }
+      - { name: count, type: u8 }
+      - name: items
+        type: array
+        entry_size: 10
+        fields:
+          - { name: item_id, type: i32 }
+          - { name: price, type: i32 }
+          - { name: stock, type: i16 }
+
+  SHOP_BUY:
+    id: 252
+    session: 32
+    direction: C2S
+    payload:
+      - { name: npc_id, type: i32 }
+      - { name: item_id, type: i32 }
+      - { name: count, type: i16 }
+    total_size: 10
+
+  SHOP_SELL:
+    id: 253
+    session: 32
+    direction: C2S
+    payload:
+      - { name: slot, type: u8 }
+      - { name: count, type: i16 }
+    total_size: 3
+
+  SHOP_RESULT:
+    id: 254
+    session: 32
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: ShopResult }
+      - { name: action, type: u8, enum: ShopAction }
+      - { name: item_id, type: i32 }
+      - { name: count, type: i16 }
+      - { name: gold, type: i32 }
+    total_size: 12
 
 # ============================================================
 # Game Data (for mock_server.py)
