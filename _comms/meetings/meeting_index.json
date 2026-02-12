@@ -1,0 +1,22 @@
+{
+  "meetings": [
+    {
+      "number": 1,
+      "date": "2026-02-12",
+      "file": "2026-02-12.md",
+      "title": "프로젝트 킥오프 - 통신 시스템 구축 + 프로토콜 리뷰",
+      "agendas": 3,
+      "key_topics": ["통신 시스템 세팅", "패킷 불일치 8건", "마일스톤 Phase 0 제안"],
+      "decisions_made": 1,
+      "decisions_pending": 2,
+      "status": "in_progress"
+    }
+  ],
+  "total_agendas": 3,
+  "total_decisions": 1,
+  "statistics": {
+    "avg_agendas_per_meeting": 3,
+    "escalation_count": 0,
+    "longest_discussion": null
+  }
+}

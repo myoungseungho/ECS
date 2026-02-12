@@ -30,6 +30,14 @@ import argparse
 from pathlib import Path
 from datetime import datetime
 
+# 회의록 시스템
+sys.path.insert(0, str(Path(__file__).parent))
+try:
+    from meeting_recorder import MeetingRecorder
+    HAS_RECORDER = True
+except ImportError:
+    HAS_RECORDER = False
+
 # ─── 설정 ─────────────────────────────────────────────
 
 POLL_INTERVAL = 30          # 폴링 간격 (초)
@@ -489,7 +497,14 @@ class AgentDaemon:
 내용:
 {body}
 
-이 메시지에 대해 적절히 응답해줘."""
+이 메시지에 대해 적절히 응답해줘.
+
+중요: 응답 마지막에 반드시 아래 형식으로 사고 과정을 추가해:
+[REASONING]
+- 이 메시지를 받고 어떤 판단을 했는지
+- 왜 이런 응답을 선택했는지
+- 고려했지만 채택하지 않은 대안이 있다면 무엇인지
+[/REASONING]"""
 
         response, is_escalate = invoke_claude(prompt, self.role)
 
@@ -552,6 +567,17 @@ references: ["{msg_id}"]
         self.processed_messages.add(msg_file.name)
         self._save_processed()
 
+        # 회의록 기록
+        self._record_meeting(
+            msg_id=msg_id,
+            sender=frontmatter.get("from", "unknown"),
+            msg_type=msg_type,
+            priority=priority,
+            message_body=body,
+            response_text=response,
+            escalated=is_escalate
+        )
+
         # 세션 상태 저장
         self._save_session(
             action=f"Replied {response_id} to {msg_id} ({msg_type})",
@@ -560,6 +586,59 @@ references: ["{msg_id}"]
 
         log(f"응답 완료: {response_id} → {msg_id}", "SEND")
         return True
+
+    def _record_meeting(self, msg_id, sender, msg_type, priority,
+                        message_body, response_text, escalated=False):
+        """메시지 교환을 회의록에 기록"""
+        if not HAS_RECORDER:
+            return
+
+        try:
+            recorder = MeetingRecorder()
+
+            # 응답에서 [REASONING] 블록 추출
+            reasoning = None
+            clean_response = response_text
+            reasoning_match = re.search(
+                r'\[REASONING\]\s*\n(.*?)\[/REASONING\]',
+                response_text, re.DOTALL
+            )
+            if reasoning_match:
+                reasoning = reasoning_match.group(1).strip()
+                clean_response = response_text[:reasoning_match.start()].strip()
+
+            # 메시지 요약 (첫 줄 또는 첫 100자)
+            msg_lines = message_body.strip().split('\n')
+            msg_title = msg_lines[0].strip('#').strip() if msg_lines else msg_id
+            if len(msg_title) > 60:
+                msg_title = msg_title[:57] + "..."
+
+            # 응답 요약
+            resp_lines = clean_response.strip().split('\n')
+            resp_summary = clean_response[:300]
+            if len(clean_response) > 300:
+                resp_summary += "..."
+
+            receiver = "server-agent" if "client" in sender else "client-agent"
+
+            recorder.record_exchange(
+                msg_id=msg_id,
+                sender=sender,
+                receiver=receiver,
+                msg_type=msg_type,
+                message_summary=msg_title,
+                response_summary=resp_summary,
+                sender_reasoning=None,  # 발신자의 reasoning은 원본에서 추출 필요
+                responder_reasoning=reasoning,
+                decision=None,
+                next_actions=None,
+                escalated=escalated
+            )
+
+            log(f"회의록 기록 완료: {msg_id}", "OK")
+
+        except Exception as e:
+            log(f"회의록 기록 실패: {e}", "WARN")
 
     def run(self):
         """메인 루프"""
