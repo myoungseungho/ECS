@@ -77,7 +77,7 @@ namespace Network
         Success         = 0,
         AccountNotFound = 1,
         WrongPassword   = 2,
-        BadPacket       = 3,
+        AlreadyOnline   = 3,
     }
 
     /// <summary>캐릭터 정보 (CHAR_LIST_RESP 파싱용)</summary>
@@ -102,11 +102,11 @@ namespace Network
     public enum AttackResult : byte
     {
         SUCCESS         = 0,
-        MISS            = 1,
+        TARGET_NOT_FOUND = 1,
         TARGET_DEAD     = 2,
         OUT_OF_RANGE    = 3,
         COOLDOWN        = 4,
-        INVALID_TARGET  = 5,
+        ATTACKER_DEAD   = 5,
         SELF_ATTACK     = 6,
     }
 
