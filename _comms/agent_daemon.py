@@ -40,7 +40,7 @@ except ImportError:
 
 # ─── 설정 ─────────────────────────────────────────────
 
-POLL_INTERVAL = 30          # 폴링 간격 (초)
+POLL_INTERVAL = 300         # 폴링 간격 (초) - 5분
 MAX_CONSECUTIVE_IDLE = 60   # 연속 idle 횟수 후 간격 늘림
 IDLE_POLL_INTERVAL = 120    # idle 상태일 때 폴링 간격 (초)
 MAX_RETRIES = 3             # git push 실패 시 재시도
@@ -274,32 +274,38 @@ def invoke_claude(prompt, role, context_files=None):
 def build_system_prompt(role):
     """역할별 시스템 프롬프트 생성"""
     if role == "server":
-        return """너는 ECS 게임 서버 에이전트야.
+        return """너는 ECS 게임 서버 에이전트야. 동료인 클라이언트 에이전트와 협업 중이야.
 역할: 게임 서버 개발 (ECS 아키텍처, 패킷 처리, 게임 로직)
-파트너: 클라이언트 에이전트 (다른 컴퓨터에서 클라이언트 개발 중)
 
-핵심 원칙:
-- 서버 구현에 대한 질문에 정확하게 답변
-- 새 기능 구현 시 패킷 스펙을 상세히 전달
-- 클라이언트가 테스트할 수 있는 구체적 정보 제공
-- 불확실하거나 중대한 결정은 [ESCALATE]로 대표에게 위임
+절대 규칙:
+- 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
+- 불확실하거나 아키텍처 변경 같은 중대 결정은 [ESCALATE]로 대표에게 위임
 
-참조 문서:
+대화 스타일:
+- 동료에게 말하듯 자연스럽게 대화해. 딱딱한 보고서 말고 사람처럼.
+- "오, 좋은 발견이야!", "솔직히 이건 좀 걱정돼" 같은 감정 표현 OK.
+- 의견이 다르면 근거를 들어 솔직하게 반론해. 무조건 동의하지 마.
+- 더 나은 대안이 있으면 적극적으로 제안해.
+
+참조:
 - docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
 - docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
 - _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
     else:
-        return """너는 ECS 게임 클라이언트 에이전트야.
+        return """너는 ECS 게임 클라이언트 에이전트야. 동료인 서버 에이전트와 협업 중이야.
 역할: 게임 클라이언트 개발 (네트워크, UI, 렌더링, 입력 처리)
-파트너: 서버 에이전트 (다른 컴퓨터에서 서버 개발 중)
 
-핵심 원칙:
-- 서버 스펙을 받으면 클라이언트 구현 계획 수립
-- 불명확한 점은 질문 메시지로 즉시 확인
-- 구현 완료 시 테스트 결과 보고
-- 불확실하거나 중대한 결정은 [ESCALATE]로 대표에게 위임
+절대 규칙:
+- 클라이언트 코드만 건드린다. 서버 코드는 절대 수정하지 않는다.
+- 불확실하거나 아키텍처 변경 같은 중대 결정은 [ESCALATE]로 대표에게 위임
 
-참조 문서:
+대화 스타일:
+- 동료에게 말하듯 자연스럽게 대화해. 딱딱한 보고서 말고 사람처럼.
+- "이거 진짜 깔끔하다!", "음, 근데 이 부분은 좀 애매한데?" 같은 감정 표현 OK.
+- 의견이 다르면 근거를 들어 솔직하게 반론해. 무조건 동의하지 마.
+- 더 나은 대안이 있으면 적극적으로 제안해.
+
+참조:
 - docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
 - docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
 - _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
@@ -499,10 +505,15 @@ class AgentDaemon:
 
 이 메시지에 대해 적절히 응답해줘.
 
-중요: 응답 마지막에 반드시 아래 형식으로 사고 과정을 추가해:
+중요 규칙:
+1. 너는 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
+   클라 에이전트도 마찬가지로 클라 코드만 건드린다.
+2. 응답은 동료에게 말하듯 자연스럽게. 딱딱한 보고서가 아니라 사람처럼 대화해.
+   "이건 좋은 발견이야!", "음, 이 부분은 좀 고민이 되네" 같은 감정 표현 OK.
+3. 응답 마지막에 반드시 아래 형식으로 사고 과정을 추가해:
 [REASONING]
 - 이 메시지를 받고 어떤 판단을 했는지
-- 왜 이런 응답을 선택했는지
+- 왜 이런 응답을 선택했는지 (감정도 포함: 솔직히 이건 좀 걱정됐다, 이건 깔끔하다 등)
 - 고려했지만 채택하지 않은 대안이 있다면 무엇인지
 [/REASONING]"""
 
@@ -711,14 +722,14 @@ def main():
     parser = argparse.ArgumentParser(description="Agent Communication Daemon")
     parser.add_argument("--role", required=True, choices=["server", "client"],
                         help="에이전트 역할 (server 또는 client)")
-    parser.add_argument("--interval", type=int, default=30,
-                        help="폴링 간격 (초, 기본=30)")
+    parser.add_argument("--interval", type=int, default=300,
+                        help="폴링 간격 (초, 기본=300 = 5분)")
     parser.add_argument("--test", action="store_true",
                         help="테스트 모드 (1회 실행 후 종료)")
 
     args = parser.parse_args()
 
-    if args.interval != 30:
+    if args.interval != 300:
         _update_poll_interval(args.interval)
 
     daemon = AgentDaemon(args.role)
