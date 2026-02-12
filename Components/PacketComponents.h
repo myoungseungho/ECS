@@ -93,6 +93,11 @@ enum class MsgType : uint16_t {
     MONSTER_SPAWN   = 110, // S→C: [entity(8) monster_id(4) level(4) hp(4) max_hp(4) x(4) y(4) z(4)] = 36바이트
     MONSTER_RESPAWN = 113, // S→C: [entity(8) hp(4) max_hp(4) x(4) y(4) z(4)] = 28바이트
 
+    // Session 16: Zone Transfer (존 전환)
+    ZONE_TRANSFER_REQ    = 120, // C→S: [target_zone_id(4 int)]
+    ZONE_TRANSFER_RESULT = 121, // S→C: [result(1) zone_id(4) x(4) y(4) z(4)] = 17바이트
+                                // result: 0=성공, 1=존재하지 않는 맵, 2=이미 같은 맵
+
     STATS       = 99,  // 내부 진단
 };
 

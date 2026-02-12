@@ -395,6 +395,136 @@ void OnZoneEnter(World& world, Entity entity, const char* payload, int len) {
            had_zone ? " (transfer)" : " (enter)");
 }
 
+// ━━━ Session 16: Zone Transfer 핸들러 ━━━
+// ZONE_TRANSFER_REQ: 존 전환 요청
+// 페이로드: [target_zone_id(4 int)]
+// 응답: ZONE_TRANSFER_RESULT [result(1) zone_id(4) x(4) y(4) z(4)]
+//   result: 0=성공, 1=존재하지 않는 맵, 2=이미 같은 맵
+void OnZoneTransfer(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) {
+        printf("[ZoneTransfer] Invalid payload size: %d (need 4)\n", len);
+        return;
+    }
+
+    int target_zone;
+    std::memcpy(&target_zone, payload, 4);
+
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    // 유효한 맵인지 확인 (1~3)
+    if (target_zone < 1 || target_zone > 3) {
+        char resp[17];
+        resp[0] = 1;  // 존재하지 않는 맵
+        std::memcpy(resp + 1, &target_zone, 4);
+        float zero = 0.0f;
+        std::memcpy(resp + 5, &zero, 4);
+        std::memcpy(resp + 9, &zero, 4);
+        std::memcpy(resp + 13, &zero, 4);
+        auto pkt = BuildPacket(MsgType::ZONE_TRANSFER_RESULT, resp, 17);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        printf("[ZoneTransfer] Entity %llu: invalid zone %d\n", entity, target_zone);
+        return;
+    }
+
+    // 현재 존 확인
+    bool had_zone = world.HasComponent<ZoneComponent>(entity);
+    int old_zone = had_zone ? world.GetComponent<ZoneComponent>(entity).zone_id : 0;
+
+    // 같은 맵 체크
+    if (had_zone && old_zone == target_zone) {
+        SpawnPoint sp = GetSpawnPoint(target_zone);
+        char resp[17];
+        resp[0] = 2;  // 이미 같은 맵
+        std::memcpy(resp + 1, &target_zone, 4);
+        std::memcpy(resp + 5, &sp.x, 4);
+        std::memcpy(resp + 9, &sp.y, 4);
+        std::memcpy(resp + 13, &sp.z, 4);
+        auto pkt = BuildPacket(MsgType::ZONE_TRANSFER_RESULT, resp, 17);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        printf("[ZoneTransfer] Entity %llu: already in zone %d\n", entity, target_zone);
+        return;
+    }
+
+    bool has_grid = world.HasComponent<GridCellComponent>(entity);
+    bool has_channel = world.HasComponent<ChannelComponent>(entity);
+    int ch_id = has_channel ? world.GetComponent<ChannelComponent>(entity).channel_id : 0;
+
+    // 1단계: 기존 맵에서 DISAPPEAR
+    if (had_zone && has_grid) {
+        auto& grid = world.GetComponent<GridCellComponent>(entity);
+
+        world.ForEach<ZoneComponent, GridCellComponent, SessionComponent>(
+            [&](Entity other, ZoneComponent& other_zone, GridCellComponent& other_grid,
+                SessionComponent& other_session) {
+
+                if (other == entity) return;
+                if (!other_session.connected) return;
+                if (other_zone.zone_id != old_zone) return;
+                if (!IsNearbyCell(grid.cell_x, grid.cell_y,
+                                  other_grid.cell_x, other_grid.cell_y)) return;
+
+                if (has_channel) {
+                    if (!world.HasComponent<ChannelComponent>(other)) return;
+                    if (world.GetComponent<ChannelComponent>(other).channel_id != ch_id) return;
+                } else if (world.HasComponent<ChannelComponent>(other)) {
+                    return;
+                }
+
+                // 양방향 DISAPPEAR
+                char p[8];
+                std::memcpy(p, &entity, 8);
+                auto pkt1 = BuildPacket(MsgType::DISAPPEAR, p, 8);
+                g_network->SendTo(other_session.session_id,
+                                  pkt1.data(), static_cast<int>(pkt1.size()));
+
+                std::memcpy(p, &other, 8);
+                auto pkt2 = BuildPacket(MsgType::DISAPPEAR, p, 8);
+                g_network->SendTo(session.session_id,
+                                  pkt2.data(), static_cast<int>(pkt2.size()));
+            }
+        );
+    }
+
+    // 2단계: 존 갱신
+    if (!had_zone) {
+        world.AddComponent(entity, ZoneComponent{target_zone});
+    } else {
+        world.GetComponent<ZoneComponent>(entity).zone_id = target_zone;
+    }
+
+    // 3단계: 스폰 포인트로 위치 이동
+    SpawnPoint spawn = GetSpawnPoint(target_zone);
+    if (!world.HasComponent<PositionComponent>(entity)) {
+        world.AddComponent(entity, PositionComponent{});
+    }
+    auto& pos = world.GetComponent<PositionComponent>(entity);
+    pos.x = spawn.x;
+    pos.y = spawn.y;
+    pos.z = spawn.z;
+    pos.position_dirty = true;
+
+    // 4단계: GridCellComponent 재설정 (InterestSystem이 다음 틱에 재배치)
+    if (world.HasComponent<GridCellComponent>(entity)) {
+        world.RemoveComponent<GridCellComponent>(entity);
+    }
+
+    // 5단계: ZONE_TRANSFER_RESULT 전송 (성공)
+    char resp[17];
+    resp[0] = 0;  // 성공
+    std::memcpy(resp + 1, &target_zone, 4);
+    std::memcpy(resp + 5, &spawn.x, 4);
+    std::memcpy(resp + 9, &spawn.y, 4);
+    std::memcpy(resp + 13, &spawn.z, 4);
+    auto pkt = BuildPacket(MsgType::ZONE_TRANSFER_RESULT, resp, 17);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    // 6단계: 새 존의 몬스터 정보 전송
+    SendZoneMonsters(world, entity);
+
+    printf("[ZoneTransfer] Entity %llu: zone %d -> %d (spawn: %.0f, %.0f)\n",
+           entity, old_zone, target_zone, spawn.x, spawn.y);
+}
+
 // HANDOFF_REQUEST 핸들러 (Session 7): 핸드오프 요청
 // 빈 페이로드 또는 무시
 //
@@ -1457,6 +1587,7 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::STAT_HEAL, OnStatHeal);              // Session 12
     dispatch.RegisterHandler(MsgType::ATTACK_REQ, OnAttackReq);            // Session 13
     dispatch.RegisterHandler(MsgType::RESPAWN_REQ, OnRespawnReq);          // Session 13
+    dispatch.RegisterHandler(MsgType::ZONE_TRANSFER_REQ, OnZoneTransfer);  // Session 16
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);

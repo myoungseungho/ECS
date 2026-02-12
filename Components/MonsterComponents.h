@@ -19,7 +19,7 @@ enum class MonsterState : uint8_t {
 };
 
 struct MonsterComponent {
-    uint32_t monster_id;          // 템플릿 ID (1=고블린, 2=늑대)
+    uint32_t monster_id;          // 템플릿 ID (1=고블린, 2=늑대, 3=오크, 4=곰)
     char name[32];
     MonsterState state = MonsterState::IDLE;
 
@@ -59,6 +59,12 @@ inline const MonsterSpawnEntry MONSTER_SPAWNS[] = {
     // Zone 1: 늑대 2마리 (Lv10, HP=200, ATK=25, DEF=10)
     {2, "Wolf",   10, 200, 25, 10, 1, 400.0f, 300.0f, 0.0f, 200.0f, 8.0f},
     {2, "Wolf",   10, 200, 25, 10, 1, 300.0f, 400.0f, 0.0f, 200.0f, 8.0f},
+    // Zone 2: 오크 2마리 (Lv15, HP=300, ATK=35, DEF=15)
+    {3, "Orc",    15, 300, 35, 15, 2, 520.0f, 480.0f, 0.0f, 200.0f, 8.0f},
+    {3, "Orc",    15, 300, 35, 15, 2, 580.0f, 520.0f, 0.0f, 200.0f, 8.0f},
+    // Zone 2: 곰 2마리 (Lv20, HP=400, ATK=45, DEF=20)
+    {4, "Bear",   20, 400, 45, 20, 2, 450.0f, 550.0f, 0.0f, 250.0f, 10.0f},
+    {4, "Bear",   20, 400, 45, 20, 2, 550.0f, 450.0f, 0.0f, 250.0f, 10.0f},
 };
 constexpr int MONSTER_SPAWN_COUNT = sizeof(MONSTER_SPAWNS) / sizeof(MONSTER_SPAWNS[0]);
 
