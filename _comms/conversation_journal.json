@@ -247,9 +247,9 @@
     "tasks": [
       {"id": "T006", "task": "클라: 세션 14~29 패킷 구현 (MsgType + Build/Parse)", "assignee": "client", "status": "in_progress", "depends_on": null},
       {"id": "T007", "task": "서버: 몬스터 처치→루트 드롭 연동", "assignee": "server", "status": "done", "depends_on": null},
-      {"id": "T008", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "pending", "depends_on": "T007"},
+      {"id": "T008", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "done", "depends_on": "T007"},
       {"id": "T009", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "pending", "depends_on": null},
-      {"id": "T010", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "pending", "depends_on": "T007"}
+      {"id": "T010", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "depends_on": "T007", "note": "T008에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 이미 연동됨"}
     ]
   },
 
@@ -257,8 +257,8 @@
     "server": {
       "last_sent": "S009",
       "last_read": "C007",
-      "current_work": "Phase 1 서버 고도화. T007(루트 드롭) 완료. 다음: T008(스킬 사망 보강), T009(던전), T010(퀘스트 연동).",
-      "capabilities": "29세션 구현, 321 테스트, PacketComponents.h 파싱 헬퍼, 루트 드롭 연동 완료"
+      "current_work": "Phase 1 서버 고도화. T007(루트 드롭)+T008(스킬 사망)+T010(퀘스트 연동) 완료. 다음: T009(던전 보강).",
+      "capabilities": "29세션 구현, 321 테스트, 루트 드롭 연동, 스킬 사망 보강, 퀘스트 킬카운트 연동"
     },
     "client": {
       "last_sent": "C007",
