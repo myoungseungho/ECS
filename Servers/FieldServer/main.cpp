@@ -886,6 +886,13 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
         world.AddComponent(entity, CurrencyComponent{});
     }
 
+    // SkillLevel (Session 33: 스킬 레벨/포인트)
+    if (!world.HasComponent<SkillLevelComponent>(entity)) {
+        SkillLevelComponent slc;
+        slc.skill_points = found->level;  // 레벨당 1포인트 (기존 캐릭터용)
+        world.AddComponent(entity, slc);
+    }
+
     // Stats (Session 12)
     auto job = static_cast<JobClass>(found->job_class);
     auto stats = CreateStats(job, found->level);
@@ -1022,6 +1029,10 @@ void OnStatAddExp(World& world, Entity entity, const char* payload, int len) {
 
     if (leveled) {
         printf("[Stats] Entity %llu: LEVEL UP %d -> %d\n", entity, old_level, stats.level);
+        // Session 33: 레벨업 시 스킬 포인트 +1
+        if (!world.HasComponent<SkillLevelComponent>(entity))
+            world.AddComponent(entity, SkillLevelComponent{});
+        world.GetComponent<SkillLevelComponent>(entity).AddSkillPoints(1);
         // EventBus에 이벤트 발행 (미래 시스템용)
         if (g_eventBus) {
             Event evt;
@@ -1343,6 +1354,10 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
         if (leveled) {
             printf("[Combat] Entity %llu: LEVEL UP %d -> %d\n",
                    entity, old_level, atk_stats.level);
+            // Session 33: 레벨업 시 스킬 포인트 +1
+            if (!world.HasComponent<SkillLevelComponent>(entity))
+                world.AddComponent(entity, SkillLevelComponent{});
+            world.GetComponent<SkillLevelComponent>(entity).AddSkillPoints(1);
         }
 
         // 공격자 스탯 동기화 (EXP 변경)
@@ -1425,20 +1440,32 @@ void OnRespawnReq(World& world, Entity entity, const char* payload, int len) {
 void OnSkillListReq(World& world, Entity entity, const char* payload, int len) {
     auto& session = world.GetComponent<SessionComponent>(entity);
     int job_num = 0;
+    int char_level = 1;
     if (world.HasComponent<StatsComponent>(entity)) {
-        job_num = static_cast<int>(world.GetComponent<StatsComponent>(entity).job) + 1;
+        auto& stats = world.GetComponent<StatsComponent>(entity);
+        job_num = static_cast<int>(stats.job) + 1;
+        char_level = stats.level;
     }
 
-    // 사용 가능한 스킬 수집 (공용 + 자기 직업)
+    // SkillLevelComponent 자동 부착
+    if (!world.HasComponent<SkillLevelComponent>(entity)) {
+        world.AddComponent(entity, SkillLevelComponent{});
+    }
+    auto& slc = world.GetComponent<SkillLevelComponent>(entity);
+
+    // 사용 가능한 스킬 수집 (공용 + 자기 직업, 레벨 충족)
     std::vector<const SkillData*> available;
     for (int i = 0; i < SKILL_TABLE_SIZE; i++) {
-        if (SKILL_TABLE[i].job_class == 0 || SKILL_TABLE[i].job_class == job_num) {
+        if ((SKILL_TABLE[i].job_class == 0 || SKILL_TABLE[i].job_class == job_num) &&
+            char_level >= SKILL_TABLE[i].min_level) {
             available.push_back(&SKILL_TABLE[i]);
         }
     }
 
     uint8_t count = static_cast<uint8_t>(available.size());
-    int payload_size = 1 + count * 37;  // id(4)+name(16)+cd(4)+dmg(4)+mp(4)+range(4)+type(1)
+    // Session 33: 확장 포맷 = id(4)+name(16)+cd(4)+dmg(4)+mp(4)+range(4)+type(1)+skill_level(1)+effect(1)+min_level(4) = 43
+    int per_skill = 43;
+    int payload_size = 1 + count * per_skill;
     std::vector<char> resp(payload_size, 0);
     resp[0] = static_cast<char>(count);
 
@@ -1452,6 +1479,9 @@ void OnSkillListReq(World& world, Entity entity, const char* payload, int len) {
         int32_t range_i = static_cast<int32_t>(s->range);
         std::memcpy(resp.data() + off, &range_i, 4); off += 4;
         resp[off++] = s->job_class;
+        resp[off++] = slc.GetSkillLevel(s->skill_id);  // Session 33: 스킬 레벨
+        resp[off++] = static_cast<uint8_t>(s->effect);  // Session 33: 효과 타입
+        std::memcpy(resp.data() + off, &s->min_level, 4); off += 4;  // Session 33: 습득 최소 레벨
     }
 
     auto pkt = BuildPacket(MsgType::SKILL_LIST_RESP, resp.data(), payload_size);
@@ -1486,32 +1516,74 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     auto& stats = world.GetComponent<StatsComponent>(entity);
     if (!stats.IsAlive()) { SendSkillResult(world, entity, SkillResult::CASTER_DEAD, skill_id, target, 0, 0); return; }
 
+    // Session 33: 캐릭터 레벨 체크
+    if (stats.level < skill->min_level) {
+        SendSkillResult(world, entity, SkillResult::LEVEL_TOO_LOW, skill_id, target, 0, 0); return;
+    }
+
     // SkillComponent 자동 부착
     if (!world.HasComponent<SkillComponent>(entity)) world.AddComponent(entity, SkillComponent{});
     auto& sc = world.GetComponent<SkillComponent>(entity);
+
+    // SkillLevelComponent 자동 부착
+    if (!world.HasComponent<SkillLevelComponent>(entity)) world.AddComponent(entity, SkillLevelComponent{});
+    auto& slc = world.GetComponent<SkillLevelComponent>(entity);
+
+    // Session 33: 스킬 레벨에 따른 스케일링
+    uint8_t sk_level = slc.GetSkillLevel(skill_id);
+    int level_idx = (sk_level > 0 && sk_level <= 5) ? sk_level : 0;
+    float dmg_scale = (level_idx > 0) ? SKILL_LEVEL_DMG_SCALE[level_idx] : 1.0f;
+    float mp_scale  = (level_idx > 0) ? SKILL_LEVEL_MP_SCALE[level_idx] : 1.0f;
+    float cd_scale  = (level_idx > 0) ? SKILL_LEVEL_CD_SCALE[level_idx] : 1.0f;
+
+    int32_t actual_mp_cost = static_cast<int32_t>(skill->mp_cost * mp_scale);
+    float actual_cd = (skill->cooldown_ms / 1000.0f) * cd_scale;
 
     // 쿨다운 확인
     if (sc.GetCooldown(skill_id) > 0) {
         SendSkillResult(world, entity, SkillResult::COOLDOWN, skill_id, target, 0, 0); return;
     }
-    // MP 확인
-    if (stats.mp < skill->mp_cost) {
+    // MP 확인 (스킬 레벨에 따라 MP 소모 감소)
+    if (stats.mp < actual_mp_cost) {
         SendSkillResult(world, entity, SkillResult::NO_MP, skill_id, target, 0, 0); return;
     }
 
-    // 자힐 스킬 (Heal, id=2)
-    if (skill_id == 2) {
-        stats.UseMp(skill->mp_cost);
-        int32_t heal = 50 + stats.level * 5;
+    // Session 33: 효과 타입별 처리
+    if (skill->effect == SkillEffect::SELF_HEAL) {
+        // 자힐 (Heal 등)
+        stats.UseMp(actual_mp_cost);
+        int32_t base_heal = skill->effect_value + stats.level * 5;
+        int32_t heal = static_cast<int32_t>(base_heal * dmg_scale);
         stats.Heal(heal);
-        sc.SetCooldown(skill_id, skill->cooldown_ms / 1000.0f);
+        sc.SetCooldown(skill_id, actual_cd);
         SendSkillResult(world, entity, SkillResult::SUCCESS, skill_id, entity, heal, stats.hp);
         SendStatSync(world, entity);
-        printf("[Skill] Entity %llu used Heal: +%d HP\n", entity, heal);
+        printf("[Skill] Entity %llu used %s: +%d HP (lv%d)\n", entity, skill->name, heal, sk_level);
         return;
     }
 
-    // 타겟 공격 스킬
+    if (skill->effect == SkillEffect::SELF_BUFF) {
+        // 자기 버프 (Warcry=ATK+%, ManaShield=DEF+%)
+        stats.UseMp(actual_mp_cost);
+        int32_t buff_pct = skill->effect_value;
+        int32_t buff_amount = 0;
+        if (skill_id == 14) {  // Warcry: ATK buff
+            buff_amount = stats.attack * buff_pct / 100;
+            stats.equip_atk_bonus += buff_amount;
+            stats.attack += buff_amount;
+        } else if (skill_id == 34) {  // ManaShield: DEF buff
+            buff_amount = stats.defense * buff_pct / 100;
+            stats.equip_def_bonus += buff_amount;
+            stats.defense += buff_amount;
+        }
+        sc.SetCooldown(skill_id, actual_cd);
+        SendSkillResult(world, entity, SkillResult::SUCCESS, skill_id, entity, buff_amount, stats.hp);
+        SendStatSync(world, entity);
+        printf("[Skill] Entity %llu used %s: +%d buff (lv%d)\n", entity, skill->name, buff_amount, sk_level);
+        return;
+    }
+
+    // 타겟 공격 스킬 (DAMAGE, AOE_DAMAGE, DOT_DAMAGE)
     if (!world.HasComponent<StatsComponent>(target)) {
         SendSkillResult(world, entity, SkillResult::INVALID_TARGET, skill_id, target, 0, 0); return;
     }
@@ -1528,11 +1600,11 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
         }
     }
 
-    // 스킬 실행
-    stats.UseMp(skill->mp_cost);
-    int32_t base_dmg = stats.attack * skill->damage_multiplier / 100;
+    // 스킬 실행 (레벨 스케일링 적용)
+    stats.UseMp(actual_mp_cost);
+    int32_t base_dmg = static_cast<int32_t>(stats.attack * skill->damage_multiplier / 100 * dmg_scale);
     int32_t damage = tgt_stats.TakeDamage(base_dmg);
-    sc.SetCooldown(skill_id, skill->cooldown_ms / 1000.0f);
+    sc.SetCooldown(skill_id, actual_cd);
 
     SendSkillResult(world, entity, SkillResult::SUCCESS, skill_id, target, damage, tgt_stats.hp);
     SendStatSync(world, entity);
@@ -1540,8 +1612,8 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     // 타겟 스탯 동기화
     if (world.HasComponent<SessionComponent>(target)) SendStatSync(world, target);
 
-    printf("[Skill] Entity %llu used skill %d on %llu: %d damage (HP: %d)\n",
-           entity, skill_id, target, damage, tgt_stats.hp);
+    printf("[Skill] Entity %llu used %s(lv%d) on %llu: %d damage (HP: %d)\n",
+           entity, skill->name, sk_level, target, damage, tgt_stats.hp);
 
     // 사망 처리 (OnAttackReq와 동일 수준으로 보강)
     if (!tgt_stats.IsAlive()) {
@@ -1586,6 +1658,12 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
         if (leveled) {
             printf("[Skill] Entity %llu: LEVEL UP %d -> %d\n",
                    entity, old_level, stats.level);
+            // Session 33: 레벨업 시 스킬 포인트 +1
+            if (world.HasComponent<SkillLevelComponent>(entity)) {
+                world.GetComponent<SkillLevelComponent>(entity).AddSkillPoints(1);
+                printf("[Skill] Entity %llu: +1 skill point (total: %d)\n",
+                       entity, world.GetComponent<SkillLevelComponent>(entity).skill_points);
+            }
         }
 
         // 공격자 스탯 동기화 (EXP 변경)
@@ -1605,6 +1683,109 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
             g_eventBus->Publish(evt);
         }
     }
+}
+
+// ━━━ Session 33: Skill Level Up 핸들러 ━━━
+
+void SendSkillPointInfo(World& world, Entity entity) {
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    if (!world.HasComponent<SkillLevelComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    auto& slc = world.GetComponent<SkillLevelComponent>(entity);
+    char buf[8];
+    std::memcpy(buf, &slc.skill_points, 4);
+    std::memcpy(buf + 4, &slc.total_spent, 4);
+    auto pkt = BuildPacket(MsgType::SKILL_POINT_INFO, buf, 8);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void OnSkillLevelUp(World& world, Entity entity, const char* payload, int len) {
+    if (len < 4) return;
+    int32_t skill_id;
+    std::memcpy(&skill_id, payload, 4);
+
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    // 스킬 존재 확인
+    auto* skill = FindSkill(skill_id);
+    if (!skill) {
+        char resp[10] = {};
+        resp[0] = static_cast<uint8_t>(SkillLevelUpResult::SKILL_NOT_FOUND);
+        std::memcpy(resp + 1, &skill_id, 4);
+        resp[5] = 0;
+        int32_t sp = 0;
+        std::memcpy(resp + 6, &sp, 4);
+        auto pkt = BuildPacket(MsgType::SKILL_LEVEL_UP_RESULT, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 캐릭터 레벨 체크
+    if (world.HasComponent<StatsComponent>(entity)) {
+        auto& stats = world.GetComponent<StatsComponent>(entity);
+        if (stats.level < skill->min_level) {
+            char resp[10] = {};
+            resp[0] = static_cast<uint8_t>(SkillLevelUpResult::LEVEL_TOO_LOW);
+            std::memcpy(resp + 1, &skill_id, 4);
+            resp[5] = 0;
+            int32_t sp = 0;
+            if (world.HasComponent<SkillLevelComponent>(entity))
+                sp = world.GetComponent<SkillLevelComponent>(entity).skill_points;
+            std::memcpy(resp + 6, &sp, 4);
+            auto pkt = BuildPacket(MsgType::SKILL_LEVEL_UP_RESULT, resp, 10);
+            g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            return;
+        }
+    }
+
+    // SkillLevelComponent 자동 부착
+    if (!world.HasComponent<SkillLevelComponent>(entity)) {
+        world.AddComponent(entity, SkillLevelComponent{});
+    }
+    auto& slc = world.GetComponent<SkillLevelComponent>(entity);
+
+    // 이미 만렙인지 확인
+    uint8_t current_level = slc.GetSkillLevel(skill_id);
+    if (current_level >= 5) {
+        char resp[10] = {};
+        resp[0] = static_cast<uint8_t>(SkillLevelUpResult::MAX_LEVEL);
+        std::memcpy(resp + 1, &skill_id, 4);
+        resp[5] = current_level;
+        std::memcpy(resp + 6, &slc.skill_points, 4);
+        auto pkt = BuildPacket(MsgType::SKILL_LEVEL_UP_RESULT, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 레벨업 시도
+    if (!slc.LearnOrUpgrade(skill_id)) {
+        // 포인트 부족 또는 슬롯 가득
+        uint8_t result = (slc.skill_points <= 0) ?
+            static_cast<uint8_t>(SkillLevelUpResult::NO_SKILL_POINTS) :
+            static_cast<uint8_t>(SkillLevelUpResult::SLOTS_FULL);
+        char resp[10] = {};
+        resp[0] = result;
+        std::memcpy(resp + 1, &skill_id, 4);
+        resp[5] = current_level;
+        std::memcpy(resp + 6, &slc.skill_points, 4);
+        auto pkt = BuildPacket(MsgType::SKILL_LEVEL_UP_RESULT, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 성공
+    uint8_t new_level = slc.GetSkillLevel(skill_id);
+    char resp[10] = {};
+    resp[0] = static_cast<uint8_t>(SkillLevelUpResult::SUCCESS);
+    std::memcpy(resp + 1, &skill_id, 4);
+    resp[5] = new_level;
+    std::memcpy(resp + 6, &slc.skill_points, 4);
+    auto pkt = BuildPacket(MsgType::SKILL_LEVEL_UP_RESULT, resp, 10);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Skill] Entity %llu upgraded skill %d to level %d (points left: %d)\n",
+           entity, skill_id, new_level, slc.skill_points);
 }
 
 // ━━━ Session 20: Party System 핸들러 ━━━
@@ -3401,6 +3582,7 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::ZONE_TRANSFER_REQ, OnZoneTransfer);  // Session 16
     dispatch.RegisterHandler(MsgType::SKILL_LIST_REQ, OnSkillListReq);     // Session 19
     dispatch.RegisterHandler(MsgType::SKILL_USE, OnSkillUse);               // Session 19
+    dispatch.RegisterHandler(MsgType::SKILL_LEVEL_UP, OnSkillLevelUp);     // Session 33
     dispatch.RegisterHandler(MsgType::PARTY_CREATE, OnPartyCreate);         // Session 20
     dispatch.RegisterHandler(MsgType::PARTY_INVITE, OnPartyInvite);         // Session 20
     dispatch.RegisterHandler(MsgType::PARTY_ACCEPT, OnPartyAccept);         // Session 20

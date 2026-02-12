@@ -1117,6 +1117,21 @@ result_codes:
     2: WHISPER
     3: SYSTEM
 
+  SkillLevelUpResult:
+    0: SUCCESS
+    1: NO_SKILL_POINTS
+    2: SKILL_NOT_FOUND
+    3: MAX_LEVEL
+    4: LEVEL_TOO_LOW
+    5: SLOTS_FULL
+
+  SkillEffect:
+    0: DAMAGE
+    1: SELF_HEAL
+    2: SELF_BUFF
+    3: AOE_DAMAGE
+    4: DOT_DAMAGE
+
 # ============================================================
 # Session 30: Chat System
 # ============================================================
@@ -1230,6 +1245,43 @@ result_codes:
       - { name: count, type: i16 }
       - { name: gold, type: i32 }
     total_size: 12
+
+# Session 33: Skill Expansion
+  SKILL_LEVEL_UP:
+    id: 260
+    session: 33
+    direction: C2S
+    payload:
+      - { name: skill_id, type: i32 }
+    total_size: 4
+
+  SKILL_LEVEL_UP_RESULT:
+    id: 261
+    session: 33
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: SkillLevelUpResult }
+      - { name: skill_id, type: i32 }
+      - { name: new_level, type: u8 }
+      - { name: skill_points, type: i32 }
+    total_size: 10
+
+  SKILL_POINT_INFO:
+    id: 262
+    session: 33
+    direction: S2C
+    payload:
+      - { name: skill_points, type: i32 }
+      - { name: total_spent, type: i32 }
+    total_size: 8
+
+# Session 33 Notes:
+# - SKILL_LIST_RESP format expanded: +skill_level(1)+effect(1)+min_level(4) per entry = 43 bytes/skill
+# - All skills now have min_level requirement and SkillEffect type
+# - Skill levels 1-5, damage/MP/CD scaling per level
+# - Skill points: +1 per level up, spend to learn/upgrade skills
+# - New skills: 8→21 (Common: Dash+Provoke, Warrior: ShieldBash+Whirlwind+Warcry,
+#   Archer: PoisonArrow+RainOfArrows+Snipe, Mage: Thunder+Blizzard+ManaShield+Meteor)
 
 # ============================================================
 # Game Data (for mock_server.py)

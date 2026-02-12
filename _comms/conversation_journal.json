@@ -7,7 +7,7 @@
   },
 
   "next_message_number": {
-    "server": 14,
+    "server": 15,
     "client": 11
   },
 
@@ -221,6 +221,16 @@
       "summary": "야근 #3 완료: NPC 상점 시스템! SHOP_OPEN(250)→SHOP_LIST(251), SHOP_BUY(252), SHOP_SELL(253), SHOP_RESULT(254). 3개 NPC 상점(잡화/무기/방어구). protocol.yaml 업데이트됨.",
       "key_content": "ShopComponents.h 생성(CurrencyComponent+ShopTemplate+3개 상점 데이터). gold=1000 초기값. 판매가=구매가*0.4. 재고 관리. test_session32_shop.py 7개 테스트.",
       "status": "pending"
+    },
+    {
+      "id": "S014",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-13",
+      "type": "status",
+      "summary": "야근 #4 완료: 스킬 확장! 21개 스킬(기존8+신규13), 스킬 레벨 1~5, 스킬 포인트(레벨업 시 +1). SKILL_LEVEL_UP(260)/RESULT(261)/POINT_INFO(262) 추가. SKILL_LIST_RESP 확장(+level+effect+min_level). protocol.yaml 업데이트.",
+      "key_content": "SkillComponents.h 확장(SkillEffect enum, SkillLevelComponent, 21개 스킬 데이터). 새 스킬: Dash, Provoke, ShieldBash, Whirlwind, Warcry, PoisonArrow, RainOfArrows, Snipe, Thunder, Blizzard, ManaShield, Meteor. test_session33_skill_expansion.py 8개 테스트.",
+      "status": "pending"
     }
   ],
 
@@ -310,16 +320,17 @@
       {"id": "T013", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "note": "T011에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 연동"},
       {"id": "T014", "task": "서버: 채팅 시스템 (Session 30)", "assignee": "server", "status": "done", "note": "야근 #1. ChatComponents.h, 5개 MsgType(240-244), 존/파티/귓속말/시스템. test_session30_chat.py 8개 테스트."},
       {"id": "T015", "task": "서버: 장비 스탯 반영 (Session 31)", "assignee": "server", "status": "done", "note": "야근 #2. StatsComponent에 equip_atk/def_bonus 추가. 장착→ATK/DEF 반영→STAT_SYNC 자동 전송. test_session31_equipment.py 6개 테스트."},
-      {"id": "T016", "task": "서버: NPC 상점 시스템 (Session 32)", "assignee": "server", "status": "done", "note": "야근 #3. ShopComponents.h, 5개 MsgType(250-254), 3개 NPC 상점(잡화/무기/방어구), CurrencyComponent(gold), 판매가=40%. test_session32_shop.py 7개 테스트."}
+      {"id": "T016", "task": "서버: NPC 상점 시스템 (Session 32)", "assignee": "server", "status": "done", "note": "야근 #3. ShopComponents.h, 5개 MsgType(250-254), 3개 NPC 상점(잡화/무기/방어구), CurrencyComponent(gold), 판매가=40%. test_session32_shop.py 7개 테스트."},
+      {"id": "T017", "task": "서버: 스킬 확장 (Session 33)", "assignee": "server", "status": "done", "note": "야근 #4. 21개 스킬(8→21), SkillEffect enum, SkillLevelComponent(레벨1~5), 스킬 포인트 시스템. 3개 MsgType(260-262). SKILL_LIST_RESP 확장. test_session33_skill_expansion.py 8개 테스트."}
     ]
   },
 
   "agent_states": {
     "server": {
-      "last_sent": "S013",
+      "last_sent": "S014",
       "last_read": "C010",
-      "current_work": "야근 진행중! 채팅(T014)+장비(T015)+상점(T016) 완료. 다음: 스킬확장→보스.",
-      "capabilities": "32세션 구현(+채팅+장비스탯+NPC상점), 321+21=342테스트, 루트/스킬사망/퀘스트킬카운트/던전클리어/채팅/장비스탯/상점 전부 연동"
+      "current_work": "야근 진행중! 채팅(T014)+장비(T015)+상점(T016)+스킬확장(T017) 완료. 다음: 보스메카닉.",
+      "capabilities": "33세션 구현(+채팅+장비스탯+NPC상점+스킬확장), 321+29=350테스트, 21개 스킬/스킬레벨/포인트 시스템 전부 연동"
     },
     "client": {
       "last_sent": "C010",

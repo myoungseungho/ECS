@@ -196,6 +196,11 @@ enum class MsgType : uint16_t {
     SHOP_SELL       = 253, // C→S: [slot(1) count(2)]
     SHOP_RESULT     = 254, // S→C: [result(1) action(1) item_id(4) count(2) gold(4)]
 
+    // Session 33: Skill Expansion
+    SKILL_LEVEL_UP        = 260, // C→S: [skill_id(4)]
+    SKILL_LEVEL_UP_RESULT = 261, // S→C: [result(1) skill_id(4) new_level(1) skill_points(4)]
+    SKILL_POINT_INFO      = 262, // S→C: [skill_points(4) total_spent(4)]
+
     STATS       = 99,  // 내부 진단
 };
 
