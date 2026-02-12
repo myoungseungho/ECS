@@ -245,7 +245,7 @@ def invoke_claude(prompt, role, context_files=None):
 
     try:
         result = subprocess.run(
-            ["claude", "-p", full_prompt, "--no-input"],
+            ["claude", "-p", full_prompt],
             capture_output=True, text=True,
             timeout=CLAUDE_TIMEOUT,
             cwd=str(REPO_ROOT)
