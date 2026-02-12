@@ -17,10 +17,12 @@ public static class ProjectSetup
     private const string PrefabsDir     = "Assets/Prefabs";
     private const string ScenesDir      = "Assets/Scenes";
 
-    private const string LocalMatPath   = MaterialsDir + "/LocalPlayer.mat";
-    private const string RemoteMatPath  = MaterialsDir + "/RemotePlayer.mat";
-    private const string LocalPrefabPath  = PrefabsDir + "/LocalPlayer.prefab";
-    private const string RemotePrefabPath = PrefabsDir + "/RemotePlayer.prefab";
+    private const string LocalMatPath    = MaterialsDir + "/LocalPlayer.mat";
+    private const string RemoteMatPath   = MaterialsDir + "/RemotePlayer.mat";
+    private const string MonsterMatPath  = MaterialsDir + "/Monster.mat";
+    private const string LocalPrefabPath   = PrefabsDir + "/LocalPlayer.prefab";
+    private const string RemotePrefabPath  = PrefabsDir + "/RemotePlayer.prefab";
+    private const string MonsterPrefabPath = PrefabsDir + "/Monster.prefab";
     private const string GameScenePath  = ScenesDir + "/GameScene.unity";
     private const string TestScenePath  = ScenesDir + "/TestScene.unity";
 
@@ -79,6 +81,7 @@ public static class ProjectSetup
     {
         CreateMaterial(LocalMatPath,  new Color(0.2f, 0.4f, 1.0f), "LocalPlayer (파랑)");
         CreateMaterial(RemoteMatPath, new Color(0.2f, 0.8f, 0.3f), "RemotePlayer (초록)");
+        CreateMaterial(MonsterMatPath, new Color(0.9f, 0.2f, 0.2f), "Monster (빨강)");
     }
 
     private static void CreateMaterial(string path, Color color, string label)
@@ -120,6 +123,34 @@ public static class ProjectSetup
             typeof(RemotePlayer),
             "RemotePlayer"
         );
+
+        CreateMonsterPrefab();
+    }
+
+    private static void CreateMonsterPrefab()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(MonsterPrefabPath) != null)
+        {
+            Debug.Log("  [Prefab] Monster — 이미 존재, 스킵");
+            return;
+        }
+
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = "Monster";
+        go.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
+
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(MonsterMatPath);
+        if (mat != null)
+        {
+            var renderer = go.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = mat;
+        }
+
+        go.AddComponent<MonsterEntity>();
+
+        PrefabUtility.SaveAsPrefabAsset(go, MonsterPrefabPath);
+        Object.DestroyImmediate(go);
+        Debug.Log("  [Prefab] Monster 생성 완료");
     }
 
     private static void CreatePlayerPrefab(
@@ -192,6 +223,12 @@ public static class ProjectSetup
         var entityPoolGo = CreateManagerObject("EntityPool", typeof(EntityPool));
         var statsManagerGo = CreateManagerObject("StatsManager", typeof(StatsManager));
         var combatManagerGo = CreateManagerObject("CombatManager", typeof(CombatManager));
+        var monsterManagerGo = CreateManagerObject("MonsterManager", typeof(MonsterManager));
+        var skillManagerGo = CreateManagerObject("SkillManager", typeof(SkillManager));
+        var inventoryManagerGo = CreateManagerObject("InventoryManager", typeof(InventoryManager));
+        var partyManagerGo = CreateManagerObject("PartyManager", typeof(PartyManager));
+        var buffManagerGo = CreateManagerObject("BuffManager", typeof(BuffManager));
+        var questManagerGo = CreateManagerObject("QuestManager", typeof(QuestManager));
 
         // --- UI Canvas ---
         CreateUICanvas(scene);
@@ -199,6 +236,7 @@ public static class ProjectSetup
         // --- Prefab 참조 연결 (SerializedObject API) ---
         var localPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(LocalPrefabPath);
         var remotePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(RemotePrefabPath);
+        var monsterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(MonsterPrefabPath);
 
         // EntityManager: localPlayerPrefab, remotePlayerPrefab
         ConnectPrefabRef(entityManagerGo, typeof(EntityManager),
@@ -209,6 +247,10 @@ public static class ProjectSetup
         // EntityPool: prefab (RemotePlayer)
         ConnectPrefabRef(entityPoolGo, typeof(EntityPool),
             "prefab", remotePrefab);
+
+        // MonsterManager: monsterPrefab (Monster)
+        ConnectPrefabRef(monsterManagerGo, typeof(MonsterManager),
+            "monsterPrefab", monsterPrefab);
 
         // Scene 저장
         EditorSceneManager.SaveScene(scene, GameScenePath);

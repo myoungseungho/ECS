@@ -22,12 +22,19 @@ Assets/
 ├── Scripts/
 │   ├── Entity/              # 플레이어/엔티티 행동
 │   │   ├── LocalPlayer.cs   # 내 캐릭터 (입력, 카메라, 이동 전송)
-│   │   └── RemotePlayer.cs  # 다른 플레이어 (서버 위치로 보간)
+│   │   ├── RemotePlayer.cs  # 다른 플레이어 (서버 위치로 보간)
+│   │   └── MonsterEntity.cs # 몬스터 (HP 추적 + 위치 보간)
 │   ├── Managers/            # 싱글톤 매니저
-│   │   ├── EntityManager.cs # 엔티티 생성/파괴/이동 관리
-│   │   ├── GameManager.cs   # 게임 상태 머신 (Login→CharSelect→InGame)
-│   │   ├── StatsManager.cs  # 스탯 동기화 (HP/MP/ATK/DEF/Level/EXP)
-│   │   └── CombatManager.cs # 전투 관리 (공격/사망/부활)
+│   │   ├── EntityManager.cs    # 엔티티 생성/파괴/이동 관리
+│   │   ├── GameManager.cs      # 게임 상태 머신 (Login→CharSelect→InGame)
+│   │   ├── StatsManager.cs     # 스탯 동기화 (HP/MP/ATK/DEF/Level/EXP)
+│   │   ├── CombatManager.cs    # 전투 관리 (공격/사망/부활)
+│   │   ├── MonsterManager.cs   # 몬스터 생명주기 (스폰/사망/리스폰)
+│   │   ├── SkillManager.cs     # 스킬 시스템 (목록/쿨다운/사용)
+│   │   ├── InventoryManager.cs # 인벤토리 (아이템 목록/사용/장착)
+│   │   ├── PartyManager.cs     # 파티 시스템 (생성/초대/탈퇴)
+│   │   ├── BuffManager.cs      # 버프 시스템 (목록/적용/제거/타이머)
+│   │   └── QuestManager.cs     # 퀘스트 시스템 (목록/수락/완료)
 │   ├── Network/             # 네트워크 레이어 (namespace: Network)
 │   │   ├── NetworkManager.cs     # Gate→Field 연결 + 패킷 디스패치
 │   │   ├── TCPClient.cs          # TCP 소켓 + 백그라운드 수신 스레드
@@ -86,6 +93,12 @@ private void Awake()
 | EntityPool | X | Scene-bound — EntityManager와 같은 수명 |
 | StatsManager | X | Scene-bound — Scene 로드 시 스탯 리셋 |
 | CombatManager | X | Scene-bound — Scene 로드 시 전투 상태 리셋 |
+| MonsterManager | X | Scene-bound — Scene 로드 시 몬스터 리셋 |
+| SkillManager | X | Scene-bound — Scene 로드 시 스킬/쿨다운 리셋 |
+| InventoryManager | X | Scene-bound — Scene 로드 시 인벤토리 리셋 |
+| PartyManager | X | Scene-bound — Scene 로드 시 파티 리셋 |
+| BuffManager | X | Scene-bound — Scene 로드 시 버프 리셋 |
+| QuestManager | X | Scene-bound — Scene 로드 시 퀘스트 리셋 |
 
 ## 데이터 흐름
 
@@ -109,10 +122,29 @@ private void Awake()
    │       스탯 데이터 저장 + OnStatsChanged 발행
    │       └──▶ [HUDManager]  ← OnStatsChanged — HP/MP/EXP/Level 표시
    │
-   └──▶ [CombatManager]   ← OnAttackResult, OnCombatDied, OnRespawnResult
-           전투 상태 관리 + 이벤트 중계
-           ├──▶ [CombatUI]  ← OnAttackFeedback — 데미지 텍스트 + 타겟 HP바
-           └──▶ [DeathUI]   ← OnEntityDied, OnRespawnComplete — 사망/부활 UI
+   ├──▶ [CombatManager]   ← OnAttackResult, OnCombatDied, OnRespawnResult
+   │       전투 상태 관리 + 이벤트 중계
+   │       ├──▶ [CombatUI]  ← OnAttackFeedback — 데미지 텍스트 + 타겟 HP바
+   │       └──▶ [DeathUI]   ← OnEntityDied, OnRespawnComplete — 사망/부활 UI
+   │
+   ├──▶ [MonsterManager]  ← OnMonsterSpawn, OnMonsterRespawn, OnCombatDied, OnEntityMove, OnAttackResult
+   │       몬스터 생명주기 관리 + HP 갱신
+   │       └──▶ [MonsterEntity]  ← Initialize(), SetTargetPosition()
+   │
+   ├──▶ [SkillManager]    ← OnSkillList, OnSkillResult, OnEnterGame
+   │       스킬 목록/쿨다운 관리 (자동 SKILL_LIST_REQ)
+   │
+   ├──▶ [InventoryManager] ← OnInventoryResp, OnItemAddResult, OnItemUseResult, OnItemEquipResult, OnEnterGame
+   │       인벤토리 관리 (자동 INVENTORY_REQ)
+   │
+   ├──▶ [PartyManager]    ← OnPartyInfo
+   │       파티 상태 관리
+   │
+   ├──▶ [BuffManager]     ← OnBuffList, OnBuffResult, OnBuffRemoveResp, OnEnterGame
+   │       버프 목록/타이머 관리 (자동 BUFF_LIST_REQ)
+   │
+   └──▶ [QuestManager]    ← OnQuestList, OnQuestAcceptResult, OnQuestCompleteResult, OnEnterGame
+           퀘스트 상태 관리 (자동 QUEST_LIST_REQ)
 
 [LocalPlayer]
    │ Update() — WASD 입력
