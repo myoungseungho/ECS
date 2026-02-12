@@ -446,7 +446,248 @@ public static class ProjectSetup
         if (rbProp != null) rbProp.objectReferenceValue = respawnBtn;
         deathSO.ApplyModifiedPropertiesWithoutUndo();
 
-        Debug.Log("  [UI] Canvas + HUD + Target + Death + DamageText 생성 완료");
+        // --- Skill Bar (하단 중앙) ---
+        var skillBarGo = new GameObject("SkillBarPanel");
+        skillBarGo.transform.SetParent(canvasGo.transform, false);
+        var skillBarRT = skillBarGo.AddComponent<RectTransform>();
+        skillBarRT.anchorMin = new Vector2(0.5f, 0f);
+        skillBarRT.anchorMax = new Vector2(0.5f, 0f);
+        skillBarRT.pivot = new Vector2(0.5f, 0f);
+        skillBarRT.anchoredPosition = new Vector2(0, 10);
+        skillBarRT.sizeDelta = new Vector2(400, 60);
+
+        var skillBarUI = skillBarGo.AddComponent<SkillBarUI>();
+        var slotNameTexts = new Text[4];
+        var slotKeyTexts = new Text[4];
+        var cooldownOverlays = new Image[4];
+
+        for (int i = 0; i < 4; i++)
+        {
+            float xOff = -150 + i * 100;
+            var slotGo = new GameObject($"Slot{i + 1}");
+            slotGo.transform.SetParent(skillBarGo.transform, false);
+            var slotRT = slotGo.AddComponent<RectTransform>();
+            slotRT.anchorMin = new Vector2(0.5f, 0.5f);
+            slotRT.anchorMax = new Vector2(0.5f, 0.5f);
+            slotRT.anchoredPosition = new Vector2(xOff, 0);
+            slotRT.sizeDelta = new Vector2(80, 50);
+            var slotBg = slotGo.AddComponent<Image>();
+            slotBg.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+
+            var keyGo = CreateUIText(slotGo.transform, "Key", $"{i + 1}",
+                new Vector2(2, -2), new Vector2(20, 16), TextAnchor.UpperLeft);
+            slotKeyTexts[i] = keyGo.GetComponent<Text>();
+
+            var nameGo = CreateUIText(slotGo.transform, "Name", "",
+                new Vector2(0, -18), new Vector2(76, 16), TextAnchor.MiddleCenter);
+            slotNameTexts[i] = nameGo.GetComponent<Text>();
+
+            var cdGo = new GameObject("Cooldown");
+            cdGo.transform.SetParent(slotGo.transform, false);
+            var cdRT = cdGo.AddComponent<RectTransform>();
+            cdRT.anchorMin = Vector2.zero;
+            cdRT.anchorMax = Vector2.one;
+            cdRT.sizeDelta = Vector2.zero;
+            var cdImg = cdGo.AddComponent<Image>();
+            cdImg.color = new Color(0, 0, 0, 0.6f);
+            cdImg.type = Image.Type.Filled;
+            cdImg.fillMethod = Image.FillMethod.Vertical;
+            cdImg.fillAmount = 0f;
+            cdGo.SetActive(false);
+            cooldownOverlays[i] = cdImg;
+        }
+
+        var skillBarSO = new SerializedObject(skillBarUI);
+        SetArrayRef(skillBarSO, "slotNameTexts", slotNameTexts);
+        SetArrayRef(skillBarSO, "slotKeyTexts", slotKeyTexts);
+        SetImageArrayRef(skillBarSO, "cooldownOverlays", cooldownOverlays);
+        skillBarSO.ApplyModifiedPropertiesWithoutUndo();
+
+        // --- Inventory Panel (우측, I키 토글) ---
+        var invPanelGo = new GameObject("InventoryPanel");
+        invPanelGo.transform.SetParent(canvasGo.transform, false);
+        var invPanelRT = invPanelGo.AddComponent<RectTransform>();
+        invPanelRT.anchorMin = new Vector2(1f, 0f);
+        invPanelRT.anchorMax = new Vector2(1f, 1f);
+        invPanelRT.pivot = new Vector2(1f, 0.5f);
+        invPanelRT.anchoredPosition = new Vector2(-10, 0);
+        invPanelRT.sizeDelta = new Vector2(250, 0);
+        var invBg = invPanelGo.AddComponent<Image>();
+        invBg.color = new Color(0.1f, 0.1f, 0.15f, 0.85f);
+
+        var invUI = invPanelGo.AddComponent<InventoryUI>();
+        var invCountGo = CreateUIText(invPanelGo.transform, "ItemCount", "Items: 0",
+            new Vector2(10, -10), new Vector2(200, 25), TextAnchor.UpperLeft);
+
+        var invListGo = new GameObject("ItemList");
+        invListGo.transform.SetParent(invPanelGo.transform, false);
+        var invListRT = invListGo.AddComponent<RectTransform>();
+        invListRT.anchorMin = new Vector2(0, 0);
+        invListRT.anchorMax = new Vector2(1, 1);
+        invListRT.offsetMin = new Vector2(5, 5);
+        invListRT.offsetMax = new Vector2(-5, -40);
+
+        var invTemplate = CreateUIText(invListGo.transform, "ItemTemplate", "[0] Item#0 x1",
+            new Vector2(0, 0), new Vector2(230, 25), TextAnchor.MiddleLeft);
+        invTemplate.SetActive(false);
+
+        var invSO = new SerializedObject(invUI);
+        var invPanelProp = invSO.FindProperty("inventoryPanel");
+        if (invPanelProp != null) invPanelProp.objectReferenceValue = invPanelGo;
+        var invListProp = invSO.FindProperty("itemListParent");
+        if (invListProp != null) invListProp.objectReferenceValue = invListGo.transform;
+        var invTemplateProp = invSO.FindProperty("itemSlotTemplate");
+        if (invTemplateProp != null) invTemplateProp.objectReferenceValue = invTemplate;
+        SetTextRef(invSO, "itemCountText", invCountGo);
+        invSO.ApplyModifiedPropertiesWithoutUndo();
+
+        // --- Party Panel (좌측, P키 토글) ---
+        var partyPanelGo = new GameObject("PartyPanel");
+        partyPanelGo.transform.SetParent(canvasGo.transform, false);
+        var partyPanelRT = partyPanelGo.AddComponent<RectTransform>();
+        partyPanelRT.anchorMin = new Vector2(0f, 0.3f);
+        partyPanelRT.anchorMax = new Vector2(0f, 0.7f);
+        partyPanelRT.pivot = new Vector2(0f, 0.5f);
+        partyPanelRT.anchoredPosition = new Vector2(10, 0);
+        partyPanelRT.sizeDelta = new Vector2(200, 0);
+        var partyBg = partyPanelGo.AddComponent<Image>();
+        partyBg.color = new Color(0.1f, 0.12f, 0.15f, 0.85f);
+
+        var partyUI = partyPanelGo.AddComponent<PartyUI>();
+        var partyStatusGo = CreateUIText(partyPanelGo.transform, "PartyStatus", "No Party",
+            new Vector2(10, -10), new Vector2(180, 25), TextAnchor.UpperLeft);
+
+        var memberListGo = new GameObject("MemberList");
+        memberListGo.transform.SetParent(partyPanelGo.transform, false);
+        var memberListRT = memberListGo.AddComponent<RectTransform>();
+        memberListRT.anchorMin = new Vector2(0, 0);
+        memberListRT.anchorMax = new Vector2(1, 1);
+        memberListRT.offsetMin = new Vector2(5, 40);
+        memberListRT.offsetMax = new Vector2(-5, -40);
+
+        var memberTemplate = CreateUIText(memberListGo.transform, "MemberTemplate", "Entity#0 Lv.1",
+            new Vector2(0, 0), new Vector2(180, 22), TextAnchor.MiddleLeft);
+        memberTemplate.SetActive(false);
+
+        var createBtnGo = new GameObject("CreateButton");
+        createBtnGo.transform.SetParent(partyPanelGo.transform, false);
+        var createBtnRT = createBtnGo.AddComponent<RectTransform>();
+        createBtnRT.anchorMin = new Vector2(0, 0);
+        createBtnRT.anchorMax = new Vector2(0.5f, 0);
+        createBtnRT.pivot = new Vector2(0.5f, 0);
+        createBtnRT.anchoredPosition = new Vector2(0, 5);
+        createBtnRT.sizeDelta = new Vector2(0, 30);
+        createBtnGo.AddComponent<Image>().color = new Color(0.3f, 0.5f, 0.3f);
+        var createBtn = createBtnGo.AddComponent<Button>();
+        var createTxt = CreateUIText(createBtnGo.transform, "Text", "Create",
+            Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter);
+        var createTxtRT = createTxt.GetComponent<RectTransform>();
+        createTxtRT.anchorMin = Vector2.zero; createTxtRT.anchorMax = Vector2.one;
+        createTxtRT.sizeDelta = Vector2.zero;
+
+        var leaveBtnGo = new GameObject("LeaveButton");
+        leaveBtnGo.transform.SetParent(partyPanelGo.transform, false);
+        var leaveBtnRT = leaveBtnGo.AddComponent<RectTransform>();
+        leaveBtnRT.anchorMin = new Vector2(0.5f, 0);
+        leaveBtnRT.anchorMax = new Vector2(1, 0);
+        leaveBtnRT.pivot = new Vector2(0.5f, 0);
+        leaveBtnRT.anchoredPosition = new Vector2(0, 5);
+        leaveBtnRT.sizeDelta = new Vector2(0, 30);
+        leaveBtnGo.AddComponent<Image>().color = new Color(0.5f, 0.3f, 0.3f);
+        var leaveBtn = leaveBtnGo.AddComponent<Button>();
+        var leaveTxt = CreateUIText(leaveBtnGo.transform, "Text", "Leave",
+            Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter);
+        var leaveTxtRT = leaveTxt.GetComponent<RectTransform>();
+        leaveTxtRT.anchorMin = Vector2.zero; leaveTxtRT.anchorMax = Vector2.one;
+        leaveTxtRT.sizeDelta = Vector2.zero;
+
+        var partySO = new SerializedObject(partyUI);
+        var partyPanelProp = partySO.FindProperty("partyPanel");
+        if (partyPanelProp != null) partyPanelProp.objectReferenceValue = partyPanelGo;
+        SetTextRef(partySO, "partyStatusText", partyStatusGo);
+        var memberListProp = partySO.FindProperty("memberListParent");
+        if (memberListProp != null) memberListProp.objectReferenceValue = memberListGo.transform;
+        var memberTemplateProp = partySO.FindProperty("memberTemplate");
+        if (memberTemplateProp != null) memberTemplateProp.objectReferenceValue = memberTemplate;
+        var createBtnProp = partySO.FindProperty("createButton");
+        if (createBtnProp != null) createBtnProp.objectReferenceValue = createBtn;
+        var leaveBtnProp = partySO.FindProperty("leaveButton");
+        if (leaveBtnProp != null) leaveBtnProp.objectReferenceValue = leaveBtn;
+        partySO.ApplyModifiedPropertiesWithoutUndo();
+
+        // --- Buff Icons (우상단) ---
+        var buffPanelGo = new GameObject("BuffPanel");
+        buffPanelGo.transform.SetParent(canvasGo.transform, false);
+        var buffPanelRT = buffPanelGo.AddComponent<RectTransform>();
+        buffPanelRT.anchorMin = new Vector2(1f, 1f);
+        buffPanelRT.anchorMax = new Vector2(1f, 1f);
+        buffPanelRT.pivot = new Vector2(1f, 1f);
+        buffPanelRT.anchoredPosition = new Vector2(-10, -10);
+        buffPanelRT.sizeDelta = new Vector2(300, 50);
+
+        var buffUI = buffPanelGo.AddComponent<BuffUI>();
+
+        var buffTemplate = new GameObject("BuffTemplate");
+        buffTemplate.transform.SetParent(buffPanelGo.transform, false);
+        var buffTemplateRT = buffTemplate.AddComponent<RectTransform>();
+        buffTemplateRT.sizeDelta = new Vector2(50, 50);
+        var buffTemplateBg = buffTemplate.AddComponent<Image>();
+        buffTemplateBg.color = new Color(0.3f, 0.2f, 0.5f, 0.8f);
+        var buffTemplateText = CreateUIText(buffTemplate.transform, "Text", "B0\n0s",
+            new Vector2(0, 0), new Vector2(50, 50), TextAnchor.MiddleCenter);
+        var bttRT = buffTemplateText.GetComponent<RectTransform>();
+        bttRT.anchorMin = Vector2.zero; bttRT.anchorMax = Vector2.one;
+        bttRT.sizeDelta = Vector2.zero; bttRT.anchoredPosition = Vector2.zero;
+        var btt = buffTemplateText.GetComponent<Text>();
+        if (btt != null) btt.fontSize = 11;
+        buffTemplate.SetActive(false);
+
+        var buffSO = new SerializedObject(buffUI);
+        var buffParentProp = buffSO.FindProperty("buffIconParent");
+        if (buffParentProp != null) buffParentProp.objectReferenceValue = buffPanelGo.transform;
+        var buffTemplateProp = buffSO.FindProperty("buffIconTemplate");
+        if (buffTemplateProp != null) buffTemplateProp.objectReferenceValue = buffTemplate;
+        buffSO.ApplyModifiedPropertiesWithoutUndo();
+
+        // --- Quest Panel (우측, Q키 토글) ---
+        var questPanelGo = new GameObject("QuestPanel");
+        questPanelGo.transform.SetParent(canvasGo.transform, false);
+        var questPanelRT = questPanelGo.AddComponent<RectTransform>();
+        questPanelRT.anchorMin = new Vector2(1f, 0.3f);
+        questPanelRT.anchorMax = new Vector2(1f, 0.7f);
+        questPanelRT.pivot = new Vector2(1f, 0.5f);
+        questPanelRT.anchoredPosition = new Vector2(-10, 0);
+        questPanelRT.sizeDelta = new Vector2(280, 0);
+        var questBg = questPanelGo.AddComponent<Image>();
+        questBg.color = new Color(0.12f, 0.1f, 0.1f, 0.85f);
+
+        var questUI = questPanelGo.AddComponent<QuestUI>();
+        var questCountGo = CreateUIText(questPanelGo.transform, "QuestCount", "Quests: 0",
+            new Vector2(10, -10), new Vector2(200, 25), TextAnchor.UpperLeft);
+
+        var questListGo = new GameObject("QuestList");
+        questListGo.transform.SetParent(questPanelGo.transform, false);
+        var questListRT = questListGo.AddComponent<RectTransform>();
+        questListRT.anchorMin = new Vector2(0, 0);
+        questListRT.anchorMax = new Vector2(1, 1);
+        questListRT.offsetMin = new Vector2(5, 5);
+        questListRT.offsetMax = new Vector2(-5, -40);
+
+        var questTemplate = CreateUIText(questListGo.transform, "QuestTemplate", "[???] Quest#0",
+            new Vector2(0, 0), new Vector2(260, 25), TextAnchor.MiddleLeft);
+        questTemplate.SetActive(false);
+
+        var questSO = new SerializedObject(questUI);
+        var questPanelProp = questSO.FindProperty("questPanel");
+        if (questPanelProp != null) questPanelProp.objectReferenceValue = questPanelGo;
+        var questListProp = questSO.FindProperty("questListParent");
+        if (questListProp != null) questListProp.objectReferenceValue = questListGo.transform;
+        var questTemplateProp = questSO.FindProperty("questEntryTemplate");
+        if (questTemplateProp != null) questTemplateProp.objectReferenceValue = questTemplate;
+        SetTextRef(questSO, "questCountText", questCountGo);
+        questSO.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log("  [UI] Canvas + HUD + Target + Death + DamageText + SkillBar + Inventory + Party + Buff + Quest 생성 완료");
     }
 
     // ━━━ UI 헬퍼 ━━━
@@ -534,6 +775,30 @@ public static class ProjectSetup
         var prop = so.FindProperty(fieldName);
         if (prop != null && textGo != null)
             prop.objectReferenceValue = textGo.GetComponent<Text>();
+    }
+
+    private static void SetArrayRef(SerializedObject so, string fieldName, Text[] texts)
+    {
+        var prop = so.FindProperty(fieldName);
+        if (prop == null) return;
+        prop.arraySize = texts.Length;
+        for (int i = 0; i < texts.Length; i++)
+        {
+            var elem = prop.GetArrayElementAtIndex(i);
+            elem.objectReferenceValue = texts[i];
+        }
+    }
+
+    private static void SetImageArrayRef(SerializedObject so, string fieldName, Image[] images)
+    {
+        var prop = so.FindProperty(fieldName);
+        if (prop == null) return;
+        prop.arraySize = images.Length;
+        for (int i = 0; i < images.Length; i++)
+        {
+            var elem = prop.GetArrayElementAtIndex(i);
+            elem.objectReferenceValue = images[i];
+        }
     }
 
     // ━━━ 유틸 ━━━

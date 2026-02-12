@@ -49,7 +49,12 @@ Assets/
 │   ├── UI/                  # UI 스크립트
 │   │   ├── HUDManager.cs    # HP/MP/EXP바 + 레벨 표시
 │   │   ├── CombatUI.cs      # 데미지 텍스트 팝업 + 타겟 HP바
-│   │   └── DeathUI.cs       # 사망 패널 + 부활 버튼
+│   │   ├── DeathUI.cs       # 사망 패널 + 부활 버튼
+│   │   ├── SkillBarUI.cs    # 하단 스킬바 (1~4키 + 쿨다운)
+│   │   ├── InventoryUI.cs   # 인벤토리 패널 (I키 토글)
+│   │   ├── PartyUI.cs       # 파티 패널 (P키 토글)
+│   │   ├── BuffUI.cs        # 버프 아이콘 (우상단)
+│   │   └── QuestUI.cs       # 퀘스트 패널 (Q키 토글)
 │   └── interaction-map.yaml # 매니저 의존성 맵
 └── Settings/                # URP 렌더링 설정
 ```
@@ -133,18 +138,23 @@ private void Awake()
    │
    ├──▶ [SkillManager]    ← OnSkillList, OnSkillResult, OnEnterGame
    │       스킬 목록/쿨다운 관리 (자동 SKILL_LIST_REQ)
+   │       └──▶ [SkillBarUI]  ← OnSkillListChanged — 1~4키 스킬바 + 쿨다운
    │
    ├──▶ [InventoryManager] ← OnInventoryResp, OnItemAddResult, OnItemUseResult, OnItemEquipResult, OnEnterGame
    │       인벤토리 관리 (자동 INVENTORY_REQ)
+   │       └──▶ [InventoryUI]  ← OnInventoryChanged — I키 토글 인벤토리 패널
    │
    ├──▶ [PartyManager]    ← OnPartyInfo
    │       파티 상태 관리
+   │       └──▶ [PartyUI]  ← OnPartyChanged — P키 토글 파티 패널
    │
    ├──▶ [BuffManager]     ← OnBuffList, OnBuffResult, OnBuffRemoveResp, OnEnterGame
    │       버프 목록/타이머 관리 (자동 BUFF_LIST_REQ)
+   │       └──▶ [BuffUI]  ← OnBuffListChanged — 우상단 버프 아이콘
    │
    └──▶ [QuestManager]    ← OnQuestList, OnQuestAcceptResult, OnQuestCompleteResult, OnEnterGame
            퀘스트 상태 관리 (자동 QUEST_LIST_REQ)
+           └──▶ [QuestUI]  ← OnQuestListChanged — Q키 토글 퀘스트 패널
 
 [LocalPlayer]
    │ Update() — WASD 입력

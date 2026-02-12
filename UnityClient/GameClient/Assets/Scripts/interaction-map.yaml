@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_28
+version: session_28_ui
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -430,6 +430,31 @@ data_flows:
     to: DeathUI
     via: "C# events (OnEntityDied, OnRespawnComplete)"
     description: "사망 패널 표시/숨김"
+
+  - from: SkillManager
+    to: SkillBarUI
+    via: "C# events (OnSkillListChanged, OnSkillUsed)"
+    description: "스킬 목록 변경 → 슬롯 이름 갱신, 쿨다운 오버레이"
+
+  - from: InventoryManager
+    to: InventoryUI
+    via: "C# event (OnInventoryChanged)"
+    description: "인벤토리 변경 → 아이템 슬롯 리스트 갱신"
+
+  - from: PartyManager
+    to: PartyUI
+    via: "C# event (OnPartyChanged)"
+    description: "파티 상태 변경 → 멤버 리스트/버튼 갱신"
+
+  - from: BuffManager
+    to: BuffUI
+    via: "C# event (OnBuffListChanged)"
+    description: "버프 변경 → 아이콘 리스트 + 타이머 갱신"
+
+  - from: QuestManager
+    to: QuestUI
+    via: "C# event (OnQuestListChanged)"
+    description: "퀘스트 변경 → 리스트 + 진행 상황 갱신"
 
   - from: LocalPlayer
     to: NetworkManager
