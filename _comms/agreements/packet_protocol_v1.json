@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "status": "proposed_by_server",
+  "last_updated": "2026-02-11",
+  "description": "서버-클라이언트 패킷 프로토콜 규격",
+
+  "header": {
+    "format": "[length:4][msg_type:2][payload:variable]",
+    "header_size": 6,
+    "byte_order": "little-endian",
+    "length_includes_header": true
+  },
+
+  "systems": {
+    "login": {
+      "LOGIN_REQ": { "id": 60, "payload": "[uname_len:1][uname:var][pw_len:1][pw:var]" },
+      "LOGIN_RESP": { "id": 61, "payload": "[result:1][account_id:4]" },
+      "CHAR_LIST_REQ": { "id": 62, "payload": "none" },
+      "CHAR_LIST_RESP": { "id": 63, "payload": "[count:1] + {char_id:4, name_len:1, name:var, level:2, job:1}..." },
+      "CHAR_SELECT_REQ": { "id": 64, "payload": "[char_id:4]" },
+      "CHAR_SELECT_RESP": { "id": 65, "payload": "[result:1][char_id:4][x:4f][y:4f][z:4f][hp:4][max_hp:4][mp:4][max_mp:4][level:2][exp:4][job:1]" }
+    },
+    "movement": {
+      "MOVE_REQ": { "id": 10, "payload": "[x:4f][y:4f][z:4f]" },
+      "MOVE_RESP": { "id": 11, "payload": "[entity_id:8][x:4f][y:4f][z:4f]" },
+      "ENTITY_SPAWN": { "id": 50, "payload": "[entity_id:8][type:1][x:4f][y:4f][z:4f] + type-specific data" },
+      "ENTITY_DESPAWN": { "id": 52, "payload": "[entity_id:8]" }
+    },
+    "combat": {
+      "ATTACK_REQ": { "id": 20, "payload": "[target_entity_id:8]" },
+      "ATTACK_RESULT": { "id": 21, "payload": "[result:1][attacker:8][target:8][damage:4][target_hp:4][target_max_hp:4]" }
+    },
+    "inventory": {
+      "INVENTORY_REQ": { "id": 190, "payload": "none" },
+      "INVENTORY_RESP": { "id": 191, "payload": "[count:1] + {slot:1, item_id:4, count:2, equipped:1}..." }
+    },
+    "quest": {
+      "QUEST_LIST_REQ": { "id": 230, "payload": "none" },
+      "QUEST_LIST_RESP": { "id": 231, "payload": "[count:1] + {quest_id:4, state:1, progress:4, target:4}..." },
+      "QUEST_ACCEPT": { "id": 232, "payload": "[quest_id:4]" },
+      "QUEST_ACCEPT_RESP": { "id": 233, "payload": "[result:1][quest_id:4]" },
+      "QUEST_COMPLETE": { "id": 234, "payload": "[quest_id:4]" },
+      "QUEST_COMPLETE_RESP": { "id": 235, "payload": "[result:1][quest_id:4]" }
+    },
+    "buff": {
+      "BUFF_LIST_REQ": { "id": 200, "payload": "none" },
+      "BUFF_LIST_RESP": { "id": 201, "payload": "[count:1] + {buff_id:4, stacks:1, remaining_ms:4}..." },
+      "BUFF_APPLY": { "id": 202, "payload": "[buff_id:4]" },
+      "BUFF_RESULT": { "id": 203, "payload": "[result:1][buff_id:4][stacks:1][duration_ms:4]" },
+      "BUFF_REMOVE": { "id": 204, "payload": "[buff_id:4]" },
+      "BUFF_REMOVE_RESP": { "id": 205, "payload": "[result:1]" }
+    }
+  },
+
+  "notes": [
+    "모든 float는 4바이트 IEEE 754",
+    "모든 정수는 little-endian",
+    "entity_id는 uint64 (8바이트)",
+    "result 0 = SUCCESS, 나머지는 에러코드 (시스템별 상이)",
+    "이 문서는 서버 에이전트가 제안한 초안. 클라 에이전트 합의 필요."
+  ]
+}
