@@ -1088,6 +1088,77 @@ result_codes:
     40: IN_ZONE
     60: CLASS_EQ
 
+  WhisperResult:
+    0: SUCCESS
+    1: TARGET_NOT_FOUND
+    2: TARGET_OFFLINE
+
+  WhisperDirection:
+    0: RECEIVED
+    1: SENT
+
+  ChatChannel:
+    0: GENERAL
+    1: PARTY
+    2: WHISPER
+    3: SYSTEM
+
+# ============================================================
+# Session 30: Chat System
+# ============================================================
+
+  CHAT_SEND:
+    id: 240
+    session: 30
+    direction: C2S
+    payload:
+      - { name: channel, type: u8, enum: ChatChannel }
+      - { name: msg_len, type: u8 }
+      - { name: message, type: bytes, size: variable }
+    note: "channel 0=zone broadcast, 1=party only"
+
+  CHAT_MESSAGE:
+    id: 241
+    session: 30
+    direction: S2C
+    payload:
+      - { name: channel, type: u8, enum: ChatChannel }
+      - { name: sender_entity, type: u64 }
+      - { name: sender_name, type: string_fixed, size: 32 }
+      - { name: msg_len, type: u8 }
+      - { name: message, type: bytes, size: variable }
+    note: "Fixed header: 1+8+32+1 = 42 bytes + variable message"
+
+  WHISPER_SEND:
+    id: 242
+    session: 30
+    direction: C2S
+    payload:
+      - { name: target_name_len, type: u8 }
+      - { name: target_name, type: string, size: variable }
+      - { name: msg_len, type: u8 }
+      - { name: message, type: bytes, size: variable }
+
+  WHISPER_RESULT:
+    id: 243
+    session: 30
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: WhisperResult }
+      - { name: direction, type: u8, enum: WhisperDirection }
+      - { name: other_name, type: string_fixed, size: 32 }
+      - { name: msg_len, type: u8 }
+      - { name: message, type: bytes, size: variable }
+    note: "direction 0=received whisper, 1=sent echo. other_name is sender(for received) or target(for sent)"
+
+  SYSTEM_MESSAGE:
+    id: 244
+    session: 30
+    direction: S2C
+    payload:
+      - { name: msg_len, type: u8 }
+      - { name: message, type: bytes, size: variable }
+
 # ============================================================
 # Game Data (for mock_server.py)
 # ============================================================

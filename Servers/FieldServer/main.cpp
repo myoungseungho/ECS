@@ -34,6 +34,7 @@
 #include "../../Core/ConditionEngine.h"              // Session 25
 #include "../../Components/LootComponents.h"         // Session 27
 #include "../../Components/QuestComponents.h"        // Session 28
+#include "../../Components/ChatComponents.h"          // Session 30
 
 #include <cstdio>
 #include <cstdlib>
@@ -869,6 +870,15 @@ void OnCharSelect(World& world, Entity entity, const char* payload, int len) {
 
     // 게임 진입: Component 부착
     login.state = LoginState::IN_GAME;
+
+    // Name (Session 30: 채팅용)
+    if (!world.HasComponent<NameComponent>(entity)) {
+        NameComponent nc;
+        nc.SetName(found->name);
+        world.AddComponent(entity, nc);
+    } else {
+        world.GetComponent<NameComponent>(entity).SetName(found->name);
+    }
 
     // Stats (Session 12)
     auto job = static_cast<JobClass>(found->job_class);
@@ -2680,6 +2690,193 @@ void OnQuestComplete(World& world, Entity entity, const char* payload, int len) 
     }
 }
 
+// ━━━ Session 30: Chat System 핸들러 ━━━
+
+// CHAT_SEND 핸들러: 존 채팅(GENERAL) 또는 파티 채팅(PARTY)
+// 페이로드: [channel(1)] [msg_len(1)] [message(N)]
+void OnChatSend(World& world, Entity entity, const char* payload, int len) {
+    if (len < 2) return;
+
+    // 로그인 체크
+    if (!world.HasComponent<LoginComponent>(entity) ||
+        world.GetComponent<LoginComponent>(entity).state != LoginState::IN_GAME) {
+        return;
+    }
+
+    uint8_t channel = static_cast<uint8_t>(payload[0]);
+    uint8_t msg_len = static_cast<uint8_t>(payload[1]);
+
+    if (msg_len == 0 || len < 2 + msg_len) return;
+    if (msg_len > MAX_CHAT_MESSAGE_LEN) msg_len = MAX_CHAT_MESSAGE_LEN;
+
+    // 발신자 이름 가져오기
+    char sender_name[32] = {};
+    if (world.HasComponent<NameComponent>(entity)) {
+        std::memcpy(sender_name, world.GetComponent<NameComponent>(entity).name, 32);
+    } else {
+        std::snprintf(sender_name, 31, "Entity_%llu", entity);
+    }
+
+    // CHAT_MESSAGE 패킷 조립: [channel(1) sender_entity(8) sender_name(32) msg_len(1) message(N)]
+    int resp_size = 1 + 8 + 32 + 1 + msg_len;
+    std::vector<char> resp(resp_size, 0);
+    resp[0] = static_cast<char>(channel);
+    std::memcpy(resp.data() + 1, &entity, 8);
+    std::memcpy(resp.data() + 9, sender_name, 32);
+    resp[41] = static_cast<char>(msg_len);
+    std::memcpy(resp.data() + 42, payload + 2, msg_len);
+
+    auto pkt = BuildPacket(MsgType::CHAT_MESSAGE, resp.data(), resp_size);
+
+    if (channel == static_cast<uint8_t>(ChatChannel::GENERAL)) {
+        // 존 채팅: 같은 존의 모든 플레이어에게 브로드캐스트
+        int32_t sender_zone = 0;
+        if (world.HasComponent<ZoneComponent>(entity)) {
+            sender_zone = world.GetComponent<ZoneComponent>(entity).zone_id;
+        }
+
+        world.ForEach<SessionComponent, LoginComponent>([&](Entity e, SessionComponent& sc, LoginComponent& lc) {
+            if (lc.state != LoginState::IN_GAME) return;
+            if (world.HasComponent<ZoneComponent>(e) &&
+                world.GetComponent<ZoneComponent>(e).zone_id == sender_zone) {
+                g_network->SendTo(sc.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            }
+        });
+
+        // 메시지에서 텍스트 추출 (로그용)
+        std::string msg_text(payload + 2, msg_len);
+        printf("[Chat] [GENERAL] %s: %s\n", sender_name, msg_text.c_str());
+
+    } else if (channel == static_cast<uint8_t>(ChatChannel::PARTY)) {
+        // 파티 채팅: 같은 파티 멤버에게만 전송
+        if (!world.HasComponent<PartyComponent>(entity)) {
+            // 파티 없으면 본인에게만 에코
+            if (world.HasComponent<SessionComponent>(entity)) {
+                auto& session = world.GetComponent<SessionComponent>(entity);
+                g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            }
+            return;
+        }
+
+        uint32_t pid = world.GetComponent<PartyComponent>(entity).party_id;
+        auto* party = FindParty(pid);
+        if (!party) return;
+
+        for (auto m : party->members) {
+            if (world.HasComponent<SessionComponent>(m)) {
+                auto& ms = world.GetComponent<SessionComponent>(m);
+                g_network->SendTo(ms.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            }
+        }
+
+        std::string msg_text(payload + 2, msg_len);
+        printf("[Chat] [PARTY:%d] %s: %s\n", pid, sender_name, msg_text.c_str());
+    }
+}
+
+// WHISPER_SEND 핸들러: 귓속말 (이름 기반)
+// 페이로드: [target_name_len(1)] [target_name(N)] [msg_len(1)] [message(N)]
+void OnWhisperSend(World& world, Entity entity, const char* payload, int len) {
+    if (len < 2) return;
+
+    // 로그인 체크
+    if (!world.HasComponent<LoginComponent>(entity) ||
+        world.GetComponent<LoginComponent>(entity).state != LoginState::IN_GAME) {
+        return;
+    }
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& sender_session = world.GetComponent<SessionComponent>(entity);
+
+    uint8_t target_name_len = static_cast<uint8_t>(payload[0]);
+    if (target_name_len == 0 || len < 1 + target_name_len + 1) return;
+
+    std::string target_name(payload + 1, target_name_len);
+
+    uint8_t msg_len = static_cast<uint8_t>(payload[1 + target_name_len]);
+    if (msg_len == 0 || len < 2 + target_name_len + msg_len) return;
+    if (msg_len > MAX_CHAT_MESSAGE_LEN) msg_len = MAX_CHAT_MESSAGE_LEN;
+
+    const char* msg_data = payload + 2 + target_name_len;
+
+    // 발신자 이름
+    char sender_name[32] = {};
+    if (world.HasComponent<NameComponent>(entity)) {
+        std::memcpy(sender_name, world.GetComponent<NameComponent>(entity).name, 32);
+    } else {
+        std::snprintf(sender_name, 31, "Entity_%llu", entity);
+    }
+
+    // 수신자 찾기 (이름으로 검색)
+    Entity target = 0;
+    bool found = false;
+    world.ForEach<NameComponent, SessionComponent, LoginComponent>(
+        [&](Entity e, NameComponent& nc, SessionComponent& sc, LoginComponent& lc) {
+            if (found) return;
+            if (lc.state == LoginState::IN_GAME && std::strcmp(nc.name, target_name.c_str()) == 0) {
+                target = e;
+                found = true;
+            }
+        });
+
+    // WHISPER_RESULT 패킷 조립: [result(1) direction(1) other_name(32) msg_len(1) message(N)]
+    auto send_whisper_result = [&](Entity to, uint8_t result, uint8_t direction,
+                                    const char* other_name, uint8_t mlen, const char* msg) {
+        if (!world.HasComponent<SessionComponent>(to)) return;
+        int resp_size = 1 + 1 + 32 + 1 + mlen;
+        std::vector<char> resp(resp_size, 0);
+        resp[0] = result;
+        resp[1] = direction;
+        std::memcpy(resp.data() + 2, other_name, 32);
+        resp[34] = static_cast<char>(mlen);
+        if (mlen > 0) std::memcpy(resp.data() + 35, msg, mlen);
+        auto pkt = BuildPacket(MsgType::WHISPER_RESULT, resp.data(), resp_size);
+        auto& sess = world.GetComponent<SessionComponent>(to);
+        g_network->SendTo(sess.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    };
+
+    if (!found) {
+        // 대상 없음
+        char tname_buf[32] = {};
+        std::strncpy(tname_buf, target_name.c_str(), 31);
+        send_whisper_result(entity, static_cast<uint8_t>(WhisperResult::TARGET_NOT_FOUND),
+                           static_cast<uint8_t>(WhisperDirection::SENT), tname_buf, msg_len, msg_data);
+        printf("[Chat] [WHISPER] %s → %s: TARGET NOT FOUND\n", sender_name, target_name.c_str());
+        return;
+    }
+
+    // 수신자에게 전달 (direction=RECEIVED, other_name=sender)
+    send_whisper_result(target, static_cast<uint8_t>(WhisperResult::SUCCESS),
+                       static_cast<uint8_t>(WhisperDirection::RECEIVED), sender_name, msg_len, msg_data);
+
+    // 발신자에게 에코 (direction=SENT, other_name=target)
+    char tname_buf[32] = {};
+    std::strncpy(tname_buf, target_name.c_str(), 31);
+    send_whisper_result(entity, static_cast<uint8_t>(WhisperResult::SUCCESS),
+                       static_cast<uint8_t>(WhisperDirection::SENT), tname_buf, msg_len, msg_data);
+
+    std::string msg_text(msg_data, msg_len);
+    printf("[Chat] [WHISPER] %s → %s: %s\n", sender_name, target_name.c_str(), msg_text.c_str());
+}
+
+// 시스템 메시지 헬퍼: 모든 접속 플레이어에게 전송
+void BroadcastSystemMessage(World& world, const char* message, uint8_t msg_len) {
+    int resp_size = 1 + msg_len;
+    std::vector<char> resp(resp_size, 0);
+    resp[0] = static_cast<char>(msg_len);
+    if (msg_len > 0) std::memcpy(resp.data() + 1, message, msg_len);
+
+    auto pkt = BuildPacket(MsgType::SYSTEM_MESSAGE, resp.data(), resp_size);
+
+    world.ForEach<SessionComponent, LoginComponent>([&](Entity e, SessionComponent& sc, LoginComponent& lc) {
+        if (lc.state == LoginState::IN_GAME) {
+            g_network->SendTo(sc.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        }
+    });
+
+    std::string msg_text(message, msg_len);
+    printf("[Chat] [SYSTEM] %s\n", msg_text.c_str());
+}
+
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
 
 // TIMER_ADD: 타이머 추가
@@ -3003,6 +3200,8 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::QUEST_ACCEPT, OnQuestAccept);         // Session 28
     dispatch.RegisterHandler(MsgType::QUEST_PROGRESS, OnQuestProgress);     // Session 28
     dispatch.RegisterHandler(MsgType::QUEST_COMPLETE, OnQuestComplete);     // Session 28
+    dispatch.RegisterHandler(MsgType::CHAT_SEND, OnChatSend);               // Session 30
+    dispatch.RegisterHandler(MsgType::WHISPER_SEND, OnWhisperSend);          // Session 30
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);

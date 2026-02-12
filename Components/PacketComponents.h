@@ -182,6 +182,13 @@ enum class MsgType : uint16_t {
     QUEST_COMPLETE       = 235, // C→S: [quest_id(4)]
     QUEST_COMPLETE_RESULT = 236, // S→C: [result(1) quest_id(4) reward_exp(4) reward_item_id(4) reward_item_count(2)]
 
+    // Session 30: Chat System
+    CHAT_SEND       = 240, // C→S: [channel(1) msg_len(1) message(N)]
+    CHAT_MESSAGE    = 241, // S→C: [channel(1) sender_entity(8) sender_name(32) msg_len(1) message(N)]
+    WHISPER_SEND    = 242, // C→S: [target_name_len(1) target_name(N) msg_len(1) message(N)]
+    WHISPER_RESULT  = 243, // S→C: [result(1) direction(1) other_name(32) msg_len(1) message(N)]
+    SYSTEM_MESSAGE  = 244, // S→C: [msg_len(1) message(N)]
+
     STATS       = 99,  // 내부 진단
 };
 
