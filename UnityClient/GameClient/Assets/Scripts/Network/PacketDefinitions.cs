@@ -62,6 +62,10 @@ namespace Network
         COMBAT_DIED     = 102,  // S→C: dead_entity(8u64) killer_entity(8u64)
         RESPAWN_REQ     = 103,  // C→S: 빈 페이로드
         RESPAWN_RESULT  = 104,  // S→C: result(1) hp(4i) mp(4i) x(4f) y(4f) z(4f)
+
+        // 몬스터 (세션 14)
+        MONSTER_SPAWN   = 110,  // S→C: entity(8u64) monster_id(4u32) level(4u32) hp(4i) max_hp(4i) x(4f) y(4f) z(4f) = 36B
+        MONSTER_RESPAWN = 113,  // S→C: entity(8u64) hp(4i) max_hp(4i) x(4f) y(4f) z(4f) = 28B
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -152,5 +156,23 @@ namespace Network
         public byte ResultCode;     // 0=성공
         public ushort Port;
         public string IP;
+    }
+
+    /// <summary>몬스터 스폰 데이터 (MONSTER_SPAWN 파싱용)</summary>
+    public class MonsterSpawnData
+    {
+        public ulong EntityId;
+        public uint MonsterId;
+        public uint Level;
+        public int HP, MaxHP;
+        public float X, Y, Z;
+    }
+
+    /// <summary>몬스터 리스폰 데이터 (MONSTER_RESPAWN 파싱용)</summary>
+    public class MonsterRespawnData
+    {
+        public ulong EntityId;
+        public int HP, MaxHP;
+        public float X, Y, Z;
     }
 }

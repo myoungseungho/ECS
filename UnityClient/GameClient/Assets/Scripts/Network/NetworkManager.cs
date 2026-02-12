@@ -52,6 +52,8 @@ namespace Network
         public event Action<AttackResultData> OnAttackResult;
         public event Action<CombatDiedData> OnCombatDied;
         public event Action<RespawnResultData> OnRespawnResult;
+        public event Action<MonsterSpawnData> OnMonsterSpawn;
+        public event Action<MonsterRespawnData> OnMonsterRespawn;
         public event Action<string> OnError;
         public event Action OnDisconnected;
 
@@ -339,6 +341,22 @@ namespace Network
                     var data = PacketBuilder.ParseRespawnResult(payload);
                     Debug.Log($"[Net] RespawnResult: result={data.ResultCode}, HP={data.HP}, pos=({data.X},{data.Y},{data.Z})");
                     OnRespawnResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MONSTER_SPAWN:
+                {
+                    var data = PacketBuilder.ParseMonsterSpawn(payload);
+                    Debug.Log($"[Net] MonsterSpawn: entity={data.EntityId}, monsterId={data.MonsterId}, lv={data.Level}, hp={data.HP}/{data.MaxHP}");
+                    OnMonsterSpawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MONSTER_RESPAWN:
+                {
+                    var data = PacketBuilder.ParseMonsterRespawn(payload);
+                    Debug.Log($"[Net] MonsterRespawn: entity={data.EntityId}, hp={data.HP}/{data.MaxHP}");
+                    OnMonsterRespawn?.Invoke(data);
                     break;
                 }
 

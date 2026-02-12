@@ -242,5 +242,33 @@ namespace Network
         {
             return BitConverter.ToInt32(payload, 0);
         }
+
+        /// <summary>MONSTER_SPAWN 파싱: entity(8) monster_id(4) level(4) hp(4) max_hp(4) x(4f) y(4f) z(4f) = 36B</summary>
+        public static MonsterSpawnData ParseMonsterSpawn(byte[] payload)
+        {
+            var d = new MonsterSpawnData();
+            d.EntityId  = BitConverter.ToUInt64(payload, 0);
+            d.MonsterId = BitConverter.ToUInt32(payload, 8);
+            d.Level     = BitConverter.ToUInt32(payload, 12);
+            d.HP        = BitConverter.ToInt32(payload, 16);
+            d.MaxHP     = BitConverter.ToInt32(payload, 20);
+            d.X         = BitConverter.ToSingle(payload, 24);
+            d.Y         = BitConverter.ToSingle(payload, 28);
+            d.Z         = BitConverter.ToSingle(payload, 32);
+            return d;
+        }
+
+        /// <summary>MONSTER_RESPAWN 파싱: entity(8) hp(4) max_hp(4) x(4f) y(4f) z(4f) = 28B</summary>
+        public static MonsterRespawnData ParseMonsterRespawn(byte[] payload)
+        {
+            var d = new MonsterRespawnData();
+            d.EntityId = BitConverter.ToUInt64(payload, 0);
+            d.HP       = BitConverter.ToInt32(payload, 8);
+            d.MaxHP    = BitConverter.ToInt32(payload, 12);
+            d.X        = BitConverter.ToSingle(payload, 16);
+            d.Y        = BitConverter.ToSingle(payload, 20);
+            d.Z        = BitConverter.ToSingle(payload, 24);
+            return d;
+        }
     }
 }

@@ -30,7 +30,7 @@ PACKET_DEFINITIONS_CS = os.path.join(SCRIPT_DIR, "Assets", "Scripts", "Network",
 PACKET_BUILDER_CS = os.path.join(SCRIPT_DIR, "Assets", "Scripts", "Network", "PacketBuilder.cs")
 
 # 세션 1~13까지 구현 완료 (Build/Parse 메서드 존재해야 함)
-IMPLEMENTED_SESSION_MAX = 13
+IMPLEMENTED_SESSION_MAX = 14
 
 # 서버 전용 메시지 (클라이언트에 MsgType 불필요)
 # - STATS(99): 서버 진단용 디버그 패킷
@@ -351,6 +351,10 @@ KNOWN_METHOD_MAP = {
     "RESPAWN_RESULT":    ("parse", "ParseRespawnResult"),
     "TIMER_INFO":        ("parse", None),
     "CONFIG_RESP":       ("parse", None),
+
+    # Session 14: Monsters
+    "MONSTER_SPAWN":     ("parse", "ParseMonsterSpawn"),
+    "MONSTER_RESPAWN":   ("parse", "ParseMonsterRespawn"),
 }
 
 
