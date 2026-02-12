@@ -161,6 +161,27 @@ enum class MsgType : uint16_t {
     BUFF_REMOVE_REQ  = 204, // C→S: [buff_id(4)]
     BUFF_REMOVE_RESP = 205, // S→C: [result(1) buff_id(4)]
 
+    // Session 25: Condition Engine
+    CONDITION_EVAL   = 210, // C→S: [node_count(1) root(1) {type(1) p1(4) p2(4) left(2) right(2)}...]
+    CONDITION_RESULT = 211, // S→C: [result(1)]
+
+    // Session 26: Spatial Query
+    SPATIAL_QUERY_REQ  = 215, // C→S: [x(4) y(4) z(4) radius(4) filter(1)] filter: 0=all,1=player,2=monster
+    SPATIAL_QUERY_RESP = 216, // S→C: [count(1) {entity(8) dist(4)}...]
+
+    // Session 27: Loot/Drop Table
+    LOOT_ROLL_REQ    = 220, // C→S: [table_id(4)]
+    LOOT_RESULT      = 221, // S→C: [count(1) {item_id(4) count(2)}...]
+
+    // Session 28: Quest System
+    QUEST_LIST_REQ       = 230, // C→S: empty
+    QUEST_LIST_RESP      = 231, // S→C: [count(1) {quest_id(4) state(1) progress(4) target(4)}...]
+    QUEST_ACCEPT         = 232, // C→S: [quest_id(4)]
+    QUEST_ACCEPT_RESULT  = 233, // S→C: [result(1) quest_id(4)]
+    QUEST_PROGRESS       = 234, // C→S: [quest_id(4)] (check/update progress)
+    QUEST_COMPLETE       = 235, // C→S: [quest_id(4)]
+    QUEST_COMPLETE_RESULT = 236, // S→C: [result(1) quest_id(4) reward_exp(4) reward_item_id(4) reward_item_count(2)]
+
     STATS       = 99,  // 내부 진단
 };
 

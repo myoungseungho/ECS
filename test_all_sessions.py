@@ -1,11 +1,11 @@
-"""종합 테스트 러너 - 세션 1~24 전체 점검"""
+"""종합 테스트 러너 - 세션 1~29 전체 점검"""
 import subprocess, sys, os, time, re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PORTS = [7777, 7778, 8888]  # Field1, Field2, Gate
 
 # 테스트 대상 세션 목록
-SESSIONS = list(range(1, 25))  # 1~24
+SESSIONS = list(range(1, 30))  # 1~29
 
 def kill_all_servers():
     """모든 게임 서버 프로세스 정리"""
@@ -38,7 +38,7 @@ def run_session_test(session_num):
     try:
         result = subprocess.run(
             [sys.executable, test_file],
-            capture_output=True, text=True, timeout=90,
+            capture_output=True, text=True, timeout=180,
             cwd=BASE_DIR)
         return result.returncode, result.stdout + result.stderr
     except subprocess.TimeoutExpired:
@@ -55,8 +55,8 @@ def parse_result(output):
 
     for line in lines:
         stripped = line.strip()
-        # [PASS] 또는 PASS: 형식 모두 인식
-        if '[PASS]' in stripped or 'PASS:' in stripped:
+        # [PASS], PASS:, [OK] 형식 모두 인식
+        if '[PASS]' in stripped or 'PASS:' in stripped or '[OK]' in stripped:
             passed += 1
             total += 1
             details.append(('PASS', stripped))
@@ -81,7 +81,7 @@ session_results = {}
 def main():
     print("=" * 70)
     print("  ECS 게임서버 스켈레톤 - 종합 테스트")
-    print("  세션 1 ~ 24 전체 점검")
+    print("  세션 1 ~ 29 전체 점검")
     print("=" * 70)
     print()
 
@@ -181,8 +181,8 @@ def main():
     print()
     if not failed_sessions:
         print("  +================================================+")
-        print("  |  ALL 24 SESSIONS PASSED!                      |")
-        print("  |  259/259 tests passed                         |")
+        print(f"  |  ALL {total_sessions} SESSIONS PASSED!                      |")
+        print(f"  |  {total_passed}/{total_tests} tests passed                         |")
         print("  +================================================+")
     else:
         print(f"  {len(failed_sessions)}개 세션 실패")

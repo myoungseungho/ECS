@@ -103,8 +103,13 @@ def test_buff_stacking():
     """Test 4: Poison stacks (max 3)"""
     s = connect_and_login("buff4")
     for i in range(4):
+        drain(s)
         send(s, 202, struct.pack("<i", 5))  # Poison (max_stacks=3)
-        t, p = recv_pkt(s)
+        # Read until we get BUFF_RESULT(203), skip other packets
+        for _ in range(20):
+            t, p = recv_pkt(s)
+            if t == 203:
+                break
     stacks = p[5]
     assert stacks == 3, f"Expected 3 stacks (max), got {stacks}"
     s.close()

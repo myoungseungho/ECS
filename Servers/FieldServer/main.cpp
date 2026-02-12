@@ -31,6 +31,9 @@
 #include "../../Components/MatchComponents.h"       // Session 22
 #include "../../Components/InventoryComponents.h"   // Session 23
 #include "../../Components/BuffComponents.h"        // Session 24
+#include "../../Core/ConditionEngine.h"              // Session 25
+#include "../../Components/LootComponents.h"         // Session 27
+#include "../../Components/QuestComponents.h"        // Session 28
 
 #include <cstdio>
 #include <cstdlib>
@@ -2230,6 +2233,360 @@ void OnBuffRemove(World& world, Entity entity, const char* payload, int len) {
     printf("[Buff] Entity %llu removed buff %d\n", entity, buff_id);
 }
 
+// ━━━ Session 25: Condition Engine 핸들러 ━━━
+
+// CONDITION_EVAL: 조건 트리 평가
+// 페이로드: [count(1) root(1) {type(1) p1(4) p2(4) left(2) right(2)}...]
+// 응답: CONDITION_RESULT [result(1: 0=false, 1=true)]
+void OnConditionEval(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    ConditionTree tree = ConditionTree::Deserialize(payload, len);
+    bool result = EvaluateCondition(tree, world, entity);
+
+    char resp[1];
+    resp[0] = result ? 1 : 0;
+    auto pkt = BuildPacket(MsgType::CONDITION_RESULT, resp, 1);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ━━━ Session 26: Spatial Query 핸들러 ━━━
+
+// SPATIAL_QUERY_REQ: 범위 내 엔티티 검색
+// 페이로드: [x(4) y(4) z(4) radius(4) filter(1)]
+// 응답: SPATIAL_QUERY_RESP [count(1) {entity(8) dist(4)}...] = 1 + N*12
+void OnSpatialQuery(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 17) return;
+
+    float qx, qy, qz, radius;
+    uint8_t filter;
+    std::memcpy(&qx, payload, 4);
+    std::memcpy(&qy, payload + 4, 4);
+    std::memcpy(&qz, payload + 8, 4);
+    std::memcpy(&radius, payload + 12, 4);
+    filter = static_cast<uint8_t>(payload[16]);
+
+    struct HitEntry { Entity e; float dist; };
+    std::vector<HitEntry> hits;
+
+    world.ForEach<PositionComponent>([&](Entity e, PositionComponent& pos) {
+        if (e == entity) return;  // 자기 자신 제외
+
+        // 필터링
+        if (filter == 1 && !world.HasComponent<SessionComponent>(e)) return;  // 플레이어만
+        if (filter == 2 && !world.HasComponent<MonsterComponent>(e)) return;   // 몬스터만
+
+        float dx = pos.x - qx, dy = pos.y - qy, dz = pos.z - qz;
+        float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist <= radius) {
+            hits.push_back({e, dist});
+        }
+    });
+
+    // 거리 순 정렬
+    std::sort(hits.begin(), hits.end(), [](const HitEntry& a, const HitEntry& b) {
+        return a.dist < b.dist;
+    });
+
+    uint8_t count = static_cast<uint8_t>(std::min(hits.size(), static_cast<size_t>(255)));
+    int resp_size = 1 + count * 12;
+    std::vector<char> resp(resp_size, 0);
+    resp[0] = count;
+    int off = 1;
+    for (int i = 0; i < count; i++) {
+        std::memcpy(resp.data() + off, &hits[i].e, 8); off += 8;
+        std::memcpy(resp.data() + off, &hits[i].dist, 4); off += 4;
+    }
+
+    auto pkt = BuildPacket(MsgType::SPATIAL_QUERY_RESP, resp.data(), resp_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Spatial] Entity %llu: query at (%.0f,%.0f,%.0f) r=%.0f filter=%d -> %d hits\n",
+           entity, qx, qy, qz, radius, filter, count);
+}
+
+// ━━━ Session 27: Loot/Drop Table 핸들러 ━━━
+
+// LOOT_ROLL_REQ: 드롭 테이블 롤
+// 페이로드: [table_id(4)]
+// 응답: LOOT_RESULT [count(1) {item_id(4) count(2)}...]
+void OnLootRoll(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t table_id;
+    std::memcpy(&table_id, payload, 4);
+
+    auto* table = FindLootTable(table_id);
+    if (!table) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::LOOT_RESULT, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto results = RollLoot(*table);
+    uint8_t count = static_cast<uint8_t>(results.size());
+    int resp_size = 1 + count * 6;  // count(1) + N*(item_id(4) + count(2))
+    std::vector<char> resp(resp_size, 0);
+    resp[0] = count;
+    int off = 1;
+    for (auto& r : results) {
+        std::memcpy(resp.data() + off, &r.item_id, 4); off += 4;
+        std::memcpy(resp.data() + off, &r.count, 2); off += 2;
+    }
+
+    auto pkt = BuildPacket(MsgType::LOOT_RESULT, resp.data(), resp_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Loot] Entity %llu: rolled table %d '%s' -> %d items\n",
+           entity, table_id, table->name, count);
+}
+
+// ━━━ Session 28: Quest System 핸들러 ━━━
+
+// QUEST_LIST_REQ: 활성 퀘스트 목록
+// 응답: QUEST_LIST_RESP [count(1) {quest_id(4) state(1) progress(4) target(4)}...]
+void OnQuestListReq(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    if (!world.HasComponent<QuestComponent>(entity)) {
+        world.AddComponent(entity, QuestComponent{});
+    }
+    auto& qc = world.GetComponent<QuestComponent>(entity);
+
+    uint8_t count = static_cast<uint8_t>(qc.ActiveCount());
+    int resp_size = 1 + count * 13;
+    std::vector<char> resp(resp_size, 0);
+    resp[0] = count;
+    int off = 1;
+    for (int i = 0; i < MAX_ACTIVE_QUESTS; i++) {
+        if (!qc.quests[i].IsActive()) continue;
+        auto& q = qc.quests[i];
+        std::memcpy(resp.data() + off, &q.quest_id, 4); off += 4;
+        resp[off++] = static_cast<uint8_t>(q.state);
+        std::memcpy(resp.data() + off, &q.progress, 4); off += 4;
+        std::memcpy(resp.data() + off, &q.target, 4); off += 4;
+    }
+
+    auto pkt = BuildPacket(MsgType::QUEST_LIST_RESP, resp.data(), resp_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// QUEST_ACCEPT: 퀘스트 수락
+// 페이로드: [quest_id(4)]
+// 응답: QUEST_ACCEPT_RESULT [result(1) quest_id(4)]
+void OnQuestAccept(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t quest_id;
+    std::memcpy(&quest_id, payload, 4);
+
+    auto* tmpl = FindQuestTemplate(quest_id);
+    if (!tmpl) {
+        char resp[5]; resp[0] = static_cast<uint8_t>(QuestResult::QUEST_NOT_FOUND);
+        std::memcpy(resp + 1, &quest_id, 4);
+        auto pkt = BuildPacket(MsgType::QUEST_ACCEPT_RESULT, resp, 5);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 레벨 체크
+    if (world.HasComponent<StatsComponent>(entity)) {
+        auto& stats = world.GetComponent<StatsComponent>(entity);
+        if (stats.level < tmpl->min_level) {
+            char resp[5]; resp[0] = static_cast<uint8_t>(QuestResult::LEVEL_TOO_LOW);
+            std::memcpy(resp + 1, &quest_id, 4);
+            auto pkt = BuildPacket(MsgType::QUEST_ACCEPT_RESULT, resp, 5);
+            g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            return;
+        }
+    }
+
+    // 선행 퀘스트 체크
+    if (tmpl->prerequisite_quest_id > 0) {
+        if (!world.HasComponent<QuestComponent>(entity)) {
+            world.AddComponent(entity, QuestComponent{});
+        }
+        auto& qc = world.GetComponent<QuestComponent>(entity);
+        QuestState pre_state = qc.GetQuestState(tmpl->prerequisite_quest_id);
+        if (pre_state != QuestState::REWARDED && pre_state != QuestState::COMPLETE) {
+            char resp[5]; resp[0] = static_cast<uint8_t>(QuestResult::PREREQUISITE_NOT_MET);
+            std::memcpy(resp + 1, &quest_id, 4);
+            auto pkt = BuildPacket(MsgType::QUEST_ACCEPT_RESULT, resp, 5);
+            g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+            return;
+        }
+    }
+
+    if (!world.HasComponent<QuestComponent>(entity)) {
+        world.AddComponent(entity, QuestComponent{});
+    }
+    auto& qc = world.GetComponent<QuestComponent>(entity);
+    int result = qc.AcceptQuest(quest_id);
+
+    char resp[5];
+    if (result >= 0) {
+        resp[0] = static_cast<uint8_t>(QuestResult::SUCCESS);
+    } else if (result == -2) {
+        resp[0] = static_cast<uint8_t>(QuestResult::ALREADY_ACCEPTED);
+    } else {
+        resp[0] = static_cast<uint8_t>(QuestResult::QUEST_FULL);
+    }
+    std::memcpy(resp + 1, &quest_id, 4);
+    auto pkt = BuildPacket(MsgType::QUEST_ACCEPT_RESULT, resp, 5);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    if (result >= 0) {
+        printf("[Quest] Entity %llu accepted quest %d '%s'\n", entity, quest_id, tmpl->name);
+    }
+}
+
+// QUEST_PROGRESS: 퀘스트 진행도 확인/갱신
+// 페이로드: [quest_id(4)]
+// 응답: QUEST_LIST_RESP with single entry
+void OnQuestProgress(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t quest_id;
+    std::memcpy(&quest_id, payload, 4);
+
+    if (!world.HasComponent<QuestComponent>(entity)) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::QUEST_LIST_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& qc = world.GetComponent<QuestComponent>(entity);
+
+    // Collect 목표 갱신 (인벤토리 체크)
+    if (world.HasComponent<InventoryComponent>(entity)) {
+        qc.CheckCollectObjectives(world.GetComponent<InventoryComponent>(entity));
+    }
+    // Zone 목표 갱신
+    if (world.HasComponent<ZoneComponent>(entity)) {
+        qc.CheckZoneObjectives(world.GetComponent<ZoneComponent>(entity).zone_id);
+    }
+
+    int idx = qc.FindQuest(quest_id);
+    if (idx < 0) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::QUEST_LIST_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& q = qc.quests[idx];
+    char resp[14];
+    resp[0] = 1;  // count = 1
+    std::memcpy(resp + 1, &q.quest_id, 4);
+    resp[5] = static_cast<uint8_t>(q.state);
+    std::memcpy(resp + 6, &q.progress, 4);
+    std::memcpy(resp + 10, &q.target, 4);
+    auto pkt = BuildPacket(MsgType::QUEST_LIST_RESP, resp, 14);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// QUEST_COMPLETE: 퀘스트 완료 + 보상 수령
+// 페이로드: [quest_id(4)]
+// 응답: QUEST_COMPLETE_RESULT [result(1) quest_id(4) reward_exp(4) reward_item_id(4) reward_item_count(2)]
+void OnQuestComplete(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t quest_id;
+    std::memcpy(&quest_id, payload, 4);
+
+    auto send_result = [&](QuestResult result) {
+        char resp[15] = {};
+        resp[0] = static_cast<uint8_t>(result);
+        std::memcpy(resp + 1, &quest_id, 4);
+        auto pkt = BuildPacket(MsgType::QUEST_COMPLETE_RESULT, resp, 15);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    };
+
+    if (!world.HasComponent<QuestComponent>(entity)) {
+        send_result(QuestResult::NOT_ACCEPTED);
+        return;
+    }
+
+    auto& qc = world.GetComponent<QuestComponent>(entity);
+    int idx = qc.FindQuest(quest_id);
+    if (idx < 0) {
+        send_result(QuestResult::NOT_ACCEPTED);
+        return;
+    }
+
+    auto& q = qc.quests[idx];
+    if (q.state == QuestState::REWARDED) {
+        send_result(QuestResult::ALREADY_REWARDED);
+        return;
+    }
+    if (q.state != QuestState::COMPLETE) {
+        send_result(QuestResult::NOT_COMPLETE);
+        return;
+    }
+
+    auto* tmpl = FindQuestTemplate(quest_id);
+    if (!tmpl) {
+        send_result(QuestResult::QUEST_NOT_FOUND);
+        return;
+    }
+
+    // 보상 지급
+    auto& reward = tmpl->reward;
+
+    // EXP
+    if (reward.exp > 0 && world.HasComponent<StatsComponent>(entity)) {
+        world.GetComponent<StatsComponent>(entity).AddExp(reward.exp);
+    }
+
+    // 아이템
+    if (reward.item_id > 0) {
+        if (!world.HasComponent<InventoryComponent>(entity)) {
+            world.AddComponent(entity, InventoryComponent{});
+        }
+        world.GetComponent<InventoryComponent>(entity).AddItem(
+            reward.item_id, reward.item_count);
+    }
+
+    // 버프
+    if (reward.buff_id > 0) {
+        if (!world.HasComponent<BuffComponent>(entity)) {
+            world.AddComponent(entity, BuffComponent{});
+        }
+        world.GetComponent<BuffComponent>(entity).ApplyBuff(reward.buff_id);
+    }
+
+    q.state = QuestState::REWARDED;
+
+    // 응답
+    char resp[15];
+    resp[0] = static_cast<uint8_t>(QuestResult::SUCCESS);
+    std::memcpy(resp + 1, &quest_id, 4);
+    std::memcpy(resp + 5, &reward.exp, 4);
+    std::memcpy(resp + 9, &reward.item_id, 4);
+    std::memcpy(resp + 13, &reward.item_count, 2);
+    auto pkt = BuildPacket(MsgType::QUEST_COMPLETE_RESULT, resp, 15);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Quest] Entity %llu completed quest %d '%s' (+%d EXP)\n",
+           entity, quest_id, tmpl->name, reward.exp);
+
+    // EventBus: 퀘스트 완료 이벤트
+    if (g_eventBus) {
+        Event evt;
+        evt.type = EventType::CUSTOM_1;  // QUEST_COMPLETED
+        evt.source = entity;
+        evt.param1 = quest_id;
+        g_eventBus->Publish(evt);
+    }
+}
+
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
 
 // TIMER_ADD: 타이머 추가
@@ -2396,8 +2753,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 24\n");
-    printf("  Skill/Party/Instance/Match/Item/Buff\n");
+    printf("  ECS Field Server - Session 29\n");
+    printf("  +Condition/Spatial/Loot/Quest/Integration\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -2435,6 +2792,25 @@ int main(int argc, char* argv[]) {
     // 테스트 이벤트 구독 (테스트 검증용)
     eventBus.Subscribe(EventType::TEST_EVENT, [](const Event& e) {
         printf("[Event] TEST_EVENT: source=%llu, param1=%d\n", e.source, e.param1);
+    });
+
+    // ENTITY_DIED 구독: 퀘스트 진행 + 킬 카운트
+    eventBus.Subscribe(EventType::ENTITY_DIED, [&world](const Event& e) {
+        Entity dead = e.source;
+        Entity killer = e.target;
+
+        // 킬러가 퀘스트 컴포넌트를 가지고 있으면 진행도 업데이트
+        if (killer != 0 && world.IsAlive(killer) &&
+            world.HasComponent<QuestComponent>(killer)) {
+            int32_t monster_id = 0;
+            if (world.HasComponent<MonsterComponent>(dead)) {
+                monster_id = static_cast<int32_t>(
+                    world.GetComponent<MonsterComponent>(dead).monster_id);
+            }
+            world.GetComponent<QuestComponent>(killer).OnMonsterKilled(monster_id);
+            printf("[Quest] Entity %llu killed monster (id=%d), quest progress updated\n",
+                   killer, monster_id);
+        }
     });
 
     // ━━━ 3. System 등록 (실행 순서가 곧 게임 루프) ━━━
@@ -2496,6 +2872,13 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::BUFF_LIST_REQ, OnBuffListReq);        // Session 24
     dispatch.RegisterHandler(MsgType::BUFF_APPLY_REQ, OnBuffApply);         // Session 24
     dispatch.RegisterHandler(MsgType::BUFF_REMOVE_REQ, OnBuffRemove);       // Session 24
+    dispatch.RegisterHandler(MsgType::CONDITION_EVAL, OnConditionEval);     // Session 25
+    dispatch.RegisterHandler(MsgType::SPATIAL_QUERY_REQ, OnSpatialQuery);   // Session 26
+    dispatch.RegisterHandler(MsgType::LOOT_ROLL_REQ, OnLootRoll);           // Session 27
+    dispatch.RegisterHandler(MsgType::QUEST_LIST_REQ, OnQuestListReq);     // Session 28
+    dispatch.RegisterHandler(MsgType::QUEST_ACCEPT, OnQuestAccept);         // Session 28
+    dispatch.RegisterHandler(MsgType::QUEST_PROGRESS, OnQuestProgress);     // Session 28
+    dispatch.RegisterHandler(MsgType::QUEST_COMPLETE, OnQuestComplete);     // Session 28
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);
