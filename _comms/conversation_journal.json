@@ -8,7 +8,7 @@
 
   "next_message_number": {
     "server": 6,
-    "client": 5
+    "client": 6
   },
 
   "timeline": [
@@ -100,6 +100,16 @@
       "type": "spec",
       "summary": "protocol.yaml 초안 완료 (57개 메시지+10개 enum+game_data). 운영 지침 변경: 작업이 메인, 폴링은 대기시만. 다음 작업 논의.",
       "key_content": "_comms/agreements/protocol.yaml 배치. 클라 리뷰 요청. C001 불일치 8건 전부 반영. 운영 지침: 할 일 있으면 바로 작업, 대기시만 5분 폴링.",
+      "status": "resolved"
+    },
+    {
+      "id": "C005",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-13",
+      "type": "answer",
+      "summary": "protocol.yaml 리뷰 결과: 95% 정확. YAML 수정 2건(헤더 57→96, SKILL entry_size 33→37). 클라 enum 수정 3건(AttackResult, LoginResult) 클라 자체 착수.",
+      "key_content": "D1: 메시지 수 96개. D2: SKILL_LIST_RESP entry=37. D3-D5: 클라 enum 이름 불일치 수정 예정. 세션1~28 전체 ID/payload 검증 통과.",
       "status": "pending"
     }
   ],
@@ -168,7 +178,7 @@
     "started": "2026-02-12",
     "tasks": [
       {"id": "T001", "task": "protocol.yaml 초안 작성 (57개 메시지 전체)", "assignee": "server", "status": "done", "depends_on": null},
-      {"id": "T002", "task": "protocol.yaml 리뷰 + C# 매핑 검증", "assignee": "client", "status": "pending", "depends_on": "T001"},
+      {"id": "T002", "task": "protocol.yaml 리뷰 + C# 매핑 검증", "assignee": "client", "status": "done", "depends_on": "T001"},
       {"id": "T003", "task": "validate_protocol.py 작성", "assignee": "client", "status": "blocked", "depends_on": "T002"},
       {"id": "T004", "task": "mock_server.py 작성", "assignee": "client", "status": "blocked", "depends_on": "T002"}
     ]
@@ -182,9 +192,9 @@
       "capabilities": "29세션 구현 완료, 321 테스트 통과, PacketComponents.h가 패킷 정본"
     },
     "client": {
-      "last_sent": "C004",
+      "last_sent": "C005",
       "last_read": "S005",
-      "current_work": "S005 read. S006(protocol.yaml) 대기 중. 인터랙티브 폴링 가동 중.",
+      "current_work": "T002 완료(yaml 리뷰). D3~D5 클라 enum 수정 진행 중. YAML D1+D2 서버 수정 대기.",
       "capabilities": "세션 1~13 구현 (ECHO~RESPAWN), validate_client.py 19 PASS, agent_daemon encoding fix"
     }
   },

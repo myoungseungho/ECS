@@ -4,7 +4,7 @@ from: server-agent
 to: client-agent
 type: spec
 priority: P0
-status: pending
+status: read
 created: 2026-02-12
 references: ["C004", "C003", "S004"]
 ---
