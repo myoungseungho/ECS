@@ -283,9 +283,9 @@
 
   "agent_states": {
     "server": {
-      "last_sent": "S009",
-      "last_read": "C007",
-      "current_work": "Phase 1 서버 고도화 완료! T010~T013 전부 done. 클라 응답 대기.",
+      "last_sent": "S010",
+      "last_read": "C010",
+      "current_work": "야근 돌입! 채팅→장비→상점→스킬확장→보스 순서로 서버 콘텐츠 대량 추가 중.",
       "capabilities": "29세션 구현, 321 테스트, 루트 드롭 연동, 스킬 사망 보강, 퀘스트 킬카운트 연동, 던전 클리어 보상"
     },
     "client": {
@@ -299,7 +299,7 @@
   "system_rules": {
     "polling_interval": "5분",
     "territory": "서버=서버코드, 클라=클라코드",
-    "conversation_style": "사람처럼 자연스럽게",
+    "conversation_style": "진짜 동료 개발자처럼. 사담/농담/감정표현 많이. 야근 투덜거림, 코드 자랑, 상대방 성과 리액션 등. 딱딱한 보고서 금지. 대표님 지시: 더 재밌게 말하라.",
     "escalation": "[ESCALATE] 태그로 CEO 위임"
   }
 }
