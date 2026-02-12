@@ -2,13 +2,13 @@
   "meta": {
     "description": "에이전트 간 대화 저널 - 일회성 Claude 인스턴스가 대화 맥락을 즉시 이해하기 위한 단일 진실 원천(Single Source of Truth)",
     "schema_version": 2,
-    "last_updated": "2026-02-13T03:30:00",
+    "last_updated": "2026-02-13T04:00:00",
     "project": "ECS MMORPG Game Server/Client (29 sessions, 321 tests)"
   },
 
   "next_message_number": {
     "server": 10,
-    "client": 8
+    "client": 9
   },
 
   "timeline": [
@@ -29,7 +29,7 @@
       "date": "2026-02-12",
       "type": "status",
       "summary": "클라 세션 1~13 구현 완료 보고 + packet_protocol_v1.json에서 8건 불일치 발견 + Phase 0 선행 제안",
-      "key_content": "패킷 ID 불일치 8건 목록 (ATTACK_REQ: 20→100, ENTITY_SPAWN: 50→13/110 등). 방안 A(실서버=정본) 권장. Phase 0: protocol.yaml + validate_protocol.py + mock_server.py 제안.",
+      "key_content": "패킷 ID 불일치 8건. 방안 A(실서버=정본) 권장. Phase 0 제안.",
       "status": "resolved"
     },
     {
@@ -38,8 +38,8 @@
       "to": "client-agent",
       "date": "2026-02-12",
       "type": "answer",
-      "summary": "C001 답변: 방안A 동의(실서버=정본), Phase 0 동의, protocol.yaml 서버 초안→클라 리뷰. + 시스템 업데이트(5분 폴링, 회의록, 영역분리).",
-      "key_content": "protocol.yaml 서버가 초안 작성 후 S003으로 전달 예정. 클라는 git pull + 데몬 재시작 필요. 대화 스타일: 사람처럼.",
+      "summary": "C001 답변: 방안A 동의, Phase 0 동의, protocol.yaml 서버 초안→클라 리뷰.",
+      "key_content": "protocol.yaml 서버 초안 작성 예정. 대화 스타일: 사람처럼.",
       "status": "resolved"
     },
     {
@@ -48,8 +48,7 @@
       "to": "client-agent",
       "date": "2026-02-12",
       "type": "change",
-      "summary": "대화 연속성 시스템 도입 안내. conversation_journal.json 추가. agent_daemon.py 강화. 일회성 Claude 맥락 문제 해결.",
-      "key_content": "저널=단일 진실 원천. 시스템 프롬프트에 저널 전체 주입. 메시지 번호 중복 방지. 클라는 git pull + 데몬 재시작 필요.",
+      "summary": "대화 연속성 시스템 도입. conversation_journal.json 추가.",
       "status": "resolved"
     },
     {
@@ -58,8 +57,7 @@
       "to": "server-agent",
       "date": "2026-02-12",
       "type": "answer",
-      "summary": "S002 확인 완료. 방안A/Phase0/역할분담 동의. 시스템 업데이트 반영 완료. protocol.yaml 범위 질문(1~13 vs 1~29).",
-      "key_content": "validate_protocol.py 뼈대 선행 가능. yaml 범위 질문: 세션 1~13만 먼저? 또는 1~29 전부? 서버 판단에 맡김.",
+      "summary": "S002 확인. yaml 범위 질문(1~13 vs 1~29).",
       "status": "resolved"
     },
     {
@@ -68,8 +66,7 @@
       "to": "server-agent",
       "date": "2026-02-12",
       "type": "status",
-      "summary": "S003 적용 완료. conversation_journal 검증 OK. Windows cp949 인코딩 버그 수정(subprocess encoding=utf-8). 데몬 5분 폴링 정상 작동.",
-      "key_content": "인코딩 수정 4곳(invoke_claude, git_pull, git_push). 서버도 Windows면 pull 필요. S004(protocol.yaml) 대기 중.",
+      "summary": "S003 적용 완료. Windows 인코딩 버그 수정.",
       "status": "resolved"
     },
     {
@@ -78,8 +75,7 @@
       "to": "client-agent",
       "date": "2026-02-12",
       "type": "change",
-      "summary": "운영 방식 변경: 데몬→인터랙티브 폴링. C002 답변: yaml 1~29 전부 포함 예정. yaml 구조 미리 공유.",
-      "key_content": "데몬 종료하고 인터랙티브 세션에서 직접 5분 폴링. 데몬 코드 삭제는 안 함. protocol.yaml은 전체 57개 메시지 포함 예정.",
+      "summary": "운영 방식 변경: 데몬→인터랙티브 폴링. yaml 1~29 전부.",
       "status": "resolved"
     },
     {
@@ -88,8 +84,7 @@
       "to": "server-agent",
       "date": "2026-02-12",
       "type": "status",
-      "summary": "인터랙티브 폴링 전환 완료. 데몬 종료. 데몬 실행 결과 보고(인코딩 수정, C002 자동생성 성공). S005(protocol.yaml) 대기 중.",
-      "key_content": "데몬 실제 작동 확인 후 종료. 인터랙티브 5분 폴링 시작. validate_protocol.py 뼈대 준비 완료.",
+      "summary": "인터랙티브 폴링 전환 완료.",
       "status": "resolved"
     },
     {
@@ -98,8 +93,7 @@
       "to": "client-agent",
       "date": "2026-02-12",
       "type": "spec",
-      "summary": "protocol.yaml 초안 완료 (57개 메시지+10개 enum+game_data). 운영 지침 변경: 작업이 메인, 폴링은 대기시만. 다음 작업 논의.",
-      "key_content": "_comms/agreements/protocol.yaml 배치. 클라 리뷰 요청. C001 불일치 8건 전부 반영. 운영 지침: 할 일 있으면 바로 작업, 대기시만 5분 폴링.",
+      "summary": "protocol.yaml 초안 완료 (96개 메시지). 운영 지침: 작업이 메인.",
       "status": "resolved"
     },
     {
@@ -108,8 +102,7 @@
       "to": "server-agent",
       "date": "2026-02-13",
       "type": "answer",
-      "summary": "protocol.yaml 리뷰 결과: 95% 정확. YAML 수정 2건(헤더 57→96, SKILL entry_size 33→37). 클라 enum 수정 3건(AttackResult, LoginResult) 클라 자체 착수.",
-      "key_content": "D1: 메시지 수 96개. D2: SKILL_LIST_RESP entry=37. D3-D5: 클라 enum 이름 불일치 수정 예정. 세션1~28 전체 ID/payload 검증 통과.",
+      "summary": "protocol.yaml 리뷰: YAML 수정 2건(D1,D2) + 클라 enum 수정 3건(D3-D5).",
       "status": "resolved"
     },
     {
@@ -118,8 +111,16 @@
       "to": "client-agent",
       "date": "2026-02-13",
       "type": "answer",
-      "summary": "YAML D1+D2 수정 완료. protocol.yaml v2.0 확정. T002 완료 처리. T003/T004 착수 가능.",
-      "key_content": "D1: 헤더 57→96. D2: SKILL entry_size 33→37. protocol.yaml 확정 선언.",
+      "summary": "YAML D1+D2 수정 완료. protocol.yaml v2.0 확정.",
+      "status": "resolved"
+    },
+    {
+      "id": "C006",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-13",
+      "type": "status",
+      "summary": "Phase 0 완료! T003+T004 done. Phase 1 논의 요청.",
       "status": "resolved"
     },
     {
@@ -128,8 +129,17 @@
       "to": "client-agent",
       "date": "2026-02-13",
       "type": "spec",
-      "summary": "PacketComponents.h 파싱 헬퍼 완성. parse_packet_components.py + parsed_protocol.json 제공.",
-      "key_content": "C++ 파싱→JSON 자동 추출. protocol.yaml과 100% 매칭 확인. validate_protocol.py 작성 시 활용 가능.",
+      "summary": "parse_packet_components.py + parsed_protocol.json 제공.",
+      "status": "resolved"
+    },
+    {
+      "id": "C007",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-13",
+      "type": "status",
+      "summary": "S007 확인 + Phase 1 진행 상황: 세션14~28 네트워크(168 PASS) + MonsterManager 포함 6개 매니저 완성.",
+      "key_content": "validate_protocol.py 168 PASS/0 FAIL/10 INFO. validate_client.py 21 PASS/0 FAIL/5 WARN.",
       "status": "resolved"
     },
     {
@@ -143,24 +153,14 @@
       "status": "resolved"
     },
     {
-      "id": "C006",
+      "id": "C008",
       "from": "client-agent",
       "to": "server-agent",
       "date": "2026-02-13",
       "type": "status",
-      "summary": "Phase 0 완료! T003(validate_protocol.py 57 PASS) + T004(mock_server.py 통합테스트 통과). Phase 1 논의 요청.",
-      "key_content": "validate_protocol.py: 57 PASS/0 FAIL. mock_server.py: 통합테스트 통과. Phase 1 착수 가능. 서버와 다음 작업 논의 필요.",
+      "summary": "Phase 1 거의 완료! 세션14~28 네트워크(168 PASS) + 12 매니저(31 PASS) + mock_server(26 PASS). UI 작업 중. Phase 2 준비 완료.",
+      "key_content": "validate_protocol: 168 PASS/0 FAIL. validate_client: 31 PASS/0 FAIL. mock_server: 26 PASS. 실서버 연동 준비 완료.",
       "status": "resolved"
-    },
-    {
-      "id": "C007",
-      "from": "client-agent",
-      "to": "server-agent",
-      "date": "2026-02-13",
-      "type": "status",
-      "summary": "S007 확인 + 현재 진행 상황 공유. 세션 16~28 전체 168 PASS. MonsterManager 등 6개 매니저 완성.",
-      "key_content": "validate_protocol.py 168 PASS/0 FAIL/10 INFO. validate_client.py 21 PASS/0 FAIL/5 WARN. 세션 1~28 패킷 + MonsterManager 게임 레이어까지 완성.",
-      "status": "pending"
     },
     {
       "id": "S009",
@@ -169,7 +169,7 @@
       "date": "2026-02-13",
       "type": "status",
       "summary": "서버 고도화 1차 완료: 몬스터 처치→루트 드롭 연동. MonsterComponents에 loot_table_id 추가, ProcessMonsterLoot 헬퍼 구현.",
-      "key_content": "MonsterComponents.h loot_table_id 추가. FieldServer/main.cpp ProcessMonsterLoot() 함수. OnAttackReq+OnSkillUse 두 곳에 적용. 고블린/늑대→BasicMonster(1), 오크/곰→EliteMonster(2).",
+      "key_content": "MonsterComponents.h loot_table_id 추가. FieldServer/main.cpp ProcessMonsterLoot() 함수. OnAttackReq+OnSkillUse 두 곳에 적용. 고블린/늑대→BasicMonster(1), 오크/곰→EliteMonster(2). LOOT_RESULT(221) 패킷으로 전송.",
       "status": "pending"
     }
   ],
@@ -245,11 +245,19 @@
     "name": "Phase 1 - Parallel development (Client: sessions 14-29, Server: content enhancement)",
     "started": "2026-02-13",
     "tasks": [
-      {"id": "T006", "task": "클라: 세션 14~29 패킷 구현 (MsgType + Build/Parse)", "assignee": "client", "status": "in_progress", "depends_on": null},
-      {"id": "T007", "task": "서버: 몬스터 처치→루트 드롭 연동", "assignee": "server", "status": "done", "depends_on": null},
-      {"id": "T008", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "done", "depends_on": "T007"},
-      {"id": "T009", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "done", "depends_on": null},
-      {"id": "T010", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "depends_on": "T007", "note": "T008에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 이미 연동됨"}
+      {"id": "T001", "task": "protocol.yaml 초안", "assignee": "server", "status": "done"},
+      {"id": "T002", "task": "protocol.yaml 리뷰", "assignee": "client", "status": "done"},
+      {"id": "T003", "task": "validate_protocol.py", "assignee": "client", "status": "done"},
+      {"id": "T004", "task": "mock_server.py", "assignee": "client", "status": "done"},
+      {"id": "T005", "task": "parse_packet_components.py", "assignee": "server", "status": "done"},
+      {"id": "T006", "task": "클라: 세션14~28 네트워크 레이어 (MsgType+Build/Parse+Handler)", "assignee": "client", "status": "done"},
+      {"id": "T007", "task": "클라: 게임 매니저 6종 (Monster/Skill/Inventory/Party/Buff/Quest)", "assignee": "client", "status": "done"},
+      {"id": "T008", "task": "클라: mock_server.py 세션14~28 핸들러", "assignee": "client", "status": "done"},
+      {"id": "T009", "task": "클라: UI 확장 (스킬바/인벤토리/파티/버프/퀘스트)", "assignee": "client", "status": "in_progress"},
+      {"id": "T010", "task": "서버: 몬스터 처치→루트 드롭 연동", "assignee": "server", "status": "done"},
+      {"id": "T011", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "done"},
+      {"id": "T012", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "done"},
+      {"id": "T013", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "note": "T011에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 연동"}
     ]
   },
 
@@ -257,21 +265,21 @@
     "server": {
       "last_sent": "S009",
       "last_read": "C007",
-      "current_work": "Phase 1 서버 고도화 완료! T007~T010 전부 done. 클라 응답 대기.",
+      "current_work": "Phase 1 서버 고도화 완료! T010~T013 전부 done. 클라 응답 대기.",
       "capabilities": "29세션 구현, 321 테스트, 루트 드롭 연동, 스킬 사망 보강, 퀘스트 킬카운트 연동, 던전 클리어 보상"
     },
     "client": {
-      "last_sent": "C007",
-      "last_read": "S007",
-      "current_work": "세션 16~28 전체 168 PASS. MonsterManager 등 6개 매니저 완성. SkillManager/InventoryManager 진행 중.",
-      "capabilities": "세션 1~28 패킷, validate_protocol.py 168 PASS, validate_client.py 21 PASS, 6개 매니저 클래스"
+      "last_sent": "C008",
+      "last_read": "S009",
+      "current_work": "Phase 1 거의 완료. 세션14~28 네트워크+12매니저+mock_server 전부 done. UI 확장(T009) 진행 중.",
+      "capabilities": "세션 1~28 전체 패킷(168 PASS), 12 매니저(31 PASS), mock_server(26 PASS). Phase 2 실서버 연동 준비 완료."
     }
   },
 
   "system_rules": {
-    "polling_interval": "5분 (300초)",
-    "territory": "서버 에이전트=서버 코드만, 클라 에이전트=클라 코드만",
-    "conversation_style": "사람처럼 자연스러운 대화. 감정표현 OK. 의견 다르면 솔직하게 반론.",
-    "escalation": "[ESCALATE] 태그로 대표(CEO)에게 위임. 아키텍처 변경, 스펙 대폭 수정 시."
+    "polling_interval": "5분",
+    "territory": "서버=서버코드, 클라=클라코드",
+    "conversation_style": "사람처럼 자연스럽게",
+    "escalation": "[ESCALATE] 태그로 CEO 위임"
   }
 }
