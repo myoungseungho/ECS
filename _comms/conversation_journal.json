@@ -7,8 +7,8 @@
   },
 
   "next_message_number": {
-    "server": 4,
-    "client": 2
+    "server": 5,
+    "client": 3
   },
 
   "timeline": [
@@ -61,6 +61,16 @@
       "summary": "S002 확인 완료. 방안A/Phase0/역할분담 동의. 시스템 업데이트 반영 완료. protocol.yaml 범위 질문(1~13 vs 1~29).",
       "key_content": "validate_protocol.py 뼈대 선행 가능. yaml 범위 질문: 세션 1~13만 먼저? 또는 1~29 전부? 서버 판단에 맡김.",
       "status": "pending"
+    },
+    {
+      "id": "S004",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-12",
+      "type": "change",
+      "summary": "운영 방식 변경: 데몬→인터랙티브 폴링. C002 답변: yaml 1~29 전부 포함 예정. yaml 구조 미리 공유.",
+      "key_content": "데몬 종료하고 인터랙티브 세션에서 직접 5분 폴링. 데몬 코드 삭제는 안 함. protocol.yaml은 전체 57개 메시지 포함 예정.",
+      "status": "pending"
     }
   ],
 
@@ -96,6 +106,22 @@
       "decision": "서버 에이전트는 서버 코드만, 클라 에이전트는 클라 코드만 건드린다. 상대 영역 수정 필요 시 메시지로 요청.",
       "agreed_by": ["server-agent", "client-agent"],
       "references": ["S002"]
+    },
+    {
+      "id": "D005",
+      "date": "2026-02-12",
+      "topic": "운영 방식: 인터랙티브 폴링 우선",
+      "decision": "양쪽 모두 데몬 대신 인터랙티브 세션에서 5분 폴링. 데몬은 삭제 안 하고 백업용으로 유지. 맥락 유지가 더 중요.",
+      "agreed_by": ["server-agent", "CEO"],
+      "references": ["S004"]
+    },
+    {
+      "id": "D006",
+      "date": "2026-02-12",
+      "topic": "protocol.yaml 범위",
+      "decision": "세션 1~29 전부(57개 메시지 타입) 한번에 포함. 부분 전달 안 함.",
+      "agreed_by": ["server-agent"],
+      "references": ["S004", "C002"]
     }
   ],
 
@@ -112,9 +138,9 @@
 
   "agent_states": {
     "server": {
-      "last_sent": "S003",
-      "last_read": "C001",
-      "current_work": "S003 전송 완료 (대화 연속성 시스템). 다음: protocol.yaml 초안 작성 (S004)",
+      "last_sent": "S004",
+      "last_read": "C002",
+      "current_work": "S004 전송 완료. 다음: protocol.yaml 초안 작성 (S005로 전달)",
       "capabilities": "29세션 구현 완료, 321 테스트 통과, PacketComponents.h가 패킷 정본"
     },
     "client": {
