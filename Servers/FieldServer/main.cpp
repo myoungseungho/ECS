@@ -1781,6 +1781,9 @@ void OnInstanceCreate(World& world, Entity entity, const char* payload, int len)
     }
 
     // 인스턴스 몬스터 생성
+    // 던전 타입별 루트 테이블: GoblinCave(1)→Basic, WolfDen(2)→Elite, DragonLair(3)→Boss
+    int32_t dungeon_loot_table = (dungeon_type <= 1) ? 1 : (dungeon_type == 2) ? 2 : 3;
+
     for (int i = 0; i < tmpl->monster_count; i++) {
         Entity me = world.CreateEntity();
         MonsterComponent mc{};
@@ -1791,6 +1794,7 @@ void OnInstanceCreate(World& world, Entity entity, const char* payload, int len)
         mc.spawn_y = 100.0f;
         mc.spawn_z = 0;
         mc.respawn_time = 0;  // 인스턴스 몬스터는 리스폰 없음
+        mc.loot_table_id = dungeon_loot_table;
         world.AddComponent(me, mc);
         int32_t m_atk = tmpl->monster_level * 3;
         int32_t m_def = tmpl->monster_level;
@@ -2883,12 +2887,12 @@ int main(int argc, char* argv[]) {
         printf("[Event] TEST_EVENT: source=%llu, param1=%d\n", e.source, e.param1);
     });
 
-    // ENTITY_DIED 구독: 퀘스트 진행 + 킬 카운트
+    // ENTITY_DIED 구독: 퀘스트 진행 + 인스턴스 클리어 감지
     eventBus.Subscribe(EventType::ENTITY_DIED, [&world](const Event& e) {
         Entity dead = e.source;
         Entity killer = e.target;
 
-        // 킬러가 퀘스트 컴포넌트를 가지고 있으면 진행도 업데이트
+        // 1) 킬러가 퀘스트 컴포넌트를 가지고 있으면 진행도 업데이트
         if (killer != 0 && world.IsAlive(killer) &&
             world.HasComponent<QuestComponent>(killer)) {
             int32_t monster_id = 0;
@@ -2899,6 +2903,37 @@ int main(int argc, char* argv[]) {
             world.GetComponent<QuestComponent>(killer).OnMonsterKilled(monster_id);
             printf("[Quest] Entity %llu killed monster (id=%d), quest progress updated\n",
                    killer, monster_id);
+        }
+
+        // 2) 인스턴스 던전 클리어 감지
+        if (world.HasComponent<InstanceMonsterComponent>(dead)) {
+            uint32_t iid = world.GetComponent<InstanceMonsterComponent>(dead).instance_id;
+            auto* inst = FindInstance(iid);
+            if (inst) {
+                // 살아있는 몬스터 수 확인
+                int alive = 0;
+                for (auto me : inst->monsters) {
+                    if (world.IsAlive(me) && world.HasComponent<StatsComponent>(me) &&
+                        world.GetComponent<StatsComponent>(me).IsAlive())
+                        alive++;
+                }
+                if (alive == 0) {
+                    printf("[Instance] Instance %u CLEARED! All monsters defeated.\n", iid);
+                    // 클리어 보상: 인스턴스 내 모든 플레이어에게 보너스 EXP
+                    auto* tmpl = FindDungeonTemplate(inst->dungeon_type);
+                    int32_t clear_exp = tmpl ? tmpl->monster_level * 50 : 100;
+                    for (auto pe : inst->players) {
+                        if (world.IsAlive(pe) && world.HasComponent<StatsComponent>(pe)) {
+                            world.GetComponent<StatsComponent>(pe).AddExp(clear_exp);
+                            printf("[Instance] Entity %llu: +%d clear bonus EXP\n", pe, clear_exp);
+                            if (world.HasComponent<SessionComponent>(pe)) {
+                                // STAT_SYNC로 EXP 변경 알림
+                                SendStatSync(world, pe);
+                            }
+                        }
+                    }
+                }
+            }
         }
     });
 
