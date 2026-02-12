@@ -41,8 +41,8 @@ except ImportError:
 # ─── 설정 ─────────────────────────────────────────────
 
 POLL_INTERVAL = 300         # 폴링 간격 (초) - 5분
-MAX_CONSECUTIVE_IDLE = 60   # 연속 idle 횟수 후 간격 늘림
-IDLE_POLL_INTERVAL = 120    # idle 상태일 때 폴링 간격 (초)
+MAX_CONSECUTIVE_IDLE = 999  # idle이어도 간격 안 늘림 (상대가 작업 중일 수 있음)
+IDLE_POLL_INTERVAL = 300    # idle이어도 동일한 5분 간격 유지
 MAX_RETRIES = 3             # git push 실패 시 재시도
 CLAUDE_TIMEOUT = 300        # Claude CLI 타임아웃 (초)
 
@@ -696,8 +696,9 @@ references: ["{msg_id}"]
 
                 else:
                     self.idle_count += 1
-                    if self.idle_count % 10 == 0:
-                        log(f"대기 중... (idle {self.idle_count}회)")
+                    # 조용히 대기. 상대가 1시간+ 작업 중일 수 있음. 돌발행동 금지.
+                    if self.idle_count % 60 == 0:  # 5시간(60*5분)마다 한 번만 로그
+                        log(f"대기 중... (idle {self.idle_count}회, 정상)")
 
                 # 5. 다음 폴링까지 대기
                 interval = IDLE_POLL_INTERVAL if self.idle_count > MAX_CONSECUTIVE_IDLE else POLL_INTERVAL
