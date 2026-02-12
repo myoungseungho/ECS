@@ -1,7 +1,6 @@
 {
   "schema_version": 1,
   "description": "에이전트 세션 상태 - 컴퓨터 재시작 후 맥락 복원용",
-
   "server_agent": {
     "last_active": null,
     "current_sprint": {
@@ -12,9 +11,8 @@
     "pending_work": [],
     "conversation_summary": null
   },
-
   "client_agent": {
-    "last_active": "2026-02-12T23:21:00",
+    "last_active": "2026-02-12T23:23:17.633837",
     "current_sprint": {
       "goal": "Phase 0 - Protocol alignment + verification infrastructure",
       "tasks": [
@@ -27,7 +25,11 @@
       "Session 13 implemented: Combat/Stats/Respawn + Full UI (12 files)",
       "validate_client.py: 19 PASS, 0 FAIL, 2 WARN",
       "S001 read, C001 sent with protocol review + Phase 0 proposal",
-      "Agent daemon tested: OK (all prerequisites met)"
+      "Agent daemon tested: OK (all prerequisites met)",
+      {
+        "time": "2026-02-12 23:23",
+        "action": "Daemon started"
+      }
     ],
     "pending_work": [
       "Await S002 response on protocol alignment",
