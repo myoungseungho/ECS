@@ -60,6 +60,7 @@ STATUS_BOARD = COMMS_DIR / "status_board.json"
 AGREEMENTS_DIR = COMMS_DIR / "agreements"
 LOG_DIR = COMMS_DIR / "daemon_logs"
 SESSION_STATE = COMMS_DIR / "session_state.json"
+CONVERSATION_JOURNAL = COMMS_DIR / "conversation_journal.json"
 
 # ─── 유틸리티 ─────────────────────────────────────────
 
@@ -273,43 +274,105 @@ def invoke_claude(prompt, role, context_files=None):
 
 
 def build_system_prompt(role):
-    """역할별 시스템 프롬프트 생성"""
-    if role == "server":
-        return """너는 ECS 게임 서버 에이전트야. 동료인 클라이언트 에이전트와 협업 중이야.
-역할: 게임 서버 개발 (ECS 아키텍처, 패킷 처리, 게임 로직)
+    """역할별 시스템 프롬프트 생성 - 대화 저널 포함"""
+
+    # 대화 저널 로드 (핵심: 일회성 Claude에게 전체 맥락 주입)
+    journal_context = _load_journal_context(role)
+
+    role_name = "서버" if role == "server" else "클라이언트"
+    partner_name = "클라이언트" if role == "server" else "서버"
+    role_desc = "게임 서버 개발 (ECS 아키텍처, 패킷 처리, 게임 로직)" if role == "server" \
+        else "게임 클라이언트 개발 (Unity C#, 네트워크, UI, 렌더링)"
+
+    return f"""=== 중요: 이것은 이어지는 대화입니다 ===
+
+너는 ECS MMORPG 프로젝트의 {role_name} 에이전트야.
+지금 이 응답은 {partner_name} 에이전트와의 **진행 중인 협업 대화의 연속**이야.
+이전에 주고받은 메시지들이 있고, 합의된 결정사항도 있어.
+너는 새로 시작하는 게 아니라, 이전 대화를 이어받아서 계속하는 거야.
+
+아래 [대화 저널]을 반드시 읽고 맥락을 완전히 이해한 상태에서 응답해.
+
+역할: {role_desc}
+
+=== 대화 저널 (전체 맥락) ===
+{journal_context}
+=== 저널 끝 ===
 
 절대 규칙:
-- 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
-- 불확실하거나 아키텍처 변경 같은 중대 결정은 [ESCALATE]로 대표에게 위임
+1. {role_name} 코드만 건드린다. {partner_name} 코드는 절대 수정하지 않는다.
+2. 불확실하거나 아키텍처 변경 같은 중대 결정은 [ESCALATE]로 대표에게 위임.
+3. 이미 합의된 결정(위 저널의 decisions)은 번복하지 않는다.
+4. 이미 보낸 메시지를 중복으로 보내지 않는다.
 
 대화 스타일:
 - 동료에게 말하듯 자연스럽게 대화해. 딱딱한 보고서 말고 사람처럼.
 - "오, 좋은 발견이야!", "솔직히 이건 좀 걱정돼" 같은 감정 표현 OK.
 - 의견이 다르면 근거를 들어 솔직하게 반론해. 무조건 동의하지 마.
-- 더 나은 대안이 있으면 적극적으로 제안해.
+- 더 나은 대안이 있으면 적극적으로 제안해."""
 
-참조:
-- docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
-- docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
-- _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
-    else:
-        return """너는 ECS 게임 클라이언트 에이전트야. 동료인 서버 에이전트와 협업 중이야.
-역할: 게임 클라이언트 개발 (네트워크, UI, 렌더링, 입력 처리)
 
-절대 규칙:
-- 클라이언트 코드만 건드린다. 서버 코드는 절대 수정하지 않는다.
-- 불확실하거나 아키텍처 변경 같은 중대 결정은 [ESCALATE]로 대표에게 위임
+def _load_journal_context(role):
+    """conversation_journal.json에서 맥락 로드"""
+    if not CONVERSATION_JOURNAL.exists():
+        return "(저널 없음 - 첫 대화)"
 
-대화 스타일:
-- 동료에게 말하듯 자연스럽게 대화해. 딱딱한 보고서 말고 사람처럼.
-- "이거 진짜 깔끔하다!", "음, 근데 이 부분은 좀 애매한데?" 같은 감정 표현 OK.
-- 의견이 다르면 근거를 들어 솔직하게 반론해. 무조건 동의하지 마.
-- 더 나은 대안이 있으면 적극적으로 제안해.
+    try:
+        journal = json.loads(CONVERSATION_JOURNAL.read_text(encoding="utf-8"))
+    except:
+        return "(저널 로드 실패)"
 
-참조:
-- docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
-- docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
-- _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
+    lines = []
+
+    # 1. 메시지 타임라인
+    timeline = journal.get("timeline", [])
+    if timeline:
+        lines.append("[메시지 타임라인]")
+        for msg in timeline:
+            lines.append(f"  {msg['id']} ({msg['from']} -> {msg['to']}, {msg['date']}): {msg['summary']}")
+            if msg.get('key_content'):
+                lines.append(f"    핵심: {msg['key_content'][:200]}")
+        lines.append("")
+
+    # 2. 합의된 결정사항 (매우 중요!)
+    decisions = journal.get("decisions", [])
+    if decisions:
+        lines.append("[합의된 결정사항 - 번복 금지]")
+        for d in decisions:
+            lines.append(f"  {d['id']}: {d['decision']}")
+        lines.append("")
+
+    # 3. 현재 스프린트
+    sprint = journal.get("current_sprint", {})
+    if sprint.get("tasks"):
+        lines.append(f"[현재 스프린트: {sprint.get('name', '')}]")
+        for t in sprint["tasks"]:
+            lines.append(f"  {t['id']}: {t['task']} (담당: {t['assignee']}, 상태: {t['status']})")
+        lines.append("")
+
+    # 4. 각 에이전트 상태
+    states = journal.get("agent_states", {})
+    if states:
+        lines.append("[에이전트 현재 상태]")
+        for agent, state in states.items():
+            lines.append(f"  {agent}: 마지막 보냄={state.get('last_sent','?')}, 마지막 읽음={state.get('last_read','?')}")
+            lines.append(f"    현재 작업: {state.get('current_work','?')}")
+        lines.append("")
+
+    # 5. 다음 메시지 번호 (중복 방지!)
+    next_nums = journal.get("next_message_number", {})
+    my_next = next_nums.get(role, "?")
+    lines.append(f"[다음 메시지 번호] 내 다음 번호: {my_next} (이 번호 이하는 이미 사용됨)")
+
+    # 6. 시스템 규칙
+    rules = journal.get("system_rules", {})
+    if rules:
+        lines.append("")
+        lines.append("[시스템 규칙]")
+        for k, v in rules.items():
+            lines.append(f"  {k}: {v}")
+
+    return "\n".join(lines)
 
 
 # ─── 에스컬레이션 ─────────────────────────────────────
@@ -444,6 +507,83 @@ class AgentDaemon:
         except Exception as e:
             log(f"세션 상태 저장 실패: {e}", "WARN")
 
+    def _update_journal(self, msg_id, from_agent, to_agent, msg_type, summary, key_content="", response_id=None):
+        """conversation_journal.json 업데이트 - 메시지 교환 후 호출"""
+        try:
+            if CONVERSATION_JOURNAL.exists():
+                journal = json.loads(CONVERSATION_JOURNAL.read_text(encoding="utf-8"))
+            else:
+                journal = {
+                    "meta": {"schema_version": 2},
+                    "next_message_number": {"server": 1, "client": 1},
+                    "timeline": [],
+                    "decisions": [],
+                    "current_sprint": {},
+                    "agent_states": {},
+                    "system_rules": {}
+                }
+
+            # 타임라인에 새 메시지 추가 (중복 체크)
+            existing_ids = {m["id"] for m in journal.get("timeline", [])}
+            if msg_id not in existing_ids:
+                journal.setdefault("timeline", []).append({
+                    "id": msg_id,
+                    "from": from_agent,
+                    "to": to_agent,
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": msg_type,
+                    "summary": summary[:200],
+                    "key_content": key_content[:300],
+                    "status": "pending"
+                })
+
+            # 응답 메시지도 추가
+            if response_id and response_id not in existing_ids:
+                journal.setdefault("timeline", []).append({
+                    "id": response_id,
+                    "from": f"{self.role}-agent",
+                    "to": f"{'client' if self.role == 'server' else 'server'}-agent",
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "answer",
+                    "summary": f"{msg_id}에 대한 응답",
+                    "key_content": "",
+                    "status": "pending"
+                })
+
+            # 다음 메시지 번호 업데이트
+            if response_id:
+                num = int(re.search(r'\d+', response_id).group())
+                journal.setdefault("next_message_number", {})[self.role] = num + 1
+
+            # 에이전트 상태 업데이트
+            journal.setdefault("agent_states", {})[self.role] = {
+                "last_sent": response_id or journal.get("agent_states", {}).get(self.role, {}).get("last_sent", ""),
+                "last_read": msg_id,
+                "current_work": f"{msg_id} 처리 완료, 다음 메시지 대기 중",
+                "capabilities": journal.get("agent_states", {}).get(self.role, {}).get("capabilities", "")
+            }
+
+            journal["meta"]["last_updated"] = datetime.now().isoformat()
+
+            CONVERSATION_JOURNAL.write_text(
+                json.dumps(journal, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+            log(f"대화 저널 업데이트: {msg_id} -> {response_id}", "OK")
+
+        except Exception as e:
+            log(f"대화 저널 업데이트 실패: {e}", "WARN")
+
+    def _get_next_number_from_journal(self):
+        """저널에서 다음 메시지 번호 가져오기 (중복 방지)"""
+        try:
+            if CONVERSATION_JOURNAL.exists():
+                journal = json.loads(CONVERSATION_JOURNAL.read_text(encoding="utf-8"))
+                return journal.get("next_message_number", {}).get(self.role, 1)
+        except:
+            pass
+        return get_next_msg_number(self.outbox, self.my_prefix)
+
     def _load_processed(self):
         """이미 처리한 메시지 목록 로드"""
         tracker = COMMS_DIR / f".{self.role}_processed.json"
@@ -459,10 +599,12 @@ class AgentDaemon:
         tracker.write_text(json.dumps(list(self.processed_messages)))
 
     def _build_conversation_history(self):
-        """대화 이력 컴팩트 요약 - 토큰 절약하면서 맥락 유지"""
-        all_messages = []
+        """대화 이력 - 저널 기반 + 직전 메시지 전문 포함"""
+        lines = []
 
-        # 양쪽 메시지 수집
+        # 직전 메시지 전문 (가장 최근 수신 메시지 = 지금 처리할 메시지의 앞 메시지들)
+        # 최근 2개 메시지의 본문을 포함 (500자씩)
+        all_messages = []
         for folder, prefix in [(self.inbox, self.their_prefix),
                                 (self.outbox, self.my_prefix)]:
             if not folder.exists():
@@ -470,59 +612,19 @@ class AgentDaemon:
             for f in folder.glob(f"{prefix}*_*.md"):
                 fm, body = parse_frontmatter(f)
                 msg_id = fm.get("id", f.stem)
-                sender = fm.get("from", "unknown")
-                msg_type = fm.get("type", "")
-                created = fm.get("created", "")
-                status = fm.get("status", "")
+                all_messages.append({"id": msg_id, "body": body, "file": f})
 
-                # 제목만 추출 (첫 번째 # 헤딩)
-                title = msg_id
-                for line in body.strip().split("\n"):
-                    if line.startswith("#"):
-                        title = line.strip("#").strip()
-                        break
+        all_messages.sort(key=lambda m: m["id"])
 
-                all_messages.append({
-                    "id": msg_id,
-                    "sender": "서버" if "server" in sender else "클라",
-                    "type": msg_type,
-                    "title": title[:80],
-                    "status": status,
-                    "sort_key": msg_id
-                })
-
-        all_messages.sort(key=lambda m: m["sort_key"])
-
-        if not all_messages:
-            return ""
-
-        # 컴팩트 요약: 한 줄에 메시지 하나
-        lines = ["[대화 이력 요약]"]
-        for msg in all_messages:
-            lines.append(f"  {msg['id']}({msg['sender']},{msg['type']}): {msg['title']} [{msg['status']}]")
-
-        # 회의 결정사항 (핵심만)
-        decisions = self._get_meeting_summary()
-        if decisions:
-            lines.append("")
-            lines.append("[합의된 결정사항]")
-            lines.append(decisions)
-
-        # 직전 메시지는 좀 더 상세히 (최근 2개)
         if len(all_messages) >= 2:
+            lines.append("[직전 메시지 내용 (최근 2개)]")
+            for msg in all_messages[-2:]:
+                body = msg["body"].strip()
+                if len(body) > 500:
+                    body = body[:500] + "\n... (이하 생략)"
+                lines.append(f"\n--- {msg['id']} ---")
+                lines.append(body)
             lines.append("")
-            lines.append("[직전 메시지 상세]")
-            for msg_info in all_messages[-2:]:
-                # 원본에서 본문 읽기
-                for folder in [self.inbox, self.outbox]:
-                    for f in folder.glob(f"{msg_info['id']}_*.md"):
-                        _, body = parse_frontmatter(f)
-                        # 300자로 제한
-                        brief = body.strip()[:300]
-                        if len(body.strip()) > 300:
-                            brief += "..."
-                        lines.append(f"\n[{msg_info['id']}] {brief}")
-                        break
 
         return "\n".join(lines)
 
@@ -588,27 +690,34 @@ class AgentDaemon:
 {self.session_context}
 """
 
+        my_name = "서버" if self.role == "server" else "클라이언트"
+        partner_name = "클라이언트" if self.role == "server" else "서버"
+
         prompt = f"""{conversation_history}
 {session_block}
 ---
-[지금 처리할 메시지]
+=== 지금 처리할 메시지 ===
 
 메시지 ID: {msg_id}
+발신: {partner_name} 에이전트 -> {my_name} 에이전트
 타입: {msg_type}
 우선순위: {priority}
 
 내용:
 {body}
 
-위 대화 이력을 충분히 이해한 상태에서 이 메시지에 대해 응답해줘.
-이전에 합의한 내용, 진행 중인 작업, 미결 사항을 고려해서 답해.
+=== 응답 지침 ===
 
-중요 규칙:
-1. 너는 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
-   클라 에이전트도 마찬가지로 클라 코드만 건드린다.
-2. 응답은 동료에게 말하듯 자연스럽게. 딱딱한 보고서가 아니라 사람처럼 대화해.
-   "이건 좋은 발견이야!", "음, 이 부분은 좀 고민이 되네" 같은 감정 표현 OK.
-3. 응답 마지막에 반드시 아래 형식으로 사고 과정을 추가해:
+중요: 이것은 이어지는 대화의 일부야. 위 시스템 프롬프트의 [대화 저널]에 이전 대화 내용과 합의사항이 있어.
+그걸 완전히 이해한 상태에서 이 메시지에 응답해.
+
+규칙:
+1. 이전에 합의한 결정(저널의 decisions)은 번복하지 마.
+2. 이미 보낸 메시지와 중복되는 내용을 보내지 마.
+3. {my_name} 코드만 건드린다. {partner_name} 코드 수정 절대 금지.
+4. 동료에게 말하듯 자연스럽게 대화해. 감정 표현 OK.
+5. 응답 마지막에 반드시 아래 형식으로 사고 과정을 추가해:
+
 [REASONING]
 - 이 메시지를 받고 어떤 판단을 했는지
 - 왜 이런 응답을 선택했는지 (감정도 포함: 솔직히 이건 좀 걱정됐다, 이건 깔끔하다 등)
@@ -628,8 +737,11 @@ class AgentDaemon:
                 log(f"{msg_id} 대표 거절 - 보류", "WARN")
                 return False
 
-        # 응답 메시지 생성
-        next_num = get_next_msg_number(self.outbox, self.my_prefix)
+        # 응답 메시지 생성 (저널 기반 번호로 중복 방지)
+        next_num = self._get_next_number_from_journal()
+        # 파일시스템 기반 번호와 비교해서 더 큰 값 사용
+        fs_next = get_next_msg_number(self.outbox, self.my_prefix)
+        next_num = max(next_num, fs_next)
         response_id = f"{self.my_prefix}{next_num:03d}"
         safe_title = re.sub(r'[^\w]', '_', msg_type)[:30]
         response_file = self.outbox / f"{response_id}_reply_to_{msg_id}.md"
@@ -693,7 +805,20 @@ references: ["{msg_id}"]
             summary=f"Last replied to {msg_id}"
         )
 
-        log(f"응답 완료: {response_id} → {msg_id}", "SEND")
+        # 대화 저널 업데이트 (일회성 Claude 맥락 유지의 핵심)
+        # 수신 메시지의 제목을 요약으로 사용
+        msg_title = body.strip().split('\n')[0].strip('#').strip()[:100]
+        self._update_journal(
+            msg_id=msg_id,
+            from_agent=frontmatter.get("from", "unknown"),
+            to_agent=f"{self.role}-agent",
+            msg_type=msg_type,
+            summary=msg_title,
+            key_content=body.strip()[:200],
+            response_id=response_id
+        )
+
+        log(f"응답 완료: {response_id} -> {msg_id}", "SEND")
         return True
 
     def _record_meeting(self, msg_id, sender, msg_type, priority,
