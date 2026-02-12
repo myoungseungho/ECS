@@ -1527,24 +1527,66 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     printf("[Skill] Entity %llu used skill %d on %llu: %d damage (HP: %d)\n",
            entity, skill_id, target, damage, tgt_stats.hp);
 
-    // 사망 처리
+    // 사망 처리 (OnAttackReq와 동일 수준으로 보강)
     if (!tgt_stats.IsAlive()) {
-        printf("[Skill] Entity %llu killed by skill!\n", target);
-        bool killed_monster = false;
-        if (world.HasComponent<MonsterComponent>(target)) {
+        printf("[Skill] Entity %llu killed by Entity %llu (skill %d)!\n", target, entity, skill_id);
+
+        bool target_is_player = world.HasComponent<SessionComponent>(target);
+        bool target_is_monster = world.HasComponent<MonsterComponent>(target);
+
+        // COMBAT_DIED 전송: [dead_entity(8) killer_entity(8)]
+        char died_buf[16];
+        std::memcpy(died_buf, &target, 8);
+        std::memcpy(died_buf + 8, &entity, 8);
+        auto died_pkt = BuildPacket(MsgType::COMBAT_DIED, died_buf, 16);
+
+        // 공격자에게 전송
+        auto& atk_session = world.GetComponent<SessionComponent>(entity);
+        g_network->SendTo(atk_session.session_id,
+                          died_pkt.data(), static_cast<int>(died_pkt.size()));
+
+        // 피격자가 플레이어면 피격자에게도 전송
+        if (target_is_player) {
+            auto& tgt_session = world.GetComponent<SessionComponent>(target);
+            g_network->SendTo(tgt_session.session_id,
+                              died_pkt.data(), static_cast<int>(died_pkt.size()));
+        }
+
+        // 몬스터 사망: 상태 변경 + 리스폰 타이머
+        if (target_is_monster) {
             auto& mc = world.GetComponent<MonsterComponent>(target);
             mc.state = MonsterState::DEAD;
             mc.death_timer = mc.respawn_time;
             mc.target_entity = 0;
-            killed_monster = true;
         }
+
+        // EXP 보상
         int32_t exp_reward = CalcKillExp(tgt_stats.level);
-        stats.AddExp(exp_reward);
+        int old_level = stats.level;
+        bool leveled = stats.AddExp(exp_reward);
+
+        printf("[Skill] Entity %llu: +%d EXP from skill kill\n", entity, exp_reward);
+
+        if (leveled) {
+            printf("[Skill] Entity %llu: LEVEL UP %d -> %d\n",
+                   entity, old_level, stats.level);
+        }
+
+        // 공격자 스탯 동기화 (EXP 변경)
         SendStatSync(world, entity);
 
         // 몬스터 루트 드롭 (Session 27)
-        if (killed_monster) {
+        if (target_is_monster) {
             ProcessMonsterLoot(world, entity, target);
+        }
+
+        // ENTITY_DIED 이벤트 (Session 11)
+        if (g_eventBus) {
+            Event evt;
+            evt.type = EventType::ENTITY_DIED;
+            evt.source = target;
+            evt.target = entity;  // killer
+            g_eventBus->Publish(evt);
         }
     }
 }
