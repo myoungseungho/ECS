@@ -1,0 +1,1134 @@
+# ============================================================
+# ECS MMORPG Packet Protocol v2.0
+# Single Source of Truth - Server Implementation Based
+# ============================================================
+# Generated from: PacketComponents.h + SERVER_IMPLEMENTATION_SUMMARY.md
+# Server: 29 sessions, 321 tests passing
+# Total: 57 message types
+# ============================================================
+
+version: "2.0"
+generated: "2026-02-12"
+source: "server-agent (PacketComponents.h)"
+
+header:
+  format: "[length:u32][msg_type:u16][payload:variable]"
+  header_size: 6
+  byte_order: little-endian
+  max_packet: 8192
+
+# ============================================================
+# Sessions 1-2: Core Infrastructure
+# ============================================================
+messages:
+
+  ECHO:
+    id: 1
+    session: 1
+    direction: bidirectional
+    payload:
+      - { name: data, type: bytes, size: variable }
+
+  PING:
+    id: 2
+    session: 2
+    direction: C2S
+    payload: []
+    note: "response is PONG (same id)"
+
+  STATS:
+    id: 99
+    session: 2
+    direction: S2C
+    payload:
+      - { name: diagnostics, type: bytes, size: variable }
+
+# ============================================================
+# Sessions 3-4: Movement & AOI
+# ============================================================
+
+  MOVE:
+    id: 10
+    session: 3
+    direction: C2S
+    payload:
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 12
+
+  MOVE_BROADCAST:
+    id: 11
+    session: 3
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 20
+
+  POS_QUERY:
+    id: 12
+    session: 3
+    direction: C2S
+    payload: []
+
+  APPEAR:
+    id: 13
+    session: 4
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 20
+
+  DISAPPEAR:
+    id: 14
+    session: 4
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+    total_size: 8
+
+# ============================================================
+# Sessions 5-6: Channel & Zone
+# ============================================================
+
+  CHANNEL_JOIN:
+    id: 20
+    session: 5
+    direction: C2S
+    payload:
+      - { name: channel_id, type: i32 }
+    total_size: 4
+
+  CHANNEL_INFO:
+    id: 22
+    session: 5
+    direction: S2C
+    payload:
+      - { name: channel_id, type: i32 }
+    total_size: 4
+
+  ZONE_ENTER:
+    id: 30
+    session: 6
+    direction: C2S
+    payload:
+      - { name: zone_id, type: i32 }
+    total_size: 4
+
+  ZONE_INFO:
+    id: 31
+    session: 6
+    direction: S2C
+    payload:
+      - { name: zone_id, type: i32 }
+    total_size: 4
+
+# ============================================================
+# Sessions 7-8: Server Handoff & Ghost
+# ============================================================
+
+  HANDOFF_REQUEST:
+    id: 40
+    session: 7
+    direction: C2S
+    payload: []
+
+  HANDOFF_DATA:
+    id: 41
+    session: 7
+    direction: S2C
+    payload:
+      - { name: serialized_entity, type: bytes, size: variable }
+
+  HANDOFF_RESTORE:
+    id: 42
+    session: 7
+    direction: C2S
+    payload:
+      - { name: serialized_entity, type: bytes, size: variable }
+
+  HANDOFF_RESULT:
+    id: 43
+    session: 7
+    direction: S2C
+    payload:
+      - { name: zone, type: i32 }
+      - { name: channel, type: i32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 20
+
+  GHOST_QUERY:
+    id: 50
+    session: 8
+    direction: C2S
+    payload: []
+
+  GHOST_INFO:
+    id: 51
+    session: 8
+    direction: S2C
+    payload:
+      - { name: ghost_count, type: i32 }
+    total_size: 4
+
+# ============================================================
+# Session 9: Authentication & Character
+# ============================================================
+
+  LOGIN:
+    id: 60
+    session: 9
+    direction: C2S
+    payload:
+      - { name: uname_len, type: u8 }
+      - { name: username, type: string, size: variable }
+      - { name: pw_len, type: u8 }
+      - { name: password, type: string, size: variable }
+
+  LOGIN_RESULT:
+    id: 61
+    session: 9
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: LoginResult }
+      - { name: account_id, type: u32 }
+    total_size: 5
+
+  CHAR_LIST_REQ:
+    id: 62
+    session: 9
+    direction: C2S
+    payload: []
+
+  CHAR_LIST_RESP:
+    id: 63
+    session: 9
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: characters
+        type: array
+        entry_size: 44
+        fields:
+          - { name: id, type: u32 }
+          - { name: name, type: string_fixed, size: 32 }
+          - { name: level, type: u32 }
+          - { name: job, type: u32 }
+
+  CHAR_SELECT:
+    id: 64
+    session: 9
+    direction: C2S
+    payload:
+      - { name: char_id, type: u32 }
+    total_size: 4
+
+  ENTER_GAME:
+    id: 65
+    session: 9
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: EnterGameResult }
+      - { name: entity, type: u64 }
+      - { name: zone, type: u32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 25
+    note: "Stats sent separately via STAT_SYNC(91)"
+
+# ============================================================
+# Sessions 10, 17: Gate Server
+# ============================================================
+
+  GATE_ROUTE_REQ:
+    id: 70
+    session: 10
+    direction: C2S
+    payload: []
+
+  GATE_ROUTE_RESP:
+    id: 71
+    session: 10
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: port, type: u16 }
+      - { name: ip_len, type: u8 }
+      - { name: ip, type: string, size: variable }
+
+  FIELD_REGISTER:
+    id: 130
+    session: 17
+    direction: server2server
+    payload:
+      - { name: port, type: u16 }
+      - { name: max_ccu, type: u32 }
+      - { name: name_len, type: u8 }
+      - { name: name, type: string, size: variable }
+
+  FIELD_HEARTBEAT:
+    id: 131
+    session: 17
+    direction: server2server
+    payload:
+      - { name: port, type: u16 }
+      - { name: ccu, type: u32 }
+      - { name: max_ccu, type: u32 }
+    total_size: 10
+
+  GATE_SERVER_LIST:
+    id: 133
+    session: 17
+    direction: C2S
+    payload: []
+
+  GATE_SERVER_LIST_RESP:
+    id: 134
+    session: 17
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: servers
+        type: array
+        entry_size: 11
+        fields:
+          - { name: port, type: u16 }
+          - { name: ccu, type: u32 }
+          - { name: max_ccu, type: u32 }
+          - { name: status, type: u8 }
+
+# ============================================================
+# Session 11: Timers & Config
+# ============================================================
+
+  TIMER_ADD:
+    id: 80
+    session: 11
+    direction: C2S
+    payload:
+      - { name: timer_id, type: u32 }
+      - { name: duration_ms, type: u32 }
+      - { name: interval_ms, type: u32 }
+    total_size: 12
+
+  TIMER_INFO:
+    id: 81
+    session: 11
+    direction: S2C
+    payload:
+      - { name: active_timer_count, type: u32 }
+      - { name: total_events_fired, type: u32 }
+    total_size: 8
+
+  CONFIG_QUERY:
+    id: 82
+    session: 11
+    direction: C2S
+    payload:
+      - { name: table_name_len, type: u8 }
+      - { name: table_name, type: string, size: variable }
+      - { name: key_col, type: u8 }
+      - { name: key, type: string, size: variable }
+
+  CONFIG_RESP:
+    id: 83
+    session: 11
+    direction: S2C
+    payload:
+      - { name: found, type: u8 }
+      - { name: data_len, type: u16 }
+      - { name: data, type: bytes, size: variable }
+
+# ============================================================
+# Session 12: Stats
+# ============================================================
+
+  STAT_QUERY:
+    id: 90
+    session: 12
+    direction: C2S
+    payload: []
+
+  STAT_SYNC:
+    id: 91
+    session: 12
+    direction: S2C
+    payload:
+      - { name: level, type: i32 }
+      - { name: hp, type: i32 }
+      - { name: max_hp, type: i32 }
+      - { name: mp, type: i32 }
+      - { name: max_mp, type: i32 }
+      - { name: atk, type: i32 }
+      - { name: def, type: i32 }
+      - { name: exp, type: i32 }
+      - { name: exp_next, type: i32 }
+    total_size: 36
+
+  STAT_ADD_EXP:
+    id: 92
+    session: 12
+    direction: C2S
+    payload:
+      - { name: exp_amount, type: i32 }
+    total_size: 4
+
+  STAT_TAKE_DMG:
+    id: 93
+    session: 12
+    direction: C2S
+    payload:
+      - { name: raw_damage, type: i32 }
+    total_size: 4
+
+  STAT_HEAL:
+    id: 94
+    session: 12
+    direction: C2S
+    payload:
+      - { name: heal_amount, type: i32 }
+    total_size: 4
+
+# ============================================================
+# Session 13: Combat
+# ============================================================
+
+  ATTACK_REQ:
+    id: 100
+    session: 13
+    direction: C2S
+    payload:
+      - { name: target_entity, type: u64 }
+    total_size: 8
+
+  ATTACK_RESULT:
+    id: 101
+    session: 13
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: AttackResult }
+      - { name: attacker, type: u64 }
+      - { name: target, type: u64 }
+      - { name: damage, type: i32 }
+      - { name: target_hp, type: i32 }
+      - { name: target_max_hp, type: i32 }
+    total_size: 29
+
+  COMBAT_DIED:
+    id: 102
+    session: 13
+    direction: S2C
+    payload:
+      - { name: dead_entity, type: u64 }
+      - { name: killer_entity, type: u64 }
+    total_size: 16
+
+  RESPAWN_REQ:
+    id: 103
+    session: 13
+    direction: C2S
+    payload: []
+
+  RESPAWN_RESULT:
+    id: 104
+    session: 13
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: hp, type: i32 }
+      - { name: mp, type: i32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 21
+
+# ============================================================
+# Session 14: Monsters
+# ============================================================
+
+  MONSTER_SPAWN:
+    id: 110
+    session: 14
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: monster_id, type: u32 }
+      - { name: level, type: u32 }
+      - { name: hp, type: i32 }
+      - { name: max_hp, type: i32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 36
+
+  MONSTER_RESPAWN:
+    id: 113
+    session: 14
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: hp, type: i32 }
+      - { name: max_hp, type: i32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 28
+
+# ============================================================
+# Session 16: Zone Transfer
+# ============================================================
+
+  ZONE_TRANSFER_REQ:
+    id: 120
+    session: 16
+    direction: C2S
+    payload:
+      - { name: target_zone_id, type: i32 }
+    total_size: 4
+
+  ZONE_TRANSFER_RESULT:
+    id: 121
+    session: 16
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: ZoneTransferResult }
+      - { name: zone_id, type: u32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 17
+
+# ============================================================
+# Session 19: Skills
+# ============================================================
+
+  SKILL_LIST_REQ:
+    id: 150
+    session: 19
+    direction: C2S
+    payload: []
+
+  SKILL_LIST_RESP:
+    id: 151
+    session: 19
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: skills
+        type: array
+        entry_size: 33
+        fields:
+          - { name: id, type: u32 }
+          - { name: name, type: string_fixed, size: 16 }
+          - { name: cd_ms, type: u32 }
+          - { name: dmg, type: u32 }
+          - { name: mp, type: u32 }
+          - { name: range, type: u32 }
+          - { name: type, type: u8 }
+
+  SKILL_USE:
+    id: 152
+    session: 19
+    direction: C2S
+    payload:
+      - { name: skill_id, type: u32 }
+      - { name: target_entity, type: u64 }
+    total_size: 12
+
+  SKILL_RESULT:
+    id: 153
+    session: 19
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: skill_id, type: u32 }
+      - { name: caster, type: u64 }
+      - { name: target, type: u64 }
+      - { name: damage, type: i32 }
+      - { name: target_hp, type: i32 }
+    total_size: 29
+
+# ============================================================
+# Session 20: Party
+# ============================================================
+
+  PARTY_CREATE:
+    id: 160
+    session: 20
+    direction: C2S
+    payload: []
+
+  PARTY_INVITE:
+    id: 161
+    session: 20
+    direction: C2S
+    payload:
+      - { name: target_entity, type: u64 }
+    total_size: 8
+
+  PARTY_ACCEPT:
+    id: 162
+    session: 20
+    direction: C2S
+    payload:
+      - { name: party_id, type: u32 }
+    total_size: 4
+
+  PARTY_LEAVE:
+    id: 163
+    session: 20
+    direction: C2S
+    payload: []
+
+  PARTY_INFO:
+    id: 164
+    session: 20
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: party_id, type: u32 }
+      - { name: leader, type: u64 }
+      - { name: count, type: u8 }
+      - name: members
+        type: array
+        entry_size: 12
+        fields:
+          - { name: entity, type: u64 }
+          - { name: level, type: u32 }
+
+  PARTY_KICK:
+    id: 165
+    session: 20
+    direction: C2S
+    payload:
+      - { name: target_entity, type: u64 }
+    total_size: 8
+
+# ============================================================
+# Session 21: Instanced Dungeons
+# ============================================================
+
+  INSTANCE_CREATE:
+    id: 170
+    session: 21
+    direction: C2S
+    payload:
+      - { name: dungeon_type, type: u32 }
+    total_size: 4
+
+  INSTANCE_ENTER:
+    id: 171
+    session: 21
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: instance_id, type: u32 }
+      - { name: dungeon_type, type: u32 }
+    total_size: 9
+
+  INSTANCE_LEAVE:
+    id: 172
+    session: 21
+    direction: C2S
+    payload: []
+
+  INSTANCE_LEAVE_RESULT:
+    id: 173
+    session: 21
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: zone_id, type: u32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 17
+
+  INSTANCE_INFO:
+    id: 174
+    session: 21
+    direction: S2C
+    payload:
+      - { name: instance_id, type: u32 }
+      - { name: dungeon_type, type: u32 }
+      - { name: player_count, type: u8 }
+      - { name: monster_count, type: u8 }
+    total_size: 10
+
+# ============================================================
+# Session 22: Matchmaking
+# ============================================================
+
+  MATCH_ENQUEUE:
+    id: 180
+    session: 22
+    direction: C2S
+    payload:
+      - { name: dungeon_type, type: u32 }
+    total_size: 4
+
+  MATCH_DEQUEUE:
+    id: 181
+    session: 22
+    direction: C2S
+    payload: []
+
+  MATCH_FOUND:
+    id: 182
+    session: 22
+    direction: S2C
+    payload:
+      - { name: match_id, type: u32 }
+      - { name: dungeon_type, type: u32 }
+      - { name: player_count, type: u8 }
+    total_size: 9
+
+  MATCH_ACCEPT:
+    id: 183
+    session: 22
+    direction: C2S
+    payload:
+      - { name: match_id, type: u32 }
+    total_size: 4
+
+  MATCH_STATUS:
+    id: 184
+    session: 22
+    direction: S2C
+    payload:
+      - { name: status, type: u8 }
+      - { name: queue_position, type: u32 }
+    total_size: 5
+
+# ============================================================
+# Session 23: Inventory
+# ============================================================
+
+  INVENTORY_REQ:
+    id: 190
+    session: 23
+    direction: C2S
+    payload: []
+
+  INVENTORY_RESP:
+    id: 191
+    session: 23
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: items
+        type: array
+        entry_size: 8
+        fields:
+          - { name: slot, type: u8 }
+          - { name: item_id, type: u32 }
+          - { name: count, type: u16 }
+          - { name: equipped, type: u8 }
+
+  ITEM_ADD:
+    id: 192
+    session: 23
+    direction: C2S
+    payload:
+      - { name: item_id, type: u32 }
+      - { name: count, type: u16 }
+    total_size: 6
+
+  ITEM_ADD_RESULT:
+    id: 193
+    session: 23
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: ItemResult }
+      - { name: slot, type: u8 }
+      - { name: item_id, type: u32 }
+      - { name: count, type: u16 }
+    total_size: 8
+
+  ITEM_USE:
+    id: 194
+    session: 23
+    direction: C2S
+    payload:
+      - { name: slot, type: u8 }
+    total_size: 1
+
+  ITEM_USE_RESULT:
+    id: 195
+    session: 23
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: slot, type: u8 }
+      - { name: item_id, type: u32 }
+    total_size: 6
+
+  ITEM_EQUIP:
+    id: 196
+    session: 23
+    direction: C2S
+    payload:
+      - { name: slot, type: u8 }
+    total_size: 1
+
+  ITEM_UNEQUIP:
+    id: 197
+    session: 23
+    direction: C2S
+    payload:
+      - { name: slot, type: u8 }
+    total_size: 1
+
+  ITEM_EQUIP_RESULT:
+    id: 198
+    session: 23
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: slot, type: u8 }
+      - { name: item_id, type: u32 }
+      - { name: equipped, type: u8 }
+    total_size: 7
+
+# ============================================================
+# Session 24: Buffs
+# ============================================================
+
+  BUFF_LIST_REQ:
+    id: 200
+    session: 24
+    direction: C2S
+    payload: []
+
+  BUFF_LIST_RESP:
+    id: 201
+    session: 24
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: buffs
+        type: array
+        entry_size: 9
+        fields:
+          - { name: buff_id, type: u32 }
+          - { name: remaining_ms, type: u32 }
+          - { name: stacks, type: u8 }
+
+  BUFF_APPLY_REQ:
+    id: 202
+    session: 24
+    direction: C2S
+    payload:
+      - { name: buff_id, type: u32 }
+    total_size: 4
+
+  BUFF_RESULT:
+    id: 203
+    session: 24
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: BuffResult }
+      - { name: buff_id, type: u32 }
+      - { name: stacks, type: u8 }
+      - { name: duration_ms, type: u32 }
+    total_size: 10
+
+  BUFF_REMOVE_REQ:
+    id: 204
+    session: 24
+    direction: C2S
+    payload:
+      - { name: buff_id, type: u32 }
+    total_size: 4
+
+  BUFF_REMOVE_RESP:
+    id: 205
+    session: 24
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: buff_id, type: u32 }
+    total_size: 5
+
+# ============================================================
+# Session 25: Condition Engine
+# ============================================================
+
+  CONDITION_EVAL:
+    id: 210
+    session: 25
+    direction: C2S
+    payload:
+      - { name: node_count, type: u8 }
+      - { name: root, type: u8 }
+      - name: nodes
+        type: array
+        entry_size: 13
+        fields:
+          - { name: type, type: u8 }
+          - { name: p1, type: i32 }
+          - { name: p2, type: i32 }
+          - { name: left, type: u16 }
+          - { name: right, type: u16 }
+
+  CONDITION_RESULT:
+    id: 211
+    session: 25
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+    total_size: 1
+
+# ============================================================
+# Session 26: Spatial Queries
+# ============================================================
+
+  SPATIAL_QUERY_REQ:
+    id: 215
+    session: 26
+    direction: C2S
+    payload:
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+      - { name: radius, type: f32 }
+      - { name: filter, type: u8, enum: SpatialFilter }
+    total_size: 17
+
+  SPATIAL_QUERY_RESP:
+    id: 216
+    session: 26
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: results
+        type: array
+        entry_size: 12
+        fields:
+          - { name: entity, type: u64 }
+          - { name: dist, type: f32 }
+
+# ============================================================
+# Session 27: Loot
+# ============================================================
+
+  LOOT_ROLL_REQ:
+    id: 220
+    session: 27
+    direction: C2S
+    payload:
+      - { name: table_id, type: u32 }
+    total_size: 4
+
+  LOOT_RESULT:
+    id: 221
+    session: 27
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: items
+        type: array
+        entry_size: 6
+        fields:
+          - { name: item_id, type: u32 }
+          - { name: count, type: u16 }
+
+# ============================================================
+# Session 28: Quests
+# ============================================================
+
+  QUEST_LIST_REQ:
+    id: 230
+    session: 28
+    direction: C2S
+    payload: []
+
+  QUEST_LIST_RESP:
+    id: 231
+    session: 28
+    direction: S2C
+    payload:
+      - { name: count, type: u8 }
+      - name: quests
+        type: array
+        entry_size: 13
+        fields:
+          - { name: quest_id, type: u32 }
+          - { name: state, type: u8, enum: QuestState }
+          - { name: progress, type: u32 }
+          - { name: target, type: u32 }
+
+  QUEST_ACCEPT:
+    id: 232
+    session: 28
+    direction: C2S
+    payload:
+      - { name: quest_id, type: u32 }
+    total_size: 4
+
+  QUEST_ACCEPT_RESULT:
+    id: 233
+    session: 28
+    direction: S2C
+    payload:
+      - { name: result, type: u8, enum: QuestAcceptResult }
+      - { name: quest_id, type: u32 }
+    total_size: 5
+
+  QUEST_PROGRESS:
+    id: 234
+    session: 28
+    direction: C2S
+    payload:
+      - { name: quest_id, type: u32 }
+    total_size: 4
+
+  QUEST_COMPLETE:
+    id: 235
+    session: 28
+    direction: C2S
+    payload:
+      - { name: quest_id, type: u32 }
+    total_size: 4
+
+  QUEST_COMPLETE_RESULT:
+    id: 236
+    session: 28
+    direction: S2C
+    payload:
+      - { name: result, type: u8 }
+      - { name: quest_id, type: u32 }
+      - { name: reward_exp, type: u32 }
+      - { name: reward_item_id, type: u32 }
+      - { name: reward_item_count, type: u16 }
+    total_size: 15
+
+# ============================================================
+# Result Code Enums
+# ============================================================
+
+result_codes:
+  LoginResult:
+    0: SUCCESS
+    1: ACCOUNT_NOT_FOUND
+    2: WRONG_PASSWORD
+    3: ALREADY_ONLINE
+
+  EnterGameResult:
+    0: SUCCESS
+    1: CHAR_NOT_FOUND
+    2: DIFFERENT_ACCOUNT
+
+  AttackResult:
+    0: SUCCESS
+    1: TARGET_NOT_FOUND
+    2: TARGET_DEAD
+    3: OUT_OF_RANGE
+    4: COOLDOWN
+    5: ATTACKER_DEAD
+    6: SELF_ATTACK
+
+  ZoneTransferResult:
+    0: SUCCESS
+    1: ZONE_NOT_EXIST
+    2: ALREADY_SAME_ZONE
+
+  ItemResult:
+    0: SUCCESS
+    1: INVENTORY_FULL
+    2: EMPTY_SLOT
+    3: ALREADY_EQUIPPED
+    4: CANNOT_EQUIP
+
+  BuffResult:
+    0: SUCCESS
+    1: BUFF_NOT_FOUND
+    2: NO_SLOT
+    3: INACTIVE
+
+  QuestState:
+    0: NONE
+    1: ACCEPTED
+    2: IN_PROGRESS
+    3: COMPLETE
+    4: REWARDED
+
+  QuestAcceptResult:
+    0: SUCCESS
+    1: QUEST_NOT_FOUND
+    2: ALREADY_ACCEPTED
+    3: QUEST_FULL
+    4: PREREQUISITES_NOT_MET
+    5: LEVEL_TOO_LOW
+    6: INCOMPLETE
+
+  SpatialFilter:
+    0: ALL
+    1: PLAYERS_ONLY
+    2: MONSTERS_ONLY
+
+  ConditionType:
+    0: ALWAYS_TRUE
+    1: ALWAYS_FALSE
+    10: AND
+    11: OR
+    12: NOT
+    20: LEVEL_GE
+    30: HAS_ITEM
+    31: HAS_BUFF
+    40: IN_ZONE
+    60: CLASS_EQ
+
+# ============================================================
+# Game Data (for mock_server.py)
+# ============================================================
+
+game_data:
+  accounts:
+    - { id: 1, username: "hero", password: "pass123" }
+    - { id: 2, username: "mage", password: "magic456" }
+
+  characters:
+    - { id: 100, account_id: 1, name: "Warrior1", level: 10, job: 1 }
+    - { id: 101, account_id: 1, name: "Mage1", level: 5, job: 2 }
+    - { id: 200, account_id: 2, name: "Archer2", level: 8, job: 3 }
+
+  zones:
+    - { id: 1, name: "Starting Village" }
+    - { id: 2, name: "Dark Forest" }
+    - { id: 3, name: "Crystal Cave" }
+
+  monsters:
+    - { id: 1001, name: "Slime", level: 1, hp: 50, atk: 5, def: 2 }
+    - { id: 1002, name: "Wolf", level: 3, hp: 120, atk: 15, def: 8 }
+    - { id: 1003, name: "Dragon", level: 20, hp: 5000, atk: 200, def: 100 }
+
+  skills:
+    - { id: 1, name: "Slash", cd_ms: 1000, dmg: 20, mp: 5, range: 3, type: 0 }
+    - { id: 2, name: "Fireball", cd_ms: 3000, dmg: 50, mp: 20, range: 10, type: 1 }
+    - { id: 3, name: "Heal", cd_ms: 5000, dmg: -30, mp: 15, range: 8, type: 2 }
+
+  buffs:
+    - { id: 1, name: "ATK_UP", duration_ms: 30000, stat: "atk", value: 10 }
+    - { id: 2, name: "DEF_UP", duration_ms: 30000, stat: "def", value: 10 }
+    - { id: 3, name: "POISON", duration_ms: 10000, stat: "hp", value: -5, tick_ms: 2000 }
+
+  loot_tables:
+    - table_id: 1
+      drops:
+        - { item_id: 2001, weight: 50, min: 1, max: 3 }
+        - { item_id: 2002, weight: 30, min: 1, max: 1 }
+        - { item_id: 2003, weight: 20, min: 1, max: 1 }
+
+  quests:
+    - { id: 1, name: "Kill 5 Slimes", type: "kill", target_monster: 1001, target_count: 5, reward_exp: 100, reward_item: 2001, reward_count: 3, min_level: 1 }
+    - { id: 2, name: "Collect 3 Wolf Pelts", type: "collect", target_item: 2002, target_count: 3, reward_exp: 250, reward_item: 2003, reward_count: 1, min_level: 3 }
