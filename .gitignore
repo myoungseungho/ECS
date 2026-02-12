@@ -42,3 +42,6 @@ UnityClient/**/*.sln
 # Client validation artifacts
 UnityClient/GameClient/_validation/evidence/*.json
 UnityClient/GameClient/_validation/logs/*.log
+
+# Agent daemon logs
+_comms/daemon_logs/
