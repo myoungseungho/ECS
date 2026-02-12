@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "description": "에이전트 세션 상태 - 컴퓨터 재시작 후 맥락 복원용",
+
+  "server_agent": {
+    "last_active": null,
+    "current_sprint": {
+      "goal": "Inter-agent communication system bootstrap",
+      "tasks": []
+    },
+    "work_log": [],
+    "pending_work": [],
+    "conversation_summary": null
+  },
+
+  "client_agent": {
+    "last_active": null,
+    "current_sprint": {
+      "goal": null,
+      "tasks": []
+    },
+    "work_log": [],
+    "pending_work": [],
+    "conversation_summary": null
+  }
+}

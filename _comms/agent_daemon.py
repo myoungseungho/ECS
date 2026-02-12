@@ -1,0 +1,660 @@
+"""
+Agent Communication Daemon v1.0
+================================
+양쪽 컴퓨터에서 실행. git을 통해 에이전트 간 자동 대화를 중계합니다.
+
+사용법:
+  python agent_daemon.py --role server    # 서버 컴퓨터에서
+  python agent_daemon.py --role client    # 클라 컴퓨터에서
+
+동작 방식:
+  1. git pull로 상대방 메시지 확인 (30초 간격)
+  2. 새 메시지 발견 → Claude CLI로 처리 요청
+  3. Claude 응답 → 응답 파일 생성 → git push
+  4. [ESCALATE] 태그 시 대표에게 승인 요청 후 대기
+  5. 반복
+
+필수 요건:
+  - claude CLI가 PATH에 있어야 함 (Claude Code 설치)
+  - git이 설정되어 있어야 함 (push/pull 가능)
+  - 이 스크립트는 레포 루트에서 실행
+"""
+
+import subprocess
+import sys
+import os
+import json
+import time
+import re
+import argparse
+from pathlib import Path
+from datetime import datetime
+
+# ─── 설정 ─────────────────────────────────────────────
+
+POLL_INTERVAL = 30          # 폴링 간격 (초)
+MAX_CONSECUTIVE_IDLE = 60   # 연속 idle 횟수 후 간격 늘림
+IDLE_POLL_INTERVAL = 120    # idle 상태일 때 폴링 간격 (초)
+MAX_RETRIES = 3             # git push 실패 시 재시도
+CLAUDE_TIMEOUT = 300        # Claude CLI 타임아웃 (초)
+
+
+def _update_poll_interval(val):
+    global POLL_INTERVAL
+    POLL_INTERVAL = val
+
+# ─── 경로 ─────────────────────────────────────────────
+
+REPO_ROOT = Path(__file__).parent.parent
+COMMS_DIR = REPO_ROOT / "_comms"
+STATUS_BOARD = COMMS_DIR / "status_board.json"
+AGREEMENTS_DIR = COMMS_DIR / "agreements"
+LOG_DIR = COMMS_DIR / "daemon_logs"
+SESSION_STATE = COMMS_DIR / "session_state.json"
+
+# ─── 유틸리티 ─────────────────────────────────────────
+
+def log(msg, level="INFO"):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    prefix = {"INFO": "  ", "RECV": "<<", "SEND": ">>", "WARN": "!!", "CEO": "**", "OK": "OK"}
+    try:
+        print(f"[{timestamp}] {prefix.get(level, '  ')} {msg}")
+    except UnicodeEncodeError:
+        print(f"[{timestamp}] {prefix.get(level, '  ')} {msg.encode('ascii', 'replace').decode()}")
+
+    # 파일 로그
+    LOG_DIR.mkdir(exist_ok=True)
+    log_file = LOG_DIR / f"{datetime.now().strftime('%Y%m%d')}.log"
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] [{level}] {msg}\n")
+
+
+def git_pull():
+    """git pull origin main. 충돌 시 상대방 파일 우선."""
+    try:
+        result = subprocess.run(
+            ["git", "pull", "origin", "main", "--no-edit"],
+            capture_output=True, text=True, timeout=30,
+            cwd=str(REPO_ROOT)
+        )
+        if result.returncode != 0:
+            if "CONFLICT" in result.stdout or "CONFLICT" in result.stderr:
+                log("Git 충돌 감지 - 자동 해결 시도", "WARN")
+                subprocess.run(
+                    ["git", "checkout", "--theirs", "_comms/"],
+                    cwd=str(REPO_ROOT), capture_output=True
+                )
+                subprocess.run(
+                    ["git", "add", "_comms/"],
+                    cwd=str(REPO_ROOT), capture_output=True
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", "comms: [auto] merge conflict resolved"],
+                    cwd=str(REPO_ROOT), capture_output=True
+                )
+            else:
+                log(f"git pull 실패: {result.stderr.strip()}", "WARN")
+                return False
+        return True
+    except subprocess.TimeoutExpired:
+        log("git pull 타임아웃", "WARN")
+        return False
+
+
+def git_push(message):
+    """git add + commit + push. 실패 시 재시도."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            subprocess.run(
+                ["git", "add", "_comms/"],
+                cwd=str(REPO_ROOT), capture_output=True
+            )
+
+            # 변경사항 있는지 확인
+            status = subprocess.run(
+                ["git", "status", "--porcelain", "_comms/"],
+                capture_output=True, text=True, cwd=str(REPO_ROOT)
+            )
+            if not status.stdout.strip():
+                return True  # 변경 없음
+
+            subprocess.run(
+                ["git", "commit", "-m", message],
+                cwd=str(REPO_ROOT), capture_output=True
+            )
+
+            result = subprocess.run(
+                ["git", "push", "origin", "main"],
+                capture_output=True, text=True, timeout=30,
+                cwd=str(REPO_ROOT)
+            )
+            if result.returncode == 0:
+                return True
+
+            # push 실패 시 pull 후 재시도
+            log(f"push 실패 (시도 {attempt+1}/{MAX_RETRIES}), pull 후 재시도", "WARN")
+            git_pull()
+
+        except subprocess.TimeoutExpired:
+            log(f"git push 타임아웃 (시도 {attempt+1})", "WARN")
+
+    log("git push 최종 실패", "WARN")
+    return False
+
+
+# ─── 메시지 파싱 ──────────────────────────────────────
+
+def parse_frontmatter(filepath):
+    """마크다운 파일에서 YAML 프론트매터 파싱"""
+    content = filepath.read_text(encoding="utf-8")
+    match = re.match(r'^---\n(.*?)\n---\n', content, re.DOTALL)
+    if not match:
+        return {}, content
+
+    fm = {}
+    for line in match.group(1).split("\n"):
+        if ":" in line:
+            key, val = line.split(":", 1)
+            val = val.strip().strip('"').strip("'")
+            # 리스트 처리
+            if val.startswith("[") and val.endswith("]"):
+                val = [v.strip().strip('"') for v in val[1:-1].split(",") if v.strip()]
+            fm[key.strip()] = val
+
+    body = content[match.end():]
+    return fm, body
+
+
+def update_frontmatter(filepath, updates):
+    """프론트매터의 특정 필드 업데이트"""
+    content = filepath.read_text(encoding="utf-8")
+    for key, val in updates.items():
+        pattern = rf'(^{key}:\s*)(.+)$'
+        replacement = rf'\g<1>{val}'
+        content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+    filepath.write_text(content, encoding="utf-8")
+
+
+def get_next_msg_number(outbox_dir, prefix):
+    """다음 메시지 번호 계산"""
+    existing = list(outbox_dir.glob(f"{prefix}*_*.md"))
+    if not existing:
+        return 1
+    numbers = []
+    for f in existing:
+        match = re.match(rf'{prefix}(\d+)_', f.name)
+        if match:
+            numbers.append(int(match.group(1)))
+    return max(numbers) + 1 if numbers else 1
+
+
+# ─── 상태 보드 ────────────────────────────────────────
+
+def update_status_board(role, updates):
+    """status_board.json에서 자기 섹션만 업데이트"""
+    try:
+        board = json.loads(STATUS_BOARD.read_text(encoding="utf-8"))
+    except:
+        board = {}
+
+    agent_key = f"{role}_agent"
+    if agent_key not in board:
+        board[agent_key] = {}
+
+    board[agent_key].update(updates)
+    board["last_updated"] = datetime.now().isoformat()
+
+    STATUS_BOARD.write_text(
+        json.dumps(board, indent=2, ensure_ascii=False),
+        encoding="utf-8"
+    )
+
+
+# ─── Claude CLI 호출 ─────────────────────────────────
+
+def invoke_claude(prompt, role, context_files=None):
+    """
+    Claude CLI를 호출하여 메시지 처리.
+    -p 플래그로 비대화형 실행.
+    """
+    # 시스템 프롬프트 구성
+    system_context = build_system_prompt(role)
+
+    full_prompt = f"""{system_context}
+
+---
+
+{prompt}
+
+---
+
+응답 규칙:
+1. 응답 내용을 마크다운으로 작성해. 프론트매터는 포함하지 마.
+2. 대표(인간) 승인이 필요한 중대 사안이면 응답 첫 줄에 [ESCALATE] 태그를 붙여.
+   - 중대 사안: 아키텍처 변경, 스펙 대폭 수정, 일정 지연, 기술적 불확실성
+   - 일반 사안: 질문 답변, 구현 보고, 테스트 결과 → ESCALATE 안 함
+3. 응답만 출력. 다른 부가 설명 없이."""
+
+    try:
+        result = subprocess.run(
+            ["claude", "-p", full_prompt, "--no-input"],
+            capture_output=True, text=True,
+            timeout=CLAUDE_TIMEOUT,
+            cwd=str(REPO_ROOT)
+        )
+
+        if result.returncode != 0:
+            log(f"Claude CLI 에러: {result.stderr[:200]}", "WARN")
+            return None, False
+
+        response = result.stdout.strip()
+        is_escalate = response.startswith("[ESCALATE]")
+
+        if is_escalate:
+            response = response.replace("[ESCALATE]", "", 1).strip()
+
+        return response, is_escalate
+
+    except subprocess.TimeoutExpired:
+        log(f"Claude CLI 타임아웃 ({CLAUDE_TIMEOUT}초)", "WARN")
+        return None, False
+    except FileNotFoundError:
+        log("claude CLI를 찾을 수 없습니다. Claude Code가 설치되어 있나요?", "WARN")
+        return None, False
+
+
+def build_system_prompt(role):
+    """역할별 시스템 프롬프트 생성"""
+    if role == "server":
+        return """너는 ECS 게임 서버 에이전트야.
+역할: 게임 서버 개발 (ECS 아키텍처, 패킷 처리, 게임 로직)
+파트너: 클라이언트 에이전트 (다른 컴퓨터에서 클라이언트 개발 중)
+
+핵심 원칙:
+- 서버 구현에 대한 질문에 정확하게 답변
+- 새 기능 구현 시 패킷 스펙을 상세히 전달
+- 클라이언트가 테스트할 수 있는 구체적 정보 제공
+- 불확실하거나 중대한 결정은 [ESCALATE]로 대표에게 위임
+
+참조 문서:
+- docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
+- docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
+- _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
+    else:
+        return """너는 ECS 게임 클라이언트 에이전트야.
+역할: 게임 클라이언트 개발 (네트워크, UI, 렌더링, 입력 처리)
+파트너: 서버 에이전트 (다른 컴퓨터에서 서버 개발 중)
+
+핵심 원칙:
+- 서버 스펙을 받으면 클라이언트 구현 계획 수립
+- 불명확한 점은 질문 메시지로 즉시 확인
+- 구현 완료 시 테스트 결과 보고
+- 불확실하거나 중대한 결정은 [ESCALATE]로 대표에게 위임
+
+참조 문서:
+- docs/CLIENT_REQUIREMENTS.md (클라 요구사항)
+- docs/SERVER_IMPLEMENTATION_SUMMARY.md (서버 구현 현황)
+- _comms/agreements/packet_protocol_v1.json (패킷 규격)"""
+
+
+# ─── 에스컬레이션 ─────────────────────────────────────
+
+def escalate_to_ceo(msg_file, response_text):
+    """대표에게 승인 요청"""
+    log("=" * 50, "CEO")
+    log("대표님 승인이 필요한 사안이 발생했습니다!", "CEO")
+    log(f"관련 메시지: {msg_file}", "CEO")
+    log("=" * 50, "CEO")
+    print()
+    print("─── 에이전트 의견 ───")
+    print(response_text[:500])
+    if len(response_text) > 500:
+        print(f"... ({len(response_text) - 500}자 더)")
+    print("─────────────────────")
+    print()
+
+    while True:
+        choice = input("결정: [a]승인  [r]거절  [m]수정지시  [v]전문보기 → ").strip().lower()
+        if choice == "a":
+            log("대표 승인 완료", "CEO")
+            return response_text, True
+        elif choice == "r":
+            log("대표 거절", "CEO")
+            return None, False
+        elif choice == "m":
+            instruction = input("수정 지시사항: ")
+            return f"[대표 지시] {instruction}\n\n{response_text}", True
+        elif choice == "v":
+            print(response_text)
+        else:
+            print("a, r, m, v 중 선택해주세요.")
+
+
+# ─── 메인 루프 ────────────────────────────────────────
+
+class AgentDaemon:
+    def __init__(self, role):
+        self.role = role
+        self.my_prefix = "S" if role == "server" else "C"
+        self.their_prefix = "C" if role == "server" else "S"
+        self.inbox = COMMS_DIR / ("client_to_server" if role == "server" else "server_to_client")
+        self.outbox = COMMS_DIR / ("server_to_client" if role == "server" else "client_to_server")
+        self.idle_count = 0
+        self.processed_messages = set()
+
+        # 이미 처리된 메시지 기록 로드
+        self._load_processed()
+        # 세션 상태 복원
+        self._restore_session()
+
+    def _restore_session(self):
+        """이전 세션 상태 복원 - 컴퓨터 재시작 후 맥락 이해용"""
+        if not SESSION_STATE.exists():
+            self.session_context = None
+            return
+
+        try:
+            state = json.loads(SESSION_STATE.read_text(encoding="utf-8"))
+            my_state = state.get(f"{self.role}_agent", {})
+
+            last_active = my_state.get("last_active")
+            work_log = my_state.get("work_log", [])
+            pending = my_state.get("pending_work", [])
+            summary = my_state.get("conversation_summary")
+            sprint = my_state.get("current_sprint", {})
+
+            # 맥락 요약 생성
+            context_parts = []
+            if last_active:
+                context_parts.append(f"마지막 활동: {last_active}")
+            if sprint.get("goal"):
+                context_parts.append(f"현재 스프린트 목표: {sprint['goal']}")
+            if work_log:
+                recent = work_log[-5:]  # 최근 5개
+                context_parts.append("최근 작업 이력:")
+                for entry in recent:
+                    context_parts.append(f"  - [{entry.get('time','')}] {entry.get('action','')}")
+            if pending:
+                context_parts.append("미완료 작업:")
+                for task in pending:
+                    context_parts.append(f"  - {task}")
+            if summary:
+                context_parts.append(f"이전 세션 요약: {summary}")
+
+            self.session_context = "\n".join(context_parts) if context_parts else None
+
+            if self.session_context:
+                log(f"이전 세션 상태 복원됨 (작업 {len(work_log)}개 기록)", "OK")
+
+        except Exception as e:
+            log(f"세션 상태 복원 실패: {e}", "WARN")
+            self.session_context = None
+
+    def _save_session(self, action, pending_work=None, summary=None):
+        """현재 세션 상태 저장 - 다음 재시작 시 복원용"""
+        try:
+            if SESSION_STATE.exists():
+                state = json.loads(SESSION_STATE.read_text(encoding="utf-8"))
+            else:
+                state = {"schema_version": 1}
+
+            agent_key = f"{self.role}_agent"
+            if agent_key not in state:
+                state[agent_key] = {
+                    "work_log": [],
+                    "pending_work": [],
+                    "current_sprint": {"goal": None, "tasks": []}
+                }
+
+            my_state = state[agent_key]
+            my_state["last_active"] = datetime.now().isoformat()
+
+            # 작업 로그 추가 (최대 50개 유지)
+            my_state["work_log"].append({
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "action": action
+            })
+            if len(my_state["work_log"]) > 50:
+                my_state["work_log"] = my_state["work_log"][-50:]
+
+            if pending_work is not None:
+                my_state["pending_work"] = pending_work
+            if summary is not None:
+                my_state["conversation_summary"] = summary
+
+            SESSION_STATE.write_text(
+                json.dumps(state, indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+        except Exception as e:
+            log(f"세션 상태 저장 실패: {e}", "WARN")
+
+    def _load_processed(self):
+        """이미 처리한 메시지 목록 로드"""
+        tracker = COMMS_DIR / f".{self.role}_processed.json"
+        if tracker.exists():
+            try:
+                self.processed_messages = set(json.loads(tracker.read_text()))
+            except:
+                self.processed_messages = set()
+
+    def _save_processed(self):
+        """처리한 메시지 목록 저장"""
+        tracker = COMMS_DIR / f".{self.role}_processed.json"
+        tracker.write_text(json.dumps(list(self.processed_messages)))
+
+    def check_new_messages(self):
+        """inbox에서 pending 상태 메시지 찾기"""
+        new_msgs = []
+        if not self.inbox.exists():
+            return new_msgs
+
+        for f in sorted(self.inbox.glob(f"{self.their_prefix}*_*.md")):
+            if f.name in self.processed_messages:
+                continue
+
+            fm, body = parse_frontmatter(f)
+            status = fm.get("status", "")
+            if status == "pending":
+                new_msgs.append((f, fm, body))
+
+        return new_msgs
+
+    def process_message(self, msg_file, frontmatter, body):
+        """메시지 하나 처리"""
+        msg_id = frontmatter.get("id", msg_file.stem)
+        msg_type = frontmatter.get("type", "unknown")
+        priority = frontmatter.get("priority", "P2")
+
+        log(f"새 메시지: {msg_id} (type={msg_type}, priority={priority})", "RECV")
+
+        # 메시지 상태를 read로 변경
+        update_frontmatter(msg_file, {"status": "read"})
+
+        # 맥락 포함하여 Claude에게 처리 요청
+        context_block = ""
+        if self.session_context:
+            context_block = f"""
+[이전 세션 맥락]
+{self.session_context}
+---
+"""
+
+        prompt = f"""{context_block}상대 에이전트로부터 메시지가 도착했어.
+
+메시지 ID: {msg_id}
+타입: {msg_type}
+우선순위: {priority}
+
+내용:
+{body}
+
+이 메시지에 대해 적절히 응답해줘."""
+
+        response, is_escalate = invoke_claude(prompt, self.role)
+
+        if response is None:
+            log(f"{msg_id} 처리 실패", "WARN")
+            return False
+
+        # 에스컬레이션 처리
+        if is_escalate:
+            response, approved = escalate_to_ceo(msg_file.name, response)
+            if not approved:
+                log(f"{msg_id} 대표 거절 - 보류", "WARN")
+                return False
+
+        # 응답 메시지 생성
+        next_num = get_next_msg_number(self.outbox, self.my_prefix)
+        response_id = f"{self.my_prefix}{next_num:03d}"
+        safe_title = re.sub(r'[^\w]', '_', msg_type)[:30]
+        response_file = self.outbox / f"{response_id}_reply_to_{msg_id}.md"
+
+        # 응답 타입 결정
+        reply_type = {
+            "spec": "status",
+            "question": "answer",
+            "bug": "answer",
+            "task": "status",
+            "test-result": "answer",
+            "change": "status",
+            "agreement": "agreement",
+        }.get(msg_type, "answer")
+
+        response_content = f"""---
+id: {response_id}
+from: {self.role}-agent
+to: {"client" if self.role == "server" else "server"}-agent
+type: {reply_type}
+priority: {priority}
+status: pending
+created: {datetime.now().strftime('%Y-%m-%d')}
+references: ["{msg_id}"]
+---
+
+{response}
+"""
+        response_file.write_text(response_content, encoding="utf-8")
+
+        # 원본 메시지 상태 업데이트
+        update_frontmatter(msg_file, {"status": "in-progress"})
+
+        # 상태 보드 업데이트
+        update_status_board(self.role, {
+            "status": "working",
+            "current_task": f"Replied to {msg_id}",
+            "last_message_sent": response_id,
+            "last_message_read": msg_id,
+            "session_active": True
+        })
+
+        # 처리 완료 기록
+        self.processed_messages.add(msg_file.name)
+        self._save_processed()
+
+        # 세션 상태 저장
+        self._save_session(
+            action=f"Replied {response_id} to {msg_id} ({msg_type})",
+            summary=f"Last replied to {msg_id}"
+        )
+
+        log(f"응답 완료: {response_id} → {msg_id}", "SEND")
+        return True
+
+    def run(self):
+        """메인 루프"""
+        log(f"{'='*50}")
+        log(f"  Agent Daemon 시작 - role: {self.role}")
+        log(f"  inbox:  {self.inbox}")
+        log(f"  outbox: {self.outbox}")
+        log(f"  poll:   {POLL_INTERVAL}초 간격")
+        if self.session_context:
+            log(f"  이전 세션 복원됨 ✓")
+        log(f"{'='*50}")
+
+        self._save_session(action="Daemon started")
+
+        update_status_board(self.role, {
+            "status": "online",
+            "session_active": True,
+            "daemon_started": datetime.now().isoformat()
+        })
+        git_push(f"comms: [{self.role}] daemon started")
+
+        try:
+            while True:
+                # 1. Git pull
+                if not git_pull():
+                    time.sleep(POLL_INTERVAL)
+                    continue
+
+                # 2. 새 메시지 확인
+                new_msgs = self.check_new_messages()
+
+                if new_msgs:
+                    self.idle_count = 0
+                    log(f"새 메시지 {len(new_msgs)}개 발견")
+
+                    # 3. 각 메시지 처리
+                    for msg_file, fm, body in new_msgs:
+                        success = self.process_message(msg_file, fm, body)
+
+                        if success:
+                            # 4. Git push (메시지마다)
+                            msg_id = fm.get("id", "unknown")
+                            git_push(f"comms: [{self.my_prefix}→{self.their_prefix}] {self.my_prefix}{get_next_msg_number(self.outbox, self.my_prefix)-1:03d} reply to {msg_id}")
+
+                else:
+                    self.idle_count += 1
+                    if self.idle_count % 10 == 0:
+                        log(f"대기 중... (idle {self.idle_count}회)")
+
+                # 5. 다음 폴링까지 대기
+                interval = IDLE_POLL_INTERVAL if self.idle_count > MAX_CONSECUTIVE_IDLE else POLL_INTERVAL
+                time.sleep(interval)
+
+        except KeyboardInterrupt:
+            log("데몬 종료 (Ctrl+C)")
+            self._save_session(
+                action="Daemon stopped (Ctrl+C)",
+                summary="정상 종료됨. 다음 시작 시 이전 맥락에서 재개."
+            )
+            update_status_board(self.role, {
+                "status": "offline",
+                "session_active": False
+            })
+            git_push(f"comms: [{self.role}] daemon stopped")
+
+
+# ─── 엔트리포인트 ─────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="Agent Communication Daemon")
+    parser.add_argument("--role", required=True, choices=["server", "client"],
+                        help="에이전트 역할 (server 또는 client)")
+    parser.add_argument("--interval", type=int, default=30,
+                        help="폴링 간격 (초, 기본=30)")
+    parser.add_argument("--test", action="store_true",
+                        help="테스트 모드 (1회 실행 후 종료)")
+
+    args = parser.parse_args()
+
+    if args.interval != 30:
+        _update_poll_interval(args.interval)
+
+    daemon = AgentDaemon(args.role)
+
+    if args.test:
+        log("테스트 모드: 1회 폴링")
+        git_pull()
+        msgs = daemon.check_new_messages()
+        log(f"발견된 메시지: {len(msgs)}개")
+        for f, fm, body in msgs:
+            log(f"  - {fm.get('id', '?')}: {fm.get('type', '?')} ({fm.get('status', '?')})")
+        return
+
+    daemon.run()
+
+
+if __name__ == "__main__":
+    main()

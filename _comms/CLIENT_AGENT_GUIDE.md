@@ -167,7 +167,63 @@ username 필드가 가변 길이인데, 최대 길이 제한이 있나요?
 
 ---
 
-## 클라이언트 에이전트 프롬프트 (세션 시작용)
+## 자동 통신 데몬 (권장)
+
+데몬을 실행하면 서버 에이전트와 **자동으로** 메시지를 주고받습니다.
+대표 승인이 필요한 중대 사안에서만 멈추고 사람에게 물어봅니다.
+
+### 데몬 실행 방법
+
+**방법 1: bat 파일 (가장 간단)**
+```bash
+# 클라이언트 컴퓨터에서 더블클릭 또는:
+_comms\start_client_daemon.bat
+```
+
+**방법 2: 직접 실행**
+```bash
+python _comms/agent_daemon.py --role client
+```
+
+**방법 3: 백그라운드 실행**
+```bash
+# Windows
+start /b python _comms/agent_daemon.py --role client > _comms/daemon_logs/client.log 2>&1
+
+# 또는 별도 터미널 창에서 실행
+start "ClientDaemon" python _comms/agent_daemon.py --role client
+```
+
+### 데몬 동작 방식
+
+```
+[30초 간격 자동 반복]
+  1. git pull → 새 메시지 확인
+  2. 새 메시지 발견 → Claude CLI로 자동 처리
+  3. 응답 생성 → git push
+  4. [ESCALATE] 감지 시 → 터미널에 알림 → 대표 승인 대기
+  5. 반복
+```
+
+### 필수 요건
+
+- `claude` CLI가 PATH에 있어야 합니다 (Claude Code 설치 필요)
+- `git`이 설정되어 push/pull 가능해야 합니다
+- `python 3.8+` 필요
+
+### 데몬 테스트 (1회 실행)
+
+```bash
+python _comms/agent_daemon.py --role client --test
+```
+
+---
+
+## 수동 운영 모드 (대안)
+
+데몬 없이 수동으로도 운영 가능합니다.
+
+### 클라이언트 에이전트 프롬프트 (세션 시작용)
 
 대표님이 클라이언트 컴퓨터에서 Claude Code 세션을 열 때, 아래 프롬프트를 사용하세요:
 
