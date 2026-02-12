@@ -52,6 +52,30 @@ namespace Network
         public event Action<AttackResultData> OnAttackResult;
         public event Action<CombatDiedData> OnCombatDied;
         public event Action<RespawnResultData> OnRespawnResult;
+        public event Action<MonsterSpawnData> OnMonsterSpawn;
+        public event Action<MonsterRespawnData> OnMonsterRespawn;
+        public event Action<ZoneTransferResultData> OnZoneTransferResult;
+        public event Action<SkillInfo[]> OnSkillList;
+        public event Action<SkillResultData> OnSkillResult;
+        public event Action<PartyInfoData> OnPartyInfo;
+        public event Action<InstanceEnterData> OnInstanceEnter;
+        public event Action<InstanceLeaveResultData> OnInstanceLeaveResult;
+        public event Action<InstanceInfoData> OnInstanceInfo;
+        public event Action<MatchFoundData> OnMatchFound;
+        public event Action<MatchStatusData> OnMatchStatus;
+        public event Action<InventoryItemInfo[]> OnInventoryResp;
+        public event Action<ItemAddResultData> OnItemAddResult;
+        public event Action<ItemUseResultData> OnItemUseResult;
+        public event Action<ItemEquipResultData> OnItemEquipResult;
+        public event Action<BuffInfo[]> OnBuffList;
+        public event Action<BuffResultData> OnBuffResult;
+        public event Action<BuffRemoveRespData> OnBuffRemoveResp;
+        public event Action<byte> OnConditionResult;
+        public event Action<SpatialQueryEntry[]> OnSpatialQueryResp;
+        public event Action<LootItemEntry[]> OnLootResult;
+        public event Action<QuestInfo[]> OnQuestList;
+        public event Action<QuestAcceptResultData> OnQuestAcceptResult;
+        public event Action<QuestCompleteResultData> OnQuestCompleteResult;
         public event Action<string> OnError;
         public event Action OnDisconnected;
 
@@ -171,6 +195,158 @@ namespace Network
         public void ConnectDirect(string host, int port)
         {
             ConnectToField(host, port);
+        }
+
+        // ━━━ 세션 16~28 API ━━━
+
+        /// <summary>존 이동 요청</summary>
+        public void RequestZoneTransfer(int targetZoneId)
+        {
+            _field?.Send(PacketBuilder.ZoneTransferReq(targetZoneId));
+        }
+
+        /// <summary>스킬 목록 요청</summary>
+        public void RequestSkillList()
+        {
+            _field?.Send(PacketBuilder.SkillListReq());
+        }
+
+        /// <summary>스킬 사용</summary>
+        public void UseSkill(uint skillId, ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.SkillUse(skillId, targetEntity));
+        }
+
+        /// <summary>파티 생성</summary>
+        public void CreateParty()
+        {
+            _field?.Send(PacketBuilder.PartyCreate());
+        }
+
+        /// <summary>파티 초대</summary>
+        public void InviteToParty(ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.PartyInvite(targetEntity));
+        }
+
+        /// <summary>파티 수락</summary>
+        public void AcceptParty(uint partyId)
+        {
+            _field?.Send(PacketBuilder.PartyAccept(partyId));
+        }
+
+        /// <summary>파티 탈퇴</summary>
+        public void LeaveParty()
+        {
+            _field?.Send(PacketBuilder.PartyLeave());
+        }
+
+        /// <summary>파티 추방</summary>
+        public void KickFromParty(ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.PartyKick(targetEntity));
+        }
+
+        /// <summary>인스턴스 던전 생성</summary>
+        public void CreateInstance(uint dungeonType)
+        {
+            _field?.Send(PacketBuilder.InstanceCreate(dungeonType));
+        }
+
+        /// <summary>인스턴스 퇴장</summary>
+        public void LeaveInstance()
+        {
+            _field?.Send(PacketBuilder.InstanceLeave());
+        }
+
+        /// <summary>매칭 큐 등록</summary>
+        public void EnqueueMatch(uint dungeonType)
+        {
+            _field?.Send(PacketBuilder.MatchEnqueue(dungeonType));
+        }
+
+        /// <summary>매칭 큐 해제</summary>
+        public void DequeueMatch()
+        {
+            _field?.Send(PacketBuilder.MatchDequeue());
+        }
+
+        /// <summary>매칭 수락</summary>
+        public void AcceptMatch(uint matchId)
+        {
+            _field?.Send(PacketBuilder.MatchAccept(matchId));
+        }
+
+        /// <summary>인벤토리 요청</summary>
+        public void RequestInventory()
+        {
+            _field?.Send(PacketBuilder.InventoryReq());
+        }
+
+        /// <summary>아이템 사용</summary>
+        public void UseItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemUse(slot));
+        }
+
+        /// <summary>아이템 장착</summary>
+        public void EquipItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemEquip(slot));
+        }
+
+        /// <summary>아이템 해제</summary>
+        public void UnequipItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemUnequip(slot));
+        }
+
+        /// <summary>버프 목록 요청</summary>
+        public void RequestBuffList()
+        {
+            _field?.Send(PacketBuilder.BuffListReq());
+        }
+
+        /// <summary>버프 적용 요청</summary>
+        public void ApplyBuff(uint buffId)
+        {
+            _field?.Send(PacketBuilder.BuffApplyReq(buffId));
+        }
+
+        /// <summary>버프 제거 요청</summary>
+        public void RemoveBuff(uint buffId)
+        {
+            _field?.Send(PacketBuilder.BuffRemoveReq(buffId));
+        }
+
+        /// <summary>루트 굴림 요청</summary>
+        public void RequestLootRoll(uint tableId)
+        {
+            _field?.Send(PacketBuilder.LootRollReq(tableId));
+        }
+
+        /// <summary>퀘스트 목록 요청</summary>
+        public void RequestQuestList()
+        {
+            _field?.Send(PacketBuilder.QuestListReq());
+        }
+
+        /// <summary>퀘스트 수락</summary>
+        public void AcceptQuest(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestAccept(questId));
+        }
+
+        /// <summary>퀘스트 진행 확인</summary>
+        public void CheckQuestProgress(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestProgress(questId));
+        }
+
+        /// <summary>퀘스트 완료</summary>
+        public void CompleteQuest(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestComplete(questId));
         }
 
         /// <summary>연결 끊기</summary>
@@ -339,6 +515,200 @@ namespace Network
                     var data = PacketBuilder.ParseRespawnResult(payload);
                     Debug.Log($"[Net] RespawnResult: result={data.ResultCode}, HP={data.HP}, pos=({data.X},{data.Y},{data.Z})");
                     OnRespawnResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MONSTER_SPAWN:
+                {
+                    var data = PacketBuilder.ParseMonsterSpawn(payload);
+                    Debug.Log($"[Net] MonsterSpawn: entity={data.EntityId}, monsterId={data.MonsterId}, lv={data.Level}, hp={data.HP}/{data.MaxHP}");
+                    OnMonsterSpawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MONSTER_RESPAWN:
+                {
+                    var data = PacketBuilder.ParseMonsterRespawn(payload);
+                    Debug.Log($"[Net] MonsterRespawn: entity={data.EntityId}, hp={data.HP}/{data.MaxHP}");
+                    OnMonsterRespawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ZONE_TRANSFER_RESULT:
+                {
+                    var data = PacketBuilder.ParseZoneTransferResult(payload);
+                    Debug.Log($"[Net] ZoneTransfer: result={data.Result}, zone={data.ZoneId}");
+                    if (data.Result == ZoneTransferResult.SUCCESS)
+                        CurrentZone = (int)data.ZoneId;
+                    OnZoneTransferResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SKILL_LIST_RESP:
+                {
+                    var skills = PacketBuilder.ParseSkillListResp(payload);
+                    Debug.Log($"[Net] SkillList: {skills.Length} skills");
+                    OnSkillList?.Invoke(skills);
+                    break;
+                }
+
+                case MsgType.SKILL_RESULT:
+                {
+                    var data = PacketBuilder.ParseSkillResult(payload);
+                    Debug.Log($"[Net] SkillResult: result={data.Result}, skill={data.SkillId}, dmg={data.Damage}");
+                    OnSkillResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PARTY_INFO:
+                {
+                    var data = PacketBuilder.ParsePartyInfo(payload);
+                    Debug.Log($"[Net] PartyInfo: result={data.Result}, partyId={data.PartyId}, members={data.Members.Length}");
+                    OnPartyInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_ENTER:
+                {
+                    var data = PacketBuilder.ParseInstanceEnter(payload);
+                    Debug.Log($"[Net] InstanceEnter: result={data.Result}, instanceId={data.InstanceId}");
+                    OnInstanceEnter?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_LEAVE_RESULT:
+                {
+                    var data = PacketBuilder.ParseInstanceLeaveResult(payload);
+                    Debug.Log($"[Net] InstanceLeave: result={data.Result}, zone={data.ZoneId}");
+                    OnInstanceLeaveResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_INFO:
+                {
+                    var data = PacketBuilder.ParseInstanceInfo(payload);
+                    Debug.Log($"[Net] InstanceInfo: id={data.InstanceId}, players={data.PlayerCount}, monsters={data.MonsterCount}");
+                    OnInstanceInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MATCH_FOUND:
+                {
+                    var data = PacketBuilder.ParseMatchFound(payload);
+                    Debug.Log($"[Net] MatchFound: matchId={data.MatchId}, players={data.PlayerCount}");
+                    OnMatchFound?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MATCH_STATUS:
+                {
+                    var data = PacketBuilder.ParseMatchStatus(payload);
+                    Debug.Log($"[Net] MatchStatus: status={data.Status}, pos={data.QueuePosition}");
+                    OnMatchStatus?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INVENTORY_RESP:
+                {
+                    var items = PacketBuilder.ParseInventoryResp(payload);
+                    Debug.Log($"[Net] Inventory: {items.Length} items");
+                    OnInventoryResp?.Invoke(items);
+                    break;
+                }
+
+                case MsgType.ITEM_ADD_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemAddResult(payload);
+                    Debug.Log($"[Net] ItemAdd: result={data.Result}, slot={data.Slot}, item={data.ItemId}");
+                    OnItemAddResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ITEM_USE_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemUseResult(payload);
+                    Debug.Log($"[Net] ItemUse: result={data.Result}, slot={data.Slot}");
+                    OnItemUseResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ITEM_EQUIP_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemEquipResult(payload);
+                    Debug.Log($"[Net] ItemEquip: result={data.Result}, slot={data.Slot}, equipped={data.Equipped}");
+                    OnItemEquipResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BUFF_LIST_RESP:
+                {
+                    var buffs = PacketBuilder.ParseBuffListResp(payload);
+                    Debug.Log($"[Net] BuffList: {buffs.Length} buffs");
+                    OnBuffList?.Invoke(buffs);
+                    break;
+                }
+
+                case MsgType.BUFF_RESULT:
+                {
+                    var data = PacketBuilder.ParseBuffResult(payload);
+                    Debug.Log($"[Net] BuffResult: result={data.Result}, buffId={data.BuffId}");
+                    OnBuffResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BUFF_REMOVE_RESP:
+                {
+                    var data = PacketBuilder.ParseBuffRemoveResp(payload);
+                    Debug.Log($"[Net] BuffRemove: result={data.Result}, buffId={data.BuffId}");
+                    OnBuffRemoveResp?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CONDITION_RESULT:
+                {
+                    byte result = payload[0];
+                    Debug.Log($"[Net] ConditionResult: {result}");
+                    OnConditionResult?.Invoke(result);
+                    break;
+                }
+
+                case MsgType.SPATIAL_QUERY_RESP:
+                {
+                    var entries = PacketBuilder.ParseSpatialQueryResp(payload);
+                    Debug.Log($"[Net] SpatialQuery: {entries.Length} results");
+                    OnSpatialQueryResp?.Invoke(entries);
+                    break;
+                }
+
+                case MsgType.LOOT_RESULT:
+                {
+                    var items = PacketBuilder.ParseLootResult(payload);
+                    Debug.Log($"[Net] Loot: {items.Length} items");
+                    OnLootResult?.Invoke(items);
+                    break;
+                }
+
+                case MsgType.QUEST_LIST_RESP:
+                {
+                    var quests = PacketBuilder.ParseQuestListResp(payload);
+                    Debug.Log($"[Net] QuestList: {quests.Length} quests");
+                    OnQuestList?.Invoke(quests);
+                    break;
+                }
+
+                case MsgType.QUEST_ACCEPT_RESULT:
+                {
+                    var data = PacketBuilder.ParseQuestAcceptResult(payload);
+                    Debug.Log($"[Net] QuestAccept: result={data.Result}, questId={data.QuestId}");
+                    OnQuestAcceptResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.QUEST_COMPLETE_RESULT:
+                {
+                    var data = PacketBuilder.ParseQuestCompleteResult(payload);
+                    Debug.Log($"[Net] QuestComplete: result={data.Result}, questId={data.QuestId}, exp={data.RewardExp}");
+                    OnQuestCompleteResult?.Invoke(data);
                     break;
                 }
 
