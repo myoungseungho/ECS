@@ -35,6 +35,9 @@ struct MonsterComponent {
 
     // 어그로 타겟
     Entity target_entity = 0;     // 현재 타겟 (0 = 없음)
+
+    // 루트 테이블 (LootComponents.h의 LOOT_TABLES 참조)
+    int32_t loot_table_id = 0;    // 0 = 드롭 없음
 };
 
 // ━━━ 몬스터 스폰 테이블 ━━━
@@ -48,23 +51,24 @@ struct MonsterSpawnEntry {
     float x, y, z;
     float aggro_range;
     float respawn_time;
+    int32_t loot_table_id;       // LootComponents.h 테이블 ID (0 = 드롭 없음)
 };
 
 // 하드코딩 스폰 테이블 (향후 CSV/DB로 대체 가능)
 inline const MonsterSpawnEntry MONSTER_SPAWNS[] = {
-    // Zone 1: 고블린 3마리 (Lv5, HP=100, ATK=15, DEF=5)
-    {1, "Goblin",  5, 100, 15, 5,  1, 150.0f, 150.0f, 0.0f, 150.0f, 5.0f},
-    {1, "Goblin",  5, 100, 15, 5,  1, 250.0f, 250.0f, 0.0f, 150.0f, 5.0f},
-    {1, "Goblin",  5, 100, 15, 5,  1, 350.0f, 150.0f, 0.0f, 150.0f, 5.0f},
-    // Zone 1: 늑대 2마리 (Lv10, HP=200, ATK=25, DEF=10)
-    {2, "Wolf",   10, 200, 25, 10, 1, 400.0f, 300.0f, 0.0f, 200.0f, 8.0f},
-    {2, "Wolf",   10, 200, 25, 10, 1, 300.0f, 400.0f, 0.0f, 200.0f, 8.0f},
-    // Zone 2: 오크 2마리 (Lv15, HP=300, ATK=35, DEF=15)
-    {3, "Orc",    15, 300, 35, 15, 2, 520.0f, 480.0f, 0.0f, 200.0f, 8.0f},
-    {3, "Orc",    15, 300, 35, 15, 2, 580.0f, 520.0f, 0.0f, 200.0f, 8.0f},
-    // Zone 2: 곰 2마리 (Lv20, HP=400, ATK=45, DEF=20)
-    {4, "Bear",   20, 400, 45, 20, 2, 450.0f, 550.0f, 0.0f, 250.0f, 10.0f},
-    {4, "Bear",   20, 400, 45, 20, 2, 550.0f, 450.0f, 0.0f, 250.0f, 10.0f},
+    // Zone 1: 고블린 3마리 (Lv5, HP=100, ATK=15, DEF=5) → BasicMonster 루트(1)
+    {1, "Goblin",  5, 100, 15, 5,  1, 150.0f, 150.0f, 0.0f, 150.0f, 5.0f, 1},
+    {1, "Goblin",  5, 100, 15, 5,  1, 250.0f, 250.0f, 0.0f, 150.0f, 5.0f, 1},
+    {1, "Goblin",  5, 100, 15, 5,  1, 350.0f, 150.0f, 0.0f, 150.0f, 5.0f, 1},
+    // Zone 1: 늑대 2마리 (Lv10, HP=200, ATK=25, DEF=10) → BasicMonster 루트(1)
+    {2, "Wolf",   10, 200, 25, 10, 1, 400.0f, 300.0f, 0.0f, 200.0f, 8.0f, 1},
+    {2, "Wolf",   10, 200, 25, 10, 1, 300.0f, 400.0f, 0.0f, 200.0f, 8.0f, 1},
+    // Zone 2: 오크 2마리 (Lv15, HP=300, ATK=35, DEF=15) → EliteMonster 루트(2)
+    {3, "Orc",    15, 300, 35, 15, 2, 520.0f, 480.0f, 0.0f, 200.0f, 8.0f, 2},
+    {3, "Orc",    15, 300, 35, 15, 2, 580.0f, 520.0f, 0.0f, 200.0f, 8.0f, 2},
+    // Zone 2: 곰 2마리 (Lv20, HP=400, ATK=45, DEF=20) → EliteMonster 루트(2)
+    {4, "Bear",   20, 400, 45, 20, 2, 450.0f, 550.0f, 0.0f, 250.0f, 10.0f, 2},
+    {4, "Bear",   20, 400, 45, 20, 2, 550.0f, 450.0f, 0.0f, 250.0f, 10.0f, 2},
 };
 constexpr int MONSTER_SPAWN_COUNT = sizeof(MONSTER_SPAWNS) / sizeof(MONSTER_SPAWNS[0]);
 

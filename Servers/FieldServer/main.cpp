@@ -1085,6 +1085,7 @@ void SpawnMonsters(World& world) {
         mc.aggro_range = spawn.aggro_range;
         mc.respawn_time = spawn.respawn_time;
         mc.target_entity = 0;
+        mc.loot_table_id = spawn.loot_table_id;
         world.AddComponent(e, mc);
 
         StatsComponent stats = CreateMonsterStats(spawn.level, spawn.hp, spawn.attack, spawn.defense);
@@ -1137,6 +1138,40 @@ void SendZoneMonsters(World& world, Entity player_entity) {
                               pkt.data(), static_cast<int>(pkt.size()));
         }
     );
+}
+
+// ━━━ Session 27: 루트 드롭 헬퍼 ━━━
+
+// 몬스터 처치 시 루트 드롭 → LOOT_RESULT 패킷 전송
+void ProcessMonsterLoot(World& world, Entity killer, Entity monster) {
+    if (!world.HasComponent<MonsterComponent>(monster)) return;
+    if (!world.HasComponent<SessionComponent>(killer)) return;
+
+    auto& mc = world.GetComponent<MonsterComponent>(monster);
+    if (mc.loot_table_id <= 0) return;
+
+    const LootTable* table = FindLootTable(mc.loot_table_id);
+    if (!table) return;
+
+    auto loot = RollLoot(*table);
+    if (loot.empty()) return;
+
+    // LOOT_RESULT: count(1) + N * {item_id(4) + count(2)}
+    uint8_t count = static_cast<uint8_t>(loot.size());
+    int payload_size = 1 + count * 6;
+    std::vector<char> buf(payload_size, 0);
+    buf[0] = count;
+    for (int i = 0; i < count; i++) {
+        std::memcpy(buf.data() + 1 + i * 6, &loot[i].item_id, 4);
+        std::memcpy(buf.data() + 1 + i * 6 + 4, &loot[i].count, 2);
+    }
+
+    auto pkt = BuildPacket(MsgType::LOOT_RESULT, buf.data(), payload_size);
+    auto& session = world.GetComponent<SessionComponent>(killer);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Loot] Entity %llu killed monster '%s': %d items dropped\n",
+           killer, mc.name, count);
 }
 
 // ━━━ Session 13: Combat System 핸들러 ━━━
@@ -1296,6 +1331,11 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
 
         // 공격자 스탯 동기화 (EXP 변경)
         SendStatSync(world, entity);
+
+        // 몬스터 루트 드롭 (Session 27)
+        if (target_is_monster) {
+            ProcessMonsterLoot(world, entity, target);
+        }
 
         // ENTITY_DIED 이벤트
         if (g_eventBus) {
@@ -1490,15 +1530,22 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     // 사망 처리
     if (!tgt_stats.IsAlive()) {
         printf("[Skill] Entity %llu killed by skill!\n", target);
+        bool killed_monster = false;
         if (world.HasComponent<MonsterComponent>(target)) {
             auto& mc = world.GetComponent<MonsterComponent>(target);
             mc.state = MonsterState::DEAD;
             mc.death_timer = mc.respawn_time;
             mc.target_entity = 0;
+            killed_monster = true;
         }
         int32_t exp_reward = CalcKillExp(tgt_stats.level);
         stats.AddExp(exp_reward);
         SendStatSync(world, entity);
+
+        // 몬스터 루트 드롭 (Session 27)
+        if (killed_monster) {
+            ProcessMonsterLoot(world, entity, target);
+        }
     }
 }
 

@@ -2,13 +2,13 @@
   "meta": {
     "description": "에이전트 간 대화 저널 - 일회성 Claude 인스턴스가 대화 맥락을 즉시 이해하기 위한 단일 진실 원천(Single Source of Truth)",
     "schema_version": 2,
-    "last_updated": "2026-02-13T02:00:00",
+    "last_updated": "2026-02-13T03:30:00",
     "project": "ECS MMORPG Game Server/Client (29 sessions, 321 tests)"
   },
 
   "next_message_number": {
-    "server": 9,
-    "client": 7
+    "server": 10,
+    "client": 8
   },
 
   "timeline": [
@@ -140,7 +140,7 @@
       "type": "answer",
       "summary": "Phase 1 결정: 방안 A. 클라=세션14~29 구현, 서버=콘텐츠 고도화. 병렬 작업.",
       "key_content": "대표 승인. 클라는 yaml 기반 세션14~29 단독 구현. 서버는 몬스터AI/던전/퀘스트 고도화. 완료 후 Phase 2 실서버 연동.",
-      "status": "pending"
+      "status": "resolved"
     },
     {
       "id": "C006",
@@ -150,6 +150,26 @@
       "type": "status",
       "summary": "Phase 0 완료! T003(validate_protocol.py 57 PASS) + T004(mock_server.py 통합테스트 통과). Phase 1 논의 요청.",
       "key_content": "validate_protocol.py: 57 PASS/0 FAIL. mock_server.py: 통합테스트 통과. Phase 1 착수 가능. 서버와 다음 작업 논의 필요.",
+      "status": "resolved"
+    },
+    {
+      "id": "C007",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-13",
+      "type": "status",
+      "summary": "S007 확인 + 현재 진행 상황 공유. 세션 16~28 전체 168 PASS. MonsterManager 등 6개 매니저 완성.",
+      "key_content": "validate_protocol.py 168 PASS/0 FAIL/10 INFO. validate_client.py 21 PASS/0 FAIL/5 WARN. 세션 1~28 패킷 + MonsterManager 게임 레이어까지 완성.",
+      "status": "pending"
+    },
+    {
+      "id": "S009",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-13",
+      "type": "status",
+      "summary": "서버 고도화 1차 완료: 몬스터 처치→루트 드롭 연동. MonsterComponents에 loot_table_id 추가, ProcessMonsterLoot 헬퍼 구현.",
+      "key_content": "MonsterComponents.h loot_table_id 추가. FieldServer/main.cpp ProcessMonsterLoot() 함수. OnAttackReq+OnSkillUse 두 곳에 적용. 고블린/늑대→BasicMonster(1), 오크/곰→EliteMonster(2).",
       "status": "pending"
     }
   ],
@@ -210,33 +230,41 @@
       "decision": "폴링이 메인이 아니라 '작업'이 메인. 할 일 있으면 바로 작업, 작업 끝나면 1회 폴링, 상대 대기시만 5분 폴링 루프.",
       "agreed_by": ["CEO"],
       "references": ["S005"]
+    },
+    {
+      "id": "D008",
+      "date": "2026-02-13",
+      "topic": "Phase 1 방안 A 채택",
+      "decision": "병렬 작업. 클라=세션14~29 패킷 구현(단독), 서버=콘텐츠 고도화(몬스터AI/던전/퀘스트). 완료 후 Phase 2 실서버 연동.",
+      "agreed_by": ["server-agent", "CEO"],
+      "references": ["C006", "S008"]
     }
   ],
 
   "current_sprint": {
-    "name": "Phase 0 - Protocol alignment + verification infrastructure",
-    "started": "2026-02-12",
+    "name": "Phase 1 - Parallel development (Client: sessions 14-29, Server: content enhancement)",
+    "started": "2026-02-13",
     "tasks": [
-      {"id": "T001", "task": "protocol.yaml 초안 작성 (57개 메시지 전체)", "assignee": "server", "status": "done", "depends_on": null},
-      {"id": "T002", "task": "protocol.yaml 리뷰 + C# 매핑 검증", "assignee": "client", "status": "done", "depends_on": "T001"},
-      {"id": "T003", "task": "validate_protocol.py 작성", "assignee": "client", "status": "done", "depends_on": "T002"},
-      {"id": "T004", "task": "mock_server.py 작성", "assignee": "client", "status": "done", "depends_on": "T002"},
-      {"id": "T005", "task": "parse_packet_components.py 작성 (서버 파싱 헬퍼)", "assignee": "server", "status": "done", "depends_on": "T001"}
+      {"id": "T006", "task": "클라: 세션 14~29 패킷 구현 (MsgType + Build/Parse)", "assignee": "client", "status": "in_progress", "depends_on": null},
+      {"id": "T007", "task": "서버: 몬스터 처치→루트 드롭 연동", "assignee": "server", "status": "done", "depends_on": null},
+      {"id": "T008", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "pending", "depends_on": "T007"},
+      {"id": "T009", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "pending", "depends_on": null},
+      {"id": "T010", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "pending", "depends_on": "T007"}
     ]
   },
 
   "agent_states": {
     "server": {
-      "last_sent": "S008",
-      "last_read": "C006",
-      "current_work": "Phase 1 시작. 서버 콘텐츠 고도화 (몬스터→루트 연동, 스킬 시스템 등). 클라와 병렬 작업.",
-      "capabilities": "29세션 구현 완료, 321 테스트 통과, PacketComponents.h 파싱 헬퍼 제공"
+      "last_sent": "S009",
+      "last_read": "C007",
+      "current_work": "Phase 1 서버 고도화. T007(루트 드롭) 완료. 다음: T008(스킬 사망 보강), T009(던전), T010(퀘스트 연동).",
+      "capabilities": "29세션 구현, 321 테스트, PacketComponents.h 파싱 헬퍼, 루트 드롭 연동 완료"
     },
     "client": {
-      "last_sent": "C006",
-      "last_read": "S006",
-      "current_work": "Phase 0 완료! T001~T004 전부 done. validate_protocol.py 57PASS/0FAIL. mock_server.py 통합테스트 통과. Phase 1 논의 대기.",
-      "capabilities": "세션 1~13 구현, validate_protocol.py 57 PASS, mock_server.py 작동 확인"
+      "last_sent": "C007",
+      "last_read": "S007",
+      "current_work": "세션 16~28 전체 168 PASS. MonsterManager 등 6개 매니저 완성. SkillManager/InventoryManager 진행 중.",
+      "capabilities": "세션 1~28 패킷, validate_protocol.py 168 PASS, validate_client.py 21 PASS, 6개 매니저 클래스"
     }
   },
 
