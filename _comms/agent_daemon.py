@@ -458,6 +458,98 @@ class AgentDaemon:
         tracker = COMMS_DIR / f".{self.role}_processed.json"
         tracker.write_text(json.dumps(list(self.processed_messages)))
 
+    def _build_conversation_history(self):
+        """대화 이력 컴팩트 요약 - 토큰 절약하면서 맥락 유지"""
+        all_messages = []
+
+        # 양쪽 메시지 수집
+        for folder, prefix in [(self.inbox, self.their_prefix),
+                                (self.outbox, self.my_prefix)]:
+            if not folder.exists():
+                continue
+            for f in folder.glob(f"{prefix}*_*.md"):
+                fm, body = parse_frontmatter(f)
+                msg_id = fm.get("id", f.stem)
+                sender = fm.get("from", "unknown")
+                msg_type = fm.get("type", "")
+                created = fm.get("created", "")
+                status = fm.get("status", "")
+
+                # 제목만 추출 (첫 번째 # 헤딩)
+                title = msg_id
+                for line in body.strip().split("\n"):
+                    if line.startswith("#"):
+                        title = line.strip("#").strip()
+                        break
+
+                all_messages.append({
+                    "id": msg_id,
+                    "sender": "서버" if "server" in sender else "클라",
+                    "type": msg_type,
+                    "title": title[:80],
+                    "status": status,
+                    "sort_key": msg_id
+                })
+
+        all_messages.sort(key=lambda m: m["sort_key"])
+
+        if not all_messages:
+            return ""
+
+        # 컴팩트 요약: 한 줄에 메시지 하나
+        lines = ["[대화 이력 요약]"]
+        for msg in all_messages:
+            lines.append(f"  {msg['id']}({msg['sender']},{msg['type']}): {msg['title']} [{msg['status']}]")
+
+        # 회의 결정사항 (핵심만)
+        decisions = self._get_meeting_summary()
+        if decisions:
+            lines.append("")
+            lines.append("[합의된 결정사항]")
+            lines.append(decisions)
+
+        # 직전 메시지는 좀 더 상세히 (최근 2개)
+        if len(all_messages) >= 2:
+            lines.append("")
+            lines.append("[직전 메시지 상세]")
+            for msg_info in all_messages[-2:]:
+                # 원본에서 본문 읽기
+                for folder in [self.inbox, self.outbox]:
+                    for f in folder.glob(f"{msg_info['id']}_*.md"):
+                        _, body = parse_frontmatter(f)
+                        # 300자로 제한
+                        brief = body.strip()[:300]
+                        if len(body.strip()) > 300:
+                            brief += "..."
+                        lines.append(f"\n[{msg_info['id']}] {brief}")
+                        break
+
+        return "\n".join(lines)
+
+    def _get_meeting_summary(self):
+        """회의록에서 결정사항만 추출"""
+        meetings_dir = COMMS_DIR / "meetings"
+        today = datetime.now().strftime("%Y-%m-%d")
+        meeting_file = meetings_dir / f"{today}.md"
+        if not meeting_file.exists():
+            return ""
+
+        content = meeting_file.read_text(encoding="utf-8")
+        # "결정사항" 섹션만 추출
+        decisions = []
+        in_decision = False
+        for line in content.split("\n"):
+            if "결정사항" in line:
+                in_decision = True
+                continue
+            if in_decision:
+                if line.startswith("##") or line.startswith("---"):
+                    in_decision = False
+                elif line.strip():
+                    decisions.append(line.strip())
+
+        return "\n".join(decisions) if decisions else ""
+
     def check_new_messages(self):
         """inbox에서 pending 상태 메시지 찾기"""
         new_msgs = []
@@ -486,16 +578,20 @@ class AgentDaemon:
         # 메시지 상태를 read로 변경
         update_frontmatter(msg_file, {"status": "read"})
 
-        # 맥락 포함하여 Claude에게 처리 요청
-        context_block = ""
+        # 전체 대화 이력 + 세션 맥락 포함
+        conversation_history = self._build_conversation_history()
+
+        session_block = ""
         if self.session_context:
-            context_block = f"""
-[이전 세션 맥락]
+            session_block = f"""
+[세션 맥락]
 {self.session_context}
----
 """
 
-        prompt = f"""{context_block}상대 에이전트로부터 메시지가 도착했어.
+        prompt = f"""{conversation_history}
+{session_block}
+---
+[지금 처리할 메시지]
 
 메시지 ID: {msg_id}
 타입: {msg_type}
@@ -504,7 +600,8 @@ class AgentDaemon:
 내용:
 {body}
 
-이 메시지에 대해 적절히 응답해줘.
+위 대화 이력을 충분히 이해한 상태에서 이 메시지에 대해 응답해줘.
+이전에 합의한 내용, 진행 중인 작업, 미결 사항을 고려해서 답해.
 
 중요 규칙:
 1. 너는 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
