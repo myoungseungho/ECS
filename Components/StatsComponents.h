@@ -32,9 +32,13 @@ struct StatsComponent {
     int32_t mp = 50;
     int32_t max_mp = 50;
 
-    // 공격/방어
+    // 공격/방어 (기본값 + 장비 보너스 합산)
     int32_t attack = 10;
     int32_t defense = 5;
+
+    // 장비 보너스 (RecalculateFromLevel에서 자동 합산됨)
+    int32_t equip_atk_bonus = 0;
+    int32_t equip_def_bonus = 0;
 
     // 직업
     JobClass job = JobClass::WARRIOR;
@@ -76,6 +80,11 @@ struct StatsComponent {
                 break;
         }
         exp_to_next = level * level * 10 + 100;  // Lv1=110, Lv10=1100, Lv50=25100
+
+        // 장비 보너스 합산 (장비 착용 중일 때 레벨업해도 보너스 유지)
+        attack += equip_atk_bonus;
+        defense += equip_def_bonus;
+
         stats_dirty = true;
     }
 

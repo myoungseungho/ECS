@@ -288,7 +288,8 @@
       {"id": "T011", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "done"},
       {"id": "T012", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "done"},
       {"id": "T013", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "note": "T011에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 연동"},
-      {"id": "T014", "task": "서버: 채팅 시스템 (Session 30)", "assignee": "server", "status": "done", "note": "야근 #1. ChatComponents.h, 5개 MsgType(240-244), 존/파티/귓속말/시스템. test_session30_chat.py 8개 테스트."}
+      {"id": "T014", "task": "서버: 채팅 시스템 (Session 30)", "assignee": "server", "status": "done", "note": "야근 #1. ChatComponents.h, 5개 MsgType(240-244), 존/파티/귓속말/시스템. test_session30_chat.py 8개 테스트."},
+      {"id": "T015", "task": "서버: 장비 스탯 반영 (Session 31)", "assignee": "server", "status": "done", "note": "야근 #2. StatsComponent에 equip_atk/def_bonus 추가. 장착→ATK/DEF 반영→STAT_SYNC 자동 전송. test_session31_equipment.py 6개 테스트."}
     ]
   },
 
@@ -296,8 +297,8 @@
     "server": {
       "last_sent": "S010",
       "last_read": "C010",
-      "current_work": "야근 진행중! 채팅 완료(T014). 다음: 장비→상점→스킬확장→보스.",
-      "capabilities": "30세션 구현(+채팅), 321+테스트, 루트/스킬사망/퀘스트킬카운트/던전클리어/채팅 전부 연동"
+      "current_work": "야근 진행중! 채팅(T014)+장비(T015) 완료. 다음: 상점→스킬확장→보스.",
+      "capabilities": "31세션 구현(+채팅+장비스탯), 321+14=335테스트, 루트/스킬사망/퀘스트킬카운트/던전클리어/채팅/장비스탯 전부 연동"
     },
     "client": {
       "last_sent": "C010",

@@ -2209,6 +2209,31 @@ void OnItemUse(World& world, Entity entity, const char* payload, int len) {
     printf("[Item] Entity %llu used item %d from slot %d\n", entity, used_id, slot);
 }
 
+// 장비 보너스 재계산: 인벤토리의 모든 장착 아이템을 순회하여 합산
+void RecalculateEquipmentBonus(World& world, Entity entity) {
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+    if (!world.HasComponent<InventoryComponent>(entity)) return;
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+
+    stats.equip_atk_bonus = 0;
+    stats.equip_def_bonus = 0;
+
+    for (int i = 0; i < MAX_INVENTORY_SLOTS; i++) {
+        if (inv.slots[i].item_id == 0 || !inv.slots[i].equipped) continue;
+        auto* tmpl = FindItemTemplate(inv.slots[i].item_id);
+        if (!tmpl) continue;
+        if (tmpl->type == ItemType::WEAPON) {
+            stats.equip_atk_bonus += tmpl->param1;
+        } else if (tmpl->type == ItemType::ARMOR) {
+            stats.equip_def_bonus += tmpl->param2;
+        }
+    }
+
+    // 기본 스탯 재계산 (장비 보너스 포함)
+    stats.RecalculateFromLevel();
+}
+
 void OnItemEquip(World& world, Entity entity, const char* payload, int len) {
     auto& session = world.GetComponent<SessionComponent>(entity);
     if (len < 1) return;
@@ -2235,7 +2260,13 @@ void OnItemEquip(World& world, Entity entity, const char* payload, int len) {
     resp[6] = 1;
     auto pkt = BuildPacket(MsgType::ITEM_EQUIP_RESULT, resp, 7);
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
-    printf("[Item] Entity %llu equipped item %d at slot %d\n", entity, inv.slots[slot].item_id, slot);
+
+    // 장비 보너스 재계산 + 스탯 동기화
+    RecalculateEquipmentBonus(world, entity);
+    SendStatSync(world, entity);
+
+    printf("[Item] Entity %llu equipped item %d (ATK+%d, DEF+%d) at slot %d\n",
+           entity, inv.slots[slot].item_id, tmpl->param1, tmpl->param2, slot);
 }
 
 void OnItemUnequip(World& world, Entity entity, const char* payload, int len) {
@@ -2256,6 +2287,12 @@ void OnItemUnequip(World& world, Entity entity, const char* payload, int len) {
     resp[6] = 0;
     auto pkt = BuildPacket(MsgType::ITEM_EQUIP_RESULT, resp, 7);
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    // 장비 보너스 재계산 + 스탯 동기화
+    RecalculateEquipmentBonus(world, entity);
+    SendStatSync(world, entity);
+
+    printf("[Item] Entity %llu unequipped item %d at slot %d\n", entity, inv.slots[slot].item_id, slot);
 }
 
 // ━━━ Session 24: Buff/Debuff 핸들러 ━━━
