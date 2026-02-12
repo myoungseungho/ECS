@@ -76,7 +76,12 @@ gate_sources = [
     ("Servers\\GateServer\\main.cpp", "gate_main.obj"),
 ]
 
-all_sources = shared_sources + field_sources + gate_sources
+# ━━━ BusServer 전용 소스 ━━━
+bus_sources = [
+    ("Servers\\BusServer\\main.cpp", "bus_main.obj"),
+]
+
+all_sources = shared_sources + field_sources + gate_sources + bus_sources
 total = len(all_sources)
 
 for i, (src, obj) in enumerate(all_sources, 1):
@@ -91,6 +96,11 @@ field_exe = link_exe("FieldServer.exe", field_objs, env)
 gate_objs = shared_objs + [obj for _, obj in gate_sources]
 gate_exe = link_exe("GateServer.exe", gate_objs, env)
 
+# ━━━ 링크: BusServer.exe ━━━
+bus_objs = shared_objs + [obj for _, obj in bus_sources]
+bus_exe = link_exe("BusServer.exe", bus_objs, env)
+
 print()
 print(f"BUILD SUCCESS: {field_exe}")
 print(f"BUILD SUCCESS: {gate_exe}")
+print(f"BUILD SUCCESS: {bus_exe}")

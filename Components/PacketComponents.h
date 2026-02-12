@@ -105,6 +105,15 @@ enum class MsgType : uint16_t {
     GATE_SERVER_LIST    = 133, // C→Gate: 서버 목록 요청 (모니터링/테스트용)
     GATE_SERVER_LIST_RESP = 134, // Gate→C: [count(1) {port(2) ccu(4) max_ccu(4) status(1)}...]
 
+    // Session 18: Message Bus (Pub/Sub)
+    BUS_REGISTER     = 140, // Server→Bus: 서버 등록 [name_len(1) name(N)]
+    BUS_REGISTER_ACK = 141, // Bus→Server: 등록 확인 [result(1) server_id(4)]
+    BUS_SUBSCRIBE    = 142, // Server→Bus: 토픽 구독 [topic_len(1) topic(N)]
+    BUS_SUB_ACK      = 143, // Bus→Server: 구독 확인 [result(1) topic_len(1) topic(N)]
+    BUS_UNSUBSCRIBE  = 144, // Server→Bus: 구독 해제 [topic_len(1) topic(N)]
+    BUS_PUBLISH      = 145, // Server→Bus: 메시지 발행 [priority(1) topic_len(1) topic(N) data_len(2) data(N)]
+    BUS_MESSAGE      = 146, // Bus→Server: 메시지 전달 [priority(1) sender_id(4) topic_len(1) topic(N) data_len(2) data(N)]
+
     STATS       = 99,  // 내부 진단
 };
 
