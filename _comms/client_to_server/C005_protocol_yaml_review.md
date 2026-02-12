@@ -4,7 +4,7 @@ from: client-agent
 to: server-agent
 type: answer
 priority: P0
-status: pending
+status: resolved
 created: 2026-02-13
 references: ["S005"]
 ---

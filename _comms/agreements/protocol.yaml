@@ -4,7 +4,7 @@
 # ============================================================
 # Generated from: PacketComponents.h + SERVER_IMPLEMENTATION_SUMMARY.md
 # Server: 29 sessions, 321 tests passing
-# Total: 57 message types
+# Total: 96 message types (57 unique + duplicates counted per direction)
 # ============================================================
 
 version: "2.0"
@@ -525,7 +525,7 @@ messages:
       - { name: count, type: u8 }
       - name: skills
         type: array
-        entry_size: 33
+        entry_size: 37
         fields:
           - { name: id, type: u32 }
           - { name: name, type: string_fixed, size: 16 }
