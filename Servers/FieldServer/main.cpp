@@ -25,6 +25,12 @@
 #include "../../Components/MonsterComponents.h"    // Session 14
 #include "../../Systems/MonsterAISystem.h"         // Session 14
 #include "../../NetworkEngine/TCPClient.h"          // Session 17
+#include "../../Components/SkillComponents.h"       // Session 19
+#include "../../Components/PartyComponents.h"       // Session 20
+#include "../../Components/InstanceComponents.h"    // Session 21
+#include "../../Components/MatchComponents.h"       // Session 22
+#include "../../Components/InventoryComponents.h"   // Session 23
+#include "../../Components/BuffComponents.h"        // Session 24
 
 #include <cstdio>
 #include <cstdlib>
@@ -32,6 +38,7 @@
 #include <string>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 // 서버 설정
 constexpr uint16_t SERVER_PORT = 7777;
@@ -1354,6 +1361,875 @@ void OnRespawnReq(World& world, Entity entity, const char* payload, int len) {
            entity, spawn_x, spawn_y);
 }
 
+// ━━━ Session 19: Skill System 핸들러 ━━━
+
+void OnSkillListReq(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    int job_num = 0;
+    if (world.HasComponent<StatsComponent>(entity)) {
+        job_num = static_cast<int>(world.GetComponent<StatsComponent>(entity).job) + 1;
+    }
+
+    // 사용 가능한 스킬 수집 (공용 + 자기 직업)
+    std::vector<const SkillData*> available;
+    for (int i = 0; i < SKILL_TABLE_SIZE; i++) {
+        if (SKILL_TABLE[i].job_class == 0 || SKILL_TABLE[i].job_class == job_num) {
+            available.push_back(&SKILL_TABLE[i]);
+        }
+    }
+
+    uint8_t count = static_cast<uint8_t>(available.size());
+    int payload_size = 1 + count * 37;  // id(4)+name(16)+cd(4)+dmg(4)+mp(4)+range(4)+type(1)
+    std::vector<char> resp(payload_size, 0);
+    resp[0] = static_cast<char>(count);
+
+    int off = 1;
+    for (auto* s : available) {
+        std::memcpy(resp.data() + off, &s->skill_id, 4); off += 4;
+        std::memcpy(resp.data() + off, s->name, 16); off += 16;
+        std::memcpy(resp.data() + off, &s->cooldown_ms, 4); off += 4;
+        std::memcpy(resp.data() + off, &s->damage_multiplier, 4); off += 4;
+        std::memcpy(resp.data() + off, &s->mp_cost, 4); off += 4;
+        int32_t range_i = static_cast<int32_t>(s->range);
+        std::memcpy(resp.data() + off, &range_i, 4); off += 4;
+        resp[off++] = s->job_class;
+    }
+
+    auto pkt = BuildPacket(MsgType::SKILL_LIST_RESP, resp.data(), payload_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void SendSkillResult(World& world, Entity caster, SkillResult result,
+                     int32_t skill_id, Entity target, int32_t damage, int32_t target_hp) {
+    if (!world.HasComponent<SessionComponent>(caster)) return;
+    auto& session = world.GetComponent<SessionComponent>(caster);
+    char buf[29];
+    buf[0] = static_cast<uint8_t>(result);
+    std::memcpy(buf + 1, &skill_id, 4);
+    std::memcpy(buf + 5, &caster, 8);
+    std::memcpy(buf + 13, &target, 8);
+    std::memcpy(buf + 21, &damage, 4);
+    std::memcpy(buf + 25, &target_hp, 4);
+    auto pkt = BuildPacket(MsgType::SKILL_RESULT, buf, 29);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
+    if (len < 12) return;
+    int32_t skill_id;
+    Entity target;
+    std::memcpy(&skill_id, payload, 4);
+    std::memcpy(&target, payload + 4, 8);
+
+    auto* skill = FindSkill(skill_id);
+    if (!skill) { SendSkillResult(world, entity, SkillResult::SKILL_NOT_FOUND, skill_id, target, 0, 0); return; }
+    if (!world.HasComponent<StatsComponent>(entity)) return;
+    auto& stats = world.GetComponent<StatsComponent>(entity);
+    if (!stats.IsAlive()) { SendSkillResult(world, entity, SkillResult::CASTER_DEAD, skill_id, target, 0, 0); return; }
+
+    // SkillComponent 자동 부착
+    if (!world.HasComponent<SkillComponent>(entity)) world.AddComponent(entity, SkillComponent{});
+    auto& sc = world.GetComponent<SkillComponent>(entity);
+
+    // 쿨다운 확인
+    if (sc.GetCooldown(skill_id) > 0) {
+        SendSkillResult(world, entity, SkillResult::COOLDOWN, skill_id, target, 0, 0); return;
+    }
+    // MP 확인
+    if (stats.mp < skill->mp_cost) {
+        SendSkillResult(world, entity, SkillResult::NO_MP, skill_id, target, 0, 0); return;
+    }
+
+    // 자힐 스킬 (Heal, id=2)
+    if (skill_id == 2) {
+        stats.UseMp(skill->mp_cost);
+        int32_t heal = 50 + stats.level * 5;
+        stats.Heal(heal);
+        sc.SetCooldown(skill_id, skill->cooldown_ms / 1000.0f);
+        SendSkillResult(world, entity, SkillResult::SUCCESS, skill_id, entity, heal, stats.hp);
+        SendStatSync(world, entity);
+        printf("[Skill] Entity %llu used Heal: +%d HP\n", entity, heal);
+        return;
+    }
+
+    // 타겟 공격 스킬
+    if (!world.HasComponent<StatsComponent>(target)) {
+        SendSkillResult(world, entity, SkillResult::INVALID_TARGET, skill_id, target, 0, 0); return;
+    }
+    auto& tgt_stats = world.GetComponent<StatsComponent>(target);
+    if (!tgt_stats.IsAlive()) {
+        SendSkillResult(world, entity, SkillResult::TARGET_DEAD, skill_id, target, 0, tgt_stats.hp); return;
+    }
+
+    // 사거리 확인
+    if (skill->range > 0 && world.HasComponent<PositionComponent>(entity) && world.HasComponent<PositionComponent>(target)) {
+        float dist = DistanceBetween(world.GetComponent<PositionComponent>(entity), world.GetComponent<PositionComponent>(target));
+        if (dist > skill->range) {
+            SendSkillResult(world, entity, SkillResult::OUT_OF_RANGE, skill_id, target, 0, tgt_stats.hp); return;
+        }
+    }
+
+    // 스킬 실행
+    stats.UseMp(skill->mp_cost);
+    int32_t base_dmg = stats.attack * skill->damage_multiplier / 100;
+    int32_t damage = tgt_stats.TakeDamage(base_dmg);
+    sc.SetCooldown(skill_id, skill->cooldown_ms / 1000.0f);
+
+    SendSkillResult(world, entity, SkillResult::SUCCESS, skill_id, target, damage, tgt_stats.hp);
+    SendStatSync(world, entity);
+
+    // 타겟 스탯 동기화
+    if (world.HasComponent<SessionComponent>(target)) SendStatSync(world, target);
+
+    printf("[Skill] Entity %llu used skill %d on %llu: %d damage (HP: %d)\n",
+           entity, skill_id, target, damage, tgt_stats.hp);
+
+    // 사망 처리
+    if (!tgt_stats.IsAlive()) {
+        printf("[Skill] Entity %llu killed by skill!\n", target);
+        if (world.HasComponent<MonsterComponent>(target)) {
+            auto& mc = world.GetComponent<MonsterComponent>(target);
+            mc.state = MonsterState::DEAD;
+            mc.death_timer = mc.respawn_time;
+            mc.target_entity = 0;
+        }
+        int32_t exp_reward = CalcKillExp(tgt_stats.level);
+        stats.AddExp(exp_reward);
+        SendStatSync(world, entity);
+    }
+}
+
+// ━━━ Session 20: Party System 핸들러 ━━━
+
+void SendPartyInfo(World& world, Entity target, PartyResult result, uint32_t party_id) {
+    if (!world.HasComponent<SessionComponent>(target)) return;
+    auto& session = world.GetComponent<SessionComponent>(target);
+
+    auto* party = FindParty(party_id);
+    if (!party || result != PartyResult::SUCCESS) {
+        char resp[14] = {};
+        resp[0] = static_cast<uint8_t>(result);
+        std::memcpy(resp + 1, &party_id, 4);
+        Entity zero = 0;
+        std::memcpy(resp + 5, &zero, 8);
+        resp[13] = 0;
+        auto pkt = BuildPacket(MsgType::PARTY_INFO, resp, 14);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    uint8_t count = static_cast<uint8_t>(party->members.size());
+    int payload_size = 14 + count * 12;  // result(1)+party_id(4)+leader(8)+count(1) + N*(entity(8)+level(4))
+    std::vector<char> resp(payload_size, 0);
+    resp[0] = 0;  // SUCCESS
+    std::memcpy(resp.data() + 1, &party_id, 4);
+    std::memcpy(resp.data() + 5, &party->leader, 8);
+    resp[13] = static_cast<char>(count);
+
+    int off = 14;
+    for (auto m : party->members) {
+        std::memcpy(resp.data() + off, &m, 8); off += 8;
+        int32_t lv = 1;
+        if (world.HasComponent<StatsComponent>(m)) lv = world.GetComponent<StatsComponent>(m).level;
+        std::memcpy(resp.data() + off, &lv, 4); off += 4;
+    }
+
+    auto pkt = BuildPacket(MsgType::PARTY_INFO, resp.data(), payload_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void BroadcastPartyInfo(World& world, uint32_t party_id) {
+    auto* party = FindParty(party_id);
+    if (!party) return;
+    for (auto m : party->members) SendPartyInfo(world, m, PartyResult::SUCCESS, party_id);
+}
+
+void OnPartyCreate(World& world, Entity entity, const char* payload, int len) {
+    if (FindEntityParty(entity) > 0) {
+        SendPartyInfo(world, entity, PartyResult::ALREADY_IN_PARTY, 0); return;
+    }
+
+    uint32_t pid = g_next_party_id++;
+    PartyData party;
+    party.party_id = pid;
+    party.leader = entity;
+    party.members.push_back(entity);
+    g_parties[pid] = party;
+
+    if (!world.HasComponent<PartyComponent>(entity)) world.AddComponent(entity, PartyComponent{pid});
+    else world.GetComponent<PartyComponent>(entity).party_id = pid;
+
+    SendPartyInfo(world, entity, PartyResult::SUCCESS, pid);
+    printf("[Party] Entity %llu created party %u\n", entity, pid);
+}
+
+void OnPartyInvite(World& world, Entity entity, const char* payload, int len) {
+    if (len < 8) return;
+    Entity target;
+    std::memcpy(&target, payload, 8);
+
+    uint32_t pid = FindEntityParty(entity);
+    if (pid == 0) { SendPartyInfo(world, entity, PartyResult::NOT_IN_PARTY, 0); return; }
+    auto* party = FindParty(pid);
+    if (!party || !party->IsLeader(entity)) { SendPartyInfo(world, entity, PartyResult::NOT_LEADER, 0); return; }
+    if (party->IsFull()) { SendPartyInfo(world, entity, PartyResult::PARTY_FULL, 0); return; }
+    if (FindEntityParty(target) > 0) { SendPartyInfo(world, entity, PartyResult::TARGET_IN_PARTY, 0); return; }
+    if (!world.HasComponent<SessionComponent>(target)) { SendPartyInfo(world, entity, PartyResult::INVALID_TARGET, 0); return; }
+
+    // 초대 전송 (자동 수락 간소화: 바로 파티에 추가)
+    party->members.push_back(target);
+    if (!world.HasComponent<PartyComponent>(target)) world.AddComponent(target, PartyComponent{pid});
+    else world.GetComponent<PartyComponent>(target).party_id = pid;
+
+    BroadcastPartyInfo(world, pid);
+    printf("[Party] Entity %llu invited %llu to party %u\n", entity, target, pid);
+}
+
+void OnPartyAccept(World& world, Entity entity, const char* payload, int len) {
+    // 간소화 버전에서는 Invite에서 자동 추가되므로, 이미 파티 상태 확인만
+    uint32_t pid = FindEntityParty(entity);
+    if (pid > 0) SendPartyInfo(world, entity, PartyResult::SUCCESS, pid);
+    else SendPartyInfo(world, entity, PartyResult::PARTY_NOT_FOUND, 0);
+}
+
+void OnPartyLeave(World& world, Entity entity, const char* payload, int len) {
+    uint32_t pid = FindEntityParty(entity);
+    if (pid == 0) { SendPartyInfo(world, entity, PartyResult::NOT_IN_PARTY, 0); return; }
+    auto* party = FindParty(pid);
+    if (!party) return;
+
+    party->RemoveMember(entity);
+    if (world.HasComponent<PartyComponent>(entity)) world.RemoveComponent<PartyComponent>(entity);
+
+    printf("[Party] Entity %llu left party %u\n", entity, pid);
+
+    if (party->members.empty()) {
+        g_parties.erase(pid);
+        printf("[Party] Party %u disbanded (empty)\n", pid);
+    } else {
+        if (party->leader == entity) {
+            party->leader = party->members[0];
+            printf("[Party] New leader: Entity %llu\n", party->leader);
+        }
+        BroadcastPartyInfo(world, pid);
+    }
+    SendPartyInfo(world, entity, PartyResult::NOT_IN_PARTY, 0);
+}
+
+void OnPartyKick(World& world, Entity entity, const char* payload, int len) {
+    if (len < 8) return;
+    Entity target;
+    std::memcpy(&target, payload, 8);
+
+    uint32_t pid = FindEntityParty(entity);
+    if (pid == 0) { SendPartyInfo(world, entity, PartyResult::NOT_IN_PARTY, 0); return; }
+    auto* party = FindParty(pid);
+    if (!party || !party->IsLeader(entity)) { SendPartyInfo(world, entity, PartyResult::NOT_LEADER, 0); return; }
+    if (!party->IsMember(target)) { SendPartyInfo(world, entity, PartyResult::INVALID_TARGET, 0); return; }
+
+    party->RemoveMember(target);
+    if (world.HasComponent<PartyComponent>(target)) world.RemoveComponent<PartyComponent>(target);
+
+    BroadcastPartyInfo(world, pid);
+    SendPartyInfo(world, target, PartyResult::NOT_IN_PARTY, 0);
+    printf("[Party] Entity %llu kicked %llu from party %u\n", entity, target, pid);
+}
+
+// ━━━ Session 21: Instance Dungeon 핸들러 ━━━
+
+void OnInstanceCreate(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t dungeon_type;
+    std::memcpy(&dungeon_type, payload, 4);
+
+    auto* tmpl = FindDungeonTemplate(dungeon_type);
+    if (!tmpl) {
+        char resp[9] = {};
+        resp[0] = static_cast<uint8_t>(InstanceResult::DUNGEON_NOT_FOUND);
+        auto pkt = BuildPacket(MsgType::INSTANCE_ENTER, resp, 9);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 이미 인스턴스에 있는지 확인
+    if (world.HasComponent<InstanceComponent>(entity)) {
+        char resp[9] = {};
+        resp[0] = static_cast<uint8_t>(InstanceResult::ALREADY_IN_INSTANCE);
+        auto pkt = BuildPacket(MsgType::INSTANCE_ENTER, resp, 9);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 레벨 확인
+    int32_t level = 1;
+    if (world.HasComponent<StatsComponent>(entity)) level = world.GetComponent<StatsComponent>(entity).level;
+    if (level < tmpl->min_level) {
+        char resp[9] = {};
+        resp[0] = static_cast<uint8_t>(InstanceResult::LEVEL_TOO_LOW);
+        auto pkt = BuildPacket(MsgType::INSTANCE_ENTER, resp, 9);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 인스턴스 생성
+    uint32_t iid = g_next_instance_id++;
+    InstanceData inst;
+    inst.instance_id = iid;
+    inst.dungeon_type = dungeon_type;
+
+    // 이전 위치 저장
+    InstanceComponent ic;
+    ic.instance_id = iid;
+    if (world.HasComponent<ZoneComponent>(entity)) ic.previous_zone = world.GetComponent<ZoneComponent>(entity).zone_id;
+    if (world.HasComponent<PositionComponent>(entity)) {
+        auto& pos = world.GetComponent<PositionComponent>(entity);
+        ic.previous_x = pos.x; ic.previous_y = pos.y; ic.previous_z = pos.z;
+    }
+
+    // 인스턴스 몬스터 생성
+    for (int i = 0; i < tmpl->monster_count; i++) {
+        Entity me = world.CreateEntity();
+        MonsterComponent mc{};
+        mc.monster_id = 100 + dungeon_type * 10 + i;
+        std::snprintf(mc.name, 31, "Inst_%s_%d", tmpl->name, i);
+        mc.state = MonsterState::IDLE;
+        mc.spawn_x = 100.0f + i * 100.0f;
+        mc.spawn_y = 100.0f;
+        mc.spawn_z = 0;
+        mc.respawn_time = 0;  // 인스턴스 몬스터는 리스폰 없음
+        world.AddComponent(me, mc);
+        int32_t m_atk = tmpl->monster_level * 3;
+        int32_t m_def = tmpl->monster_level;
+        world.AddComponent(me, CreateMonsterStats(tmpl->monster_level, tmpl->monster_hp, m_atk, m_def));
+        CombatComponent cc; cc.attack_range = 200.0f; cc.attack_cooldown = 2.0f;
+        world.AddComponent(me, cc);
+        PositionComponent pos; pos.x = mc.spawn_x; pos.y = mc.spawn_y;
+        world.AddComponent(me, pos);
+        InstanceMonsterComponent imc; imc.instance_id = iid;
+        world.AddComponent(me, imc);
+        inst.monsters.push_back(me);
+    }
+
+    inst.players.push_back(entity);
+    g_instances[iid] = inst;
+
+    world.AddComponent(entity, ic);
+
+    // 응답
+    char resp[9];
+    resp[0] = static_cast<uint8_t>(InstanceResult::SUCCESS);
+    std::memcpy(resp + 1, &iid, 4);
+    std::memcpy(resp + 5, &dungeon_type, 4);
+    auto pkt = BuildPacket(MsgType::INSTANCE_ENTER, resp, 9);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Instance] Entity %llu created instance %u (type=%d, monsters=%d)\n",
+           entity, iid, dungeon_type, tmpl->monster_count);
+}
+
+void OnInstanceLeave(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    if (!world.HasComponent<InstanceComponent>(entity)) {
+        char resp[17] = {};
+        resp[0] = static_cast<uint8_t>(InstanceResult::NOT_IN_INSTANCE);
+        auto pkt = BuildPacket(MsgType::INSTANCE_LEAVE_RESULT, resp, 17);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& ic = world.GetComponent<InstanceComponent>(entity);
+    uint32_t iid = ic.instance_id;
+    int32_t prev_zone = ic.previous_zone;
+    float px = ic.previous_x, py = ic.previous_y, pz = ic.previous_z;
+
+    // 인스턴스에서 제거
+    auto* inst = FindInstance(iid);
+    if (inst) {
+        inst->RemovePlayer(entity);
+        if (inst->players.empty()) {
+            // 인스턴스 정리: 몬스터 Entity 삭제
+            for (auto me : inst->monsters) {
+                world.DestroyEntity(me);
+            }
+            g_instances.erase(iid);
+            printf("[Instance] Instance %u destroyed (no players)\n", iid);
+        }
+    }
+
+    world.RemoveComponent<InstanceComponent>(entity);
+
+    // 이전 위치로 복원
+    if (world.HasComponent<PositionComponent>(entity)) {
+        auto& pos = world.GetComponent<PositionComponent>(entity);
+        pos.x = px; pos.y = py; pos.z = pz;
+        pos.position_dirty = true;
+    }
+
+    char resp[17];
+    resp[0] = static_cast<uint8_t>(InstanceResult::SUCCESS);
+    std::memcpy(resp + 1, &prev_zone, 4);
+    std::memcpy(resp + 5, &px, 4);
+    std::memcpy(resp + 9, &py, 4);
+    std::memcpy(resp + 13, &pz, 4);
+    auto pkt = BuildPacket(MsgType::INSTANCE_LEAVE_RESULT, resp, 17);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Instance] Entity %llu left instance %u, returned to zone %d\n", entity, iid, prev_zone);
+}
+
+void OnInstanceInfo(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (!world.HasComponent<InstanceComponent>(entity)) {
+        char resp[10] = {};
+        auto pkt = BuildPacket(MsgType::INSTANCE_INFO, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& ic = world.GetComponent<InstanceComponent>(entity);
+    auto* inst = FindInstance(ic.instance_id);
+    if (!inst) {
+        char resp[10] = {};
+        auto pkt = BuildPacket(MsgType::INSTANCE_INFO, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 살아있는 몬스터 수
+    uint8_t alive_monsters = 0;
+    for (auto me : inst->monsters) {
+        if (world.HasComponent<StatsComponent>(me) && world.GetComponent<StatsComponent>(me).IsAlive())
+            alive_monsters++;
+    }
+
+    char resp[10];
+    std::memcpy(resp, &inst->instance_id, 4);
+    std::memcpy(resp + 4, &inst->dungeon_type, 4);
+    resp[8] = static_cast<uint8_t>(inst->players.size());
+    resp[9] = alive_monsters;
+    auto pkt = BuildPacket(MsgType::INSTANCE_INFO, resp, 10);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ━━━ Session 22: Matching Queue 핸들러 ━━━
+
+void OnMatchEnqueue(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    int32_t dungeon_type;
+    std::memcpy(&dungeon_type, payload, 4);
+
+    // 이미 큐에 있는지 확인
+    if (world.HasComponent<MatchComponent>(entity) && world.GetComponent<MatchComponent>(entity).in_queue) {
+        char resp[5];
+        resp[0] = static_cast<uint8_t>(MatchStatus::IN_QUEUE);
+        int32_t pos = GetQueuePosition(entity);
+        std::memcpy(resp + 1, &pos, 4);
+        auto pkt = BuildPacket(MsgType::MATCH_STATUS, resp, 5);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 인스턴스에 있으면 불가
+    if (world.HasComponent<InstanceComponent>(entity)) {
+        char resp[5] = {};
+        resp[0] = static_cast<uint8_t>(MatchStatus::IDLE);
+        auto pkt = BuildPacket(MsgType::MATCH_STATUS, resp, 5);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    int32_t level = 1;
+    if (world.HasComponent<StatsComponent>(entity)) level = world.GetComponent<StatsComponent>(entity).level;
+
+    MatchQueueEntry entry;
+    entry.entity = entity;
+    entry.dungeon_type = dungeon_type;
+    entry.level = level;
+    entry.wait_time = 0;
+    g_match_queue.push_back(entry);
+
+    if (!world.HasComponent<MatchComponent>(entity)) world.AddComponent(entity, MatchComponent{});
+    auto& mc = world.GetComponent<MatchComponent>(entity);
+    mc.in_queue = true;
+    mc.dungeon_type = dungeon_type;
+
+    char resp[5];
+    resp[0] = static_cast<uint8_t>(MatchStatus::IN_QUEUE);
+    int32_t pos = GetQueuePosition(entity);
+    std::memcpy(resp + 1, &pos, 4);
+    auto pkt = BuildPacket(MsgType::MATCH_STATUS, resp, 5);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Match] Entity %llu enqueued for dungeon %d (queue pos=%d)\n", entity, dungeon_type, pos);
+
+    // 큐에서 죽은 엔티티 정리
+    g_match_queue.erase(
+        std::remove_if(g_match_queue.begin(), g_match_queue.end(),
+            [&world](const MatchQueueEntry& e) { return !world.IsAlive(e.entity); }),
+        g_match_queue.end());
+
+    // 즉시 매칭 체크: 같은 던전 타입 2명 이상이면 매칭
+    std::vector<Entity> matched;
+    for (auto& e : g_match_queue) {
+        if (e.dungeon_type == dungeon_type) matched.push_back(e.entity);
+        if (static_cast<int>(matched.size()) >= 2) break;
+    }
+
+    if (static_cast<int>(matched.size()) >= 2) {
+        uint32_t mid = g_next_match_id++;
+
+        // 큐에서 제거
+        for (auto m : matched) {
+            RemoveFromMatchQueue(m);
+            if (world.HasComponent<MatchComponent>(m)) {
+                auto& mmc = world.GetComponent<MatchComponent>(m);
+                mmc.in_queue = false;
+                mmc.pending_match_id = mid;
+            }
+        }
+
+        // MATCH_FOUND 전송
+        for (auto m : matched) {
+            if (!world.HasComponent<SessionComponent>(m)) continue;
+            auto& ms = world.GetComponent<SessionComponent>(m);
+            char fbuf[9];
+            std::memcpy(fbuf, &mid, 4);
+            std::memcpy(fbuf + 4, &dungeon_type, 4);
+            fbuf[8] = static_cast<uint8_t>(matched.size());
+            auto fpkt = BuildPacket(MsgType::MATCH_FOUND, fbuf, 9);
+            g_network->SendTo(ms.session_id, fpkt.data(), static_cast<int>(fpkt.size()));
+        }
+
+        MatchResultData mrd;
+        mrd.match_id = mid;
+        mrd.dungeon_type = dungeon_type;
+        mrd.players = matched;
+        g_pending_matches[mid] = mrd;
+
+        printf("[Match] Match %u found for dungeon %d (%d players)\n",
+               mid, dungeon_type, static_cast<int>(matched.size()));
+    }
+}
+
+void OnMatchDequeue(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    RemoveFromMatchQueue(entity);
+    if (world.HasComponent<MatchComponent>(entity)) {
+        world.GetComponent<MatchComponent>(entity).in_queue = false;
+    }
+
+    char resp[5] = {};
+    resp[0] = static_cast<uint8_t>(MatchStatus::IDLE);
+    auto pkt = BuildPacket(MsgType::MATCH_STATUS, resp, 5);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    printf("[Match] Entity %llu dequeued\n", entity);
+}
+
+void OnMatchAccept(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+
+    uint32_t match_id;
+    std::memcpy(&match_id, payload, 4);
+
+    auto it = g_pending_matches.find(match_id);
+    if (it == g_pending_matches.end()) {
+        char resp[5] = {};
+        resp[0] = static_cast<uint8_t>(MatchStatus::IDLE);
+        auto pkt = BuildPacket(MsgType::MATCH_STATUS, resp, 5);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& mrd = it->second;
+    mrd.accept_count++;
+
+    printf("[Match] Entity %llu accepted match %u (%d/%d)\n",
+           entity, match_id, mrd.accept_count, static_cast<int>(mrd.players.size()));
+
+    // 모든 플레이어 수락 시 인스턴스 자동 생성
+    if (mrd.accept_count >= static_cast<int>(mrd.players.size())) {
+        // 인스턴스 생성 (첫 플레이어 기준)
+        int32_t dt = mrd.dungeon_type;
+        char create_buf[4];
+        std::memcpy(create_buf, &dt, 4);
+
+        // 첫 플레이어로 인스턴스 생성
+        Entity first = mrd.players[0];
+        OnInstanceCreate(world, first, create_buf, 4);
+
+        // 나머지 플레이어도 같은 인스턴스에 추가
+        if (world.HasComponent<InstanceComponent>(first)) {
+            uint32_t iid = world.GetComponent<InstanceComponent>(first).instance_id;
+            auto* inst = FindInstance(iid);
+            if (inst) {
+                for (size_t i = 1; i < mrd.players.size(); i++) {
+                    Entity p = mrd.players[i];
+                    InstanceComponent pic;
+                    pic.instance_id = iid;
+                    if (world.HasComponent<ZoneComponent>(p)) pic.previous_zone = world.GetComponent<ZoneComponent>(p).zone_id;
+                    if (world.HasComponent<PositionComponent>(p)) {
+                        auto& pp = world.GetComponent<PositionComponent>(p);
+                        pic.previous_x = pp.x; pic.previous_y = pp.y; pic.previous_z = pp.z;
+                    }
+                    if (!world.HasComponent<InstanceComponent>(p)) world.AddComponent(p, pic);
+                    inst->players.push_back(p);
+
+                    // INSTANCE_ENTER 전송
+                    if (world.HasComponent<SessionComponent>(p)) {
+                        auto& ps = world.GetComponent<SessionComponent>(p);
+                        char ieresp[9];
+                        ieresp[0] = 0;
+                        std::memcpy(ieresp + 1, &iid, 4);
+                        std::memcpy(ieresp + 5, &dt, 4);
+                        auto iepkt = BuildPacket(MsgType::INSTANCE_ENTER, ieresp, 9);
+                        g_network->SendTo(ps.session_id, iepkt.data(), static_cast<int>(iepkt.size()));
+                    }
+                }
+            }
+        }
+
+        // MatchComponent 정리
+        for (auto p : mrd.players) {
+            if (world.HasComponent<MatchComponent>(p)) world.RemoveComponent<MatchComponent>(p);
+        }
+        g_pending_matches.erase(it);
+
+        printf("[Match] Match %u completed - instance created\n", match_id);
+    }
+}
+
+// ━━━ Session 23: Inventory/Item 핸들러 ━━━
+
+void OnInventoryReq(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (!world.HasComponent<InventoryComponent>(entity)) world.AddComponent(entity, InventoryComponent{});
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+
+    // 비어있지 않은 슬롯 수 계산
+    uint8_t count = 0;
+    for (int i = 0; i < MAX_INVENTORY_SLOTS; i++) {
+        if (inv.slots[i].item_id != 0) count++;
+    }
+
+    int payload_size = 1 + count * 8;  // count(1) + N*(slot(1)+item_id(4)+count(2)+equipped(1))
+    std::vector<char> resp(payload_size, 0);
+    resp[0] = count;
+    int off = 1;
+    for (int i = 0; i < MAX_INVENTORY_SLOTS; i++) {
+        if (inv.slots[i].item_id == 0) continue;
+        resp[off++] = static_cast<char>(i);
+        std::memcpy(resp.data() + off, &inv.slots[i].item_id, 4); off += 4;
+        std::memcpy(resp.data() + off, &inv.slots[i].count, 2); off += 2;
+        resp[off++] = inv.slots[i].equipped ? 1 : 0;
+    }
+    auto pkt = BuildPacket(MsgType::INVENTORY_RESP, resp.data(), payload_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void OnItemAdd(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 6) return;
+    int32_t item_id;
+    int16_t count;
+    std::memcpy(&item_id, payload, 4);
+    std::memcpy(&count, payload + 4, 2);
+
+    if (!world.HasComponent<InventoryComponent>(entity)) world.AddComponent(entity, InventoryComponent{});
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+
+    int slot = inv.AddItem(item_id, count);
+    char resp[8];
+    resp[0] = (slot >= 0) ? 0 : static_cast<uint8_t>(ItemResult::INVENTORY_FULL);
+    resp[1] = (slot >= 0) ? static_cast<char>(slot) : 0;
+    std::memcpy(resp + 2, &item_id, 4);
+    std::memcpy(resp + 6, &count, 2);
+    auto pkt = BuildPacket(MsgType::ITEM_ADD_RESULT, resp, 8);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    if (slot >= 0) printf("[Item] Entity %llu: added item %d x%d to slot %d\n", entity, item_id, count, slot);
+}
+
+void OnItemUse(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 1) return;
+    uint8_t slot = static_cast<uint8_t>(payload[0]);
+
+    if (!world.HasComponent<InventoryComponent>(entity)) {
+        char resp[6] = {}; resp[0] = static_cast<uint8_t>(ItemResult::EMPTY_SLOT);
+        auto pkt = BuildPacket(MsgType::ITEM_USE_RESULT, resp, 6);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+    if (slot >= MAX_INVENTORY_SLOTS || inv.slots[slot].item_id == 0) {
+        char resp[6] = {}; resp[0] = static_cast<uint8_t>(ItemResult::EMPTY_SLOT);
+        auto pkt = BuildPacket(MsgType::ITEM_USE_RESULT, resp, 6);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto* tmpl = FindItemTemplate(inv.slots[slot].item_id);
+    if (!tmpl || tmpl->type != ItemType::CONSUMABLE) {
+        char resp[6] = {}; resp[0] = static_cast<uint8_t>(ItemResult::NOT_CONSUMABLE);
+        resp[1] = slot;
+        auto pkt = BuildPacket(MsgType::ITEM_USE_RESULT, resp, 6);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    // 포션 사용
+    if (world.HasComponent<StatsComponent>(entity)) {
+        auto& stats = world.GetComponent<StatsComponent>(entity);
+        if (tmpl->param2 == 0) stats.Heal(tmpl->param1);        // HP 포션
+        else { stats.mp = std::min(stats.max_mp, stats.mp + tmpl->param1); stats.stats_dirty = true; } // MP 포션
+        SendStatSync(world, entity);
+    }
+
+    int32_t used_id = inv.slots[slot].item_id;
+    inv.RemoveItem(slot, 1);
+
+    char resp[6];
+    resp[0] = 0;  // SUCCESS
+    resp[1] = slot;
+    std::memcpy(resp + 2, &used_id, 4);
+    auto pkt = BuildPacket(MsgType::ITEM_USE_RESULT, resp, 6);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    printf("[Item] Entity %llu used item %d from slot %d\n", entity, used_id, slot);
+}
+
+void OnItemEquip(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 1) return;
+    uint8_t slot = static_cast<uint8_t>(payload[0]);
+
+    if (!world.HasComponent<InventoryComponent>(entity)) { return; }
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+    if (slot >= MAX_INVENTORY_SLOTS || inv.slots[slot].item_id == 0) { return; }
+
+    auto* tmpl = FindItemTemplate(inv.slots[slot].item_id);
+    if (!tmpl || (tmpl->type != ItemType::WEAPON && tmpl->type != ItemType::ARMOR)) {
+        char resp[7] = {}; resp[0] = static_cast<uint8_t>(ItemResult::NOT_EQUIPMENT);
+        auto pkt = BuildPacket(MsgType::ITEM_EQUIP_RESULT, resp, 7);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    inv.slots[slot].equipped = true;
+
+    char resp[7];
+    resp[0] = 0;
+    resp[1] = slot;
+    std::memcpy(resp + 2, &inv.slots[slot].item_id, 4);
+    resp[6] = 1;
+    auto pkt = BuildPacket(MsgType::ITEM_EQUIP_RESULT, resp, 7);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    printf("[Item] Entity %llu equipped item %d at slot %d\n", entity, inv.slots[slot].item_id, slot);
+}
+
+void OnItemUnequip(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 1) return;
+    uint8_t slot = static_cast<uint8_t>(payload[0]);
+
+    if (!world.HasComponent<InventoryComponent>(entity)) return;
+    auto& inv = world.GetComponent<InventoryComponent>(entity);
+    if (slot >= MAX_INVENTORY_SLOTS || inv.slots[slot].item_id == 0) return;
+
+    inv.slots[slot].equipped = false;
+
+    char resp[7];
+    resp[0] = 0;
+    resp[1] = slot;
+    std::memcpy(resp + 2, &inv.slots[slot].item_id, 4);
+    resp[6] = 0;
+    auto pkt = BuildPacket(MsgType::ITEM_EQUIP_RESULT, resp, 7);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ━━━ Session 24: Buff/Debuff 핸들러 ━━━
+
+void OnBuffListReq(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (!world.HasComponent<BuffComponent>(entity)) world.AddComponent(entity, BuffComponent{});
+    auto& bc = world.GetComponent<BuffComponent>(entity);
+
+    uint8_t count = static_cast<uint8_t>(bc.ActiveCount());
+    int payload_size = 1 + count * 9;  // count(1) + N*(buff_id(4)+remaining_ms(4)+stacks(1))
+    std::vector<char> resp(payload_size, 0);
+    resp[0] = count;
+    int off = 1;
+    for (int i = 0; i < MAX_ACTIVE_BUFFS; i++) {
+        if (!bc.buffs[i].active) continue;
+        std::memcpy(resp.data() + off, &bc.buffs[i].buff_id, 4); off += 4;
+        int32_t rem_ms = static_cast<int32_t>(bc.buffs[i].remaining * 1000);
+        std::memcpy(resp.data() + off, &rem_ms, 4); off += 4;
+        resp[off++] = static_cast<uint8_t>(bc.buffs[i].stacks);
+    }
+    auto pkt = BuildPacket(MsgType::BUFF_LIST_RESP, resp.data(), payload_size);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void OnBuffApply(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+    int32_t buff_id;
+    std::memcpy(&buff_id, payload, 4);
+
+    auto* tmpl = FindBuffTemplate(buff_id);
+    if (!tmpl) {
+        char resp[10] = {}; resp[0] = static_cast<uint8_t>(BuffResult::BUFF_NOT_FOUND);
+        auto pkt = BuildPacket(MsgType::BUFF_RESULT, resp, 10);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    if (!world.HasComponent<BuffComponent>(entity)) world.AddComponent(entity, BuffComponent{});
+    auto& bc = world.GetComponent<BuffComponent>(entity);
+    int idx = bc.ApplyBuff(buff_id);
+
+    char resp[10];
+    resp[0] = (idx >= 0) ? 0 : static_cast<uint8_t>(BuffResult::NO_SLOT);
+    std::memcpy(resp + 1, &buff_id, 4);
+    resp[5] = (idx >= 0) ? static_cast<uint8_t>(bc.buffs[idx].stacks) : 0;
+    std::memcpy(resp + 6, &tmpl->duration_ms, 4);
+    auto pkt = BuildPacket(MsgType::BUFF_RESULT, resp, 10);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+
+    printf("[Buff] Entity %llu applied buff %d '%s' (stacks=%d)\n",
+           entity, buff_id, tmpl->name, (idx >= 0) ? bc.buffs[idx].stacks : 0);
+}
+
+void OnBuffRemove(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (len < 4) return;
+    int32_t buff_id;
+    std::memcpy(&buff_id, payload, 4);
+
+    if (!world.HasComponent<BuffComponent>(entity)) {
+        char resp[5] = {}; resp[0] = static_cast<uint8_t>(BuffResult::NOT_ACTIVE);
+        std::memcpy(resp + 1, &buff_id, 4);
+        auto pkt = BuildPacket(MsgType::BUFF_REMOVE_RESP, resp, 5);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    auto& bc = world.GetComponent<BuffComponent>(entity);
+    bc.RemoveBuff(buff_id);
+
+    char resp[5];
+    resp[0] = 0;
+    std::memcpy(resp + 1, &buff_id, 4);
+    auto pkt = BuildPacket(MsgType::BUFF_REMOVE_RESP, resp, 5);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+    printf("[Buff] Entity %llu removed buff %d\n", entity, buff_id);
+}
+
 // ━━━ Session 11: Infrastructure 핸들러 ━━━
 
 // TIMER_ADD: 타이머 추가
@@ -1520,8 +2396,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 17\n");
-    printf("  Dynamic Load Balancing\n");
+    printf("  ECS Field Server - Session 24\n");
+    printf("  Skill/Party/Instance/Match/Item/Buff\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -1599,6 +2475,27 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::ATTACK_REQ, OnAttackReq);            // Session 13
     dispatch.RegisterHandler(MsgType::RESPAWN_REQ, OnRespawnReq);          // Session 13
     dispatch.RegisterHandler(MsgType::ZONE_TRANSFER_REQ, OnZoneTransfer);  // Session 16
+    dispatch.RegisterHandler(MsgType::SKILL_LIST_REQ, OnSkillListReq);     // Session 19
+    dispatch.RegisterHandler(MsgType::SKILL_USE, OnSkillUse);               // Session 19
+    dispatch.RegisterHandler(MsgType::PARTY_CREATE, OnPartyCreate);         // Session 20
+    dispatch.RegisterHandler(MsgType::PARTY_INVITE, OnPartyInvite);         // Session 20
+    dispatch.RegisterHandler(MsgType::PARTY_ACCEPT, OnPartyAccept);         // Session 20
+    dispatch.RegisterHandler(MsgType::PARTY_LEAVE, OnPartyLeave);           // Session 20
+    dispatch.RegisterHandler(MsgType::PARTY_KICK, OnPartyKick);             // Session 20
+    dispatch.RegisterHandler(MsgType::INSTANCE_CREATE, OnInstanceCreate);   // Session 21
+    dispatch.RegisterHandler(MsgType::INSTANCE_LEAVE, OnInstanceLeave);     // Session 21
+    dispatch.RegisterHandler(MsgType::INSTANCE_INFO, OnInstanceInfo);       // Session 21
+    dispatch.RegisterHandler(MsgType::MATCH_ENQUEUE, OnMatchEnqueue);       // Session 22
+    dispatch.RegisterHandler(MsgType::MATCH_DEQUEUE, OnMatchDequeue);       // Session 22
+    dispatch.RegisterHandler(MsgType::MATCH_ACCEPT, OnMatchAccept);         // Session 22
+    dispatch.RegisterHandler(MsgType::INVENTORY_REQ, OnInventoryReq);       // Session 23
+    dispatch.RegisterHandler(MsgType::ITEM_ADD, OnItemAdd);                 // Session 23
+    dispatch.RegisterHandler(MsgType::ITEM_USE, OnItemUse);                 // Session 23
+    dispatch.RegisterHandler(MsgType::ITEM_EQUIP, OnItemEquip);             // Session 23
+    dispatch.RegisterHandler(MsgType::ITEM_UNEQUIP, OnItemUnequip);         // Session 23
+    dispatch.RegisterHandler(MsgType::BUFF_LIST_REQ, OnBuffListReq);        // Session 24
+    dispatch.RegisterHandler(MsgType::BUFF_APPLY_REQ, OnBuffApply);         // Session 24
+    dispatch.RegisterHandler(MsgType::BUFF_REMOVE_REQ, OnBuffRemove);       // Session 24
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);

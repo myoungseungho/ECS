@@ -114,6 +114,53 @@ enum class MsgType : uint16_t {
     BUS_PUBLISH      = 145, // Server→Bus: 메시지 발행 [priority(1) topic_len(1) topic(N) data_len(2) data(N)]
     BUS_MESSAGE      = 146, // Bus→Server: 메시지 전달 [priority(1) sender_id(4) topic_len(1) topic(N) data_len(2) data(N)]
 
+    // Session 19: Skill System
+    SKILL_LIST_REQ   = 150, // C→S: 빈 페이로드 → 스킬 목록 조회
+    SKILL_LIST_RESP  = 151, // S→C: [count(1) {id(4) name(16) cd_ms(4) dmg(4) mp(4) range(4) type(1)}...]
+    SKILL_USE        = 152, // C→S: [skill_id(4) target_entity(8)]
+    SKILL_RESULT     = 153, // S→C: [result(1) skill_id(4) caster(8) target(8) damage(4) target_hp(4)]
+
+    // Session 20: Party System
+    PARTY_CREATE     = 160, // C→S: 빈 페이로드
+    PARTY_INVITE     = 161, // C→S: [target_entity(8)]
+    PARTY_ACCEPT     = 162, // C→S: [party_id(4)]
+    PARTY_LEAVE      = 163, // C→S: 빈 페이로드
+    PARTY_INFO       = 164, // S→C: [result(1) party_id(4) leader(8) count(1) {entity(8) level(4)}...]
+    PARTY_KICK       = 165, // C→S: [target_entity(8)]
+
+    // Session 21: Instance Dungeon
+    INSTANCE_CREATE  = 170, // C→S: [dungeon_type(4)]
+    INSTANCE_ENTER   = 171, // S→C: [result(1) instance_id(4) dungeon_type(4)]
+    INSTANCE_LEAVE   = 172, // C→S: 빈 페이로드
+    INSTANCE_LEAVE_RESULT = 173, // S→C: [result(1) zone_id(4) x(4) y(4) z(4)]
+    INSTANCE_INFO    = 174, // S→C: [instance_id(4) dungeon_type(4) player_count(1) monster_count(1)]
+
+    // Session 22: Matching Queue
+    MATCH_ENQUEUE    = 180, // C→S: [dungeon_type(4)]
+    MATCH_DEQUEUE    = 181, // C→S: 빈 페이로드
+    MATCH_FOUND      = 182, // S→C: [match_id(4) dungeon_type(4) player_count(1)]
+    MATCH_ACCEPT     = 183, // C→S: [match_id(4)]
+    MATCH_STATUS     = 184, // S→C: [status(1) queue_position(4)]
+
+    // Session 23: Inventory/Item
+    INVENTORY_REQ    = 190, // C→S: 빈 페이로드
+    INVENTORY_RESP   = 191, // S→C: [count(1) {slot(1) item_id(4) count(2) equipped(1)}...]
+    ITEM_ADD         = 192, // C→S: [item_id(4) count(2)] (테스트용)
+    ITEM_ADD_RESULT  = 193, // S→C: [result(1) slot(1) item_id(4) count(2)]
+    ITEM_USE         = 194, // C→S: [slot(1)]
+    ITEM_USE_RESULT  = 195, // S→C: [result(1) slot(1) item_id(4)]
+    ITEM_EQUIP       = 196, // C→S: [slot(1)]
+    ITEM_UNEQUIP     = 197, // C→S: [slot(1)]
+    ITEM_EQUIP_RESULT = 198, // S→C: [result(1) slot(1) item_id(4) equipped(1)]
+
+    // Session 24: Buff/Debuff
+    BUFF_LIST_REQ    = 200, // C→S: 빈 페이로드
+    BUFF_LIST_RESP   = 201, // S→C: [count(1) {buff_id(4) remaining_ms(4) stacks(1)}...]
+    BUFF_APPLY_REQ   = 202, // C→S: [buff_id(4)] (테스트용)
+    BUFF_RESULT      = 203, // S→C: [result(1) buff_id(4) stacks(1) duration_ms(4)]
+    BUFF_REMOVE_REQ  = 204, // C→S: [buff_id(4)]
+    BUFF_REMOVE_RESP = 205, // S→C: [result(1) buff_id(4)]
+
     STATS       = 99,  // 내부 진단
 };
 
