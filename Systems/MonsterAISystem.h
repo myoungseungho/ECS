@@ -10,6 +10,7 @@
 #include "../Components/SpatialComponents.h"
 #include "../Components/ZoneComponents.h"
 #include "../Components/PacketComponents.h"
+#include "../Components/BossComponents.h"  // Session 34
 
 #include <cstdio>
 #include <cstring>
@@ -74,6 +75,21 @@ private:
             pos.z = monster.spawn_z;
             monster.state = MonsterState::IDLE;
             monster.target_entity = 0;
+
+            // Session 34: 보스 리스폰 시 BossComponent 리셋
+            if (world.HasComponent<BossComponent>(entity)) {
+                auto& bc = world.GetComponent<BossComponent>(entity);
+                auto* tmpl = FindBossTemplate(bc.boss_id);
+                bc.current_phase = 0;
+                bc.enrage_timer = 0;
+                bc.is_enraged = false;
+                bc.combat_started = false;
+                bc.special_timer = tmpl ? tmpl->phases[0].special_cooldown : 10.0f;
+                // ATK도 원래대로 복구
+                if (tmpl) {
+                    stats.attack = tmpl->attack;
+                }
+            }
 
             printf("[MonsterAI] Entity %llu '%s' RESPAWNED at (%.0f, %.0f)\n",
                    entity, monster.name, pos.x, pos.y);

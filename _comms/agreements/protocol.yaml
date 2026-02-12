@@ -1132,6 +1132,20 @@ result_codes:
     3: AOE_DAMAGE
     4: DOT_DAMAGE
 
+  BossAttackType:
+    0: GROUND_SLAM
+    1: FIRE_BREATH
+    2: TAIL_SWIPE
+    3: SUMMON_ADDS
+    4: STOMP
+    5: DARK_NOVA
+
+  BossEventType:
+    0: PHASE_CHANGE
+    1: SPECIAL_ATTACK
+    2: ENRAGE
+    3: DEFEATED
+
 # ============================================================
 # Session 30: Chat System
 # ============================================================
@@ -1282,6 +1296,89 @@ result_codes:
 # - Skill points: +1 per level up, spend to learn/upgrade skills
 # - New skills: 8→21 (Common: Dash+Provoke, Warrior: ShieldBash+Whirlwind+Warcry,
 #   Archer: PoisonArrow+RainOfArrows+Snipe, Mage: Thunder+Blizzard+ManaShield+Meteor)
+
+# ============================================================
+# Session 34: Boss Mechanics
+# ============================================================
+
+  BOSS_SPAWN:
+    id: 270
+    session: 34
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: boss_id, type: i32 }
+      - { name: name, type: string_fixed, size: 32 }
+      - { name: level, type: i32 }
+      - { name: hp, type: i32 }
+      - { name: max_hp, type: i32 }
+      - { name: atk, type: i32 }
+      - { name: def, type: i32 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+      - { name: phase_count, type: u8 }
+      - { name: enrage_time, type: f32 }
+    total_size: 73
+    note: "Sent alongside MONSTER_SPAWN for boss entities. boss_id maps to BossTemplate."
+
+  BOSS_PHASE_CHANGE:
+    id: 271
+    session: 34
+    direction: S2C
+    payload:
+      - { name: boss_entity, type: u64 }
+      - { name: new_phase, type: u8 }
+      - { name: hp_percent, type: f32 }
+      - { name: atk_multiplier, type: i32 }
+      - { name: special_type, type: u8, enum: BossAttackType }
+    total_size: 18
+    note: "Broadcast to all players in boss zone when HP crosses phase threshold."
+
+  BOSS_SPECIAL_ATTACK:
+    id: 272
+    session: 34
+    direction: S2C
+    payload:
+      - { name: boss_entity, type: u64 }
+      - { name: attack_type, type: u8, enum: BossAttackType }
+      - { name: damage, type: i32 }
+      - { name: targets_hit, type: u8 }
+    total_size: 14
+    note: "Broadcast when boss uses special attack. Damages all players in zone."
+
+  BOSS_ENRAGE:
+    id: 273
+    session: 34
+    direction: S2C
+    payload:
+      - { name: boss_entity, type: u64 }
+      - { name: new_atk, type: i32 }
+      - { name: atk_bonus_pct, type: i32 }
+    total_size: 16
+    note: "Broadcast when boss enrage timer expires. ATK permanently increased."
+
+  BOSS_DEFEATED:
+    id: 274
+    session: 34
+    direction: S2C
+    payload:
+      - { name: boss_entity, type: u64 }
+      - { name: boss_id, type: i32 }
+      - { name: killer_entity, type: u64 }
+      - { name: loot_table_id, type: i32 }
+    total_size: 24
+    note: "Broadcast when boss is killed. Client can trigger victory UI + loot roll."
+
+# Session 34 Notes:
+# - 3 Bosses: AncientGolem(100, Zone2, Lv25, 3000HP, 2 phases),
+#   Dragon(101, Zone3, Lv30, 5000HP, 3 phases), DemonKing(102, Zone3, Lv40, 8000HP, 3 phases)
+# - HP% phase transitions: 100%→Phase1, 50-70%→Phase2, 40%→Phase3
+# - Each phase: ATK multiplier (100-200%), special attack type, special cooldown
+# - Enrage timer: 180-300s from combat start, adds 50-100% ATK permanently
+# - Special attacks: GROUND_SLAM, FIRE_BREATH, TAIL_SWIPE, SUMMON_ADDS, STOMP, DARK_NOVA
+# - Boss entities also have MonsterComponent (reuse monster AI for basic attack)
+# - Respawn resets: phase→0, enrage→false, ATK→base, timers→initial
 
 # ============================================================
 # Game Data (for mock_server.py)

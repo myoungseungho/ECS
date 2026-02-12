@@ -201,6 +201,13 @@ enum class MsgType : uint16_t {
     SKILL_LEVEL_UP_RESULT = 261, // S→C: [result(1) skill_id(4) new_level(1) skill_points(4)]
     SKILL_POINT_INFO      = 262, // S→C: [skill_points(4) total_spent(4)]
 
+    // Session 34: Boss Mechanics
+    BOSS_SPAWN            = 270, // S→C: [entity(8) boss_id(4) name(32) level(4) hp(4) max_hp(4) phase(1)]
+    BOSS_PHASE_CHANGE     = 271, // S→C: [entity(8) boss_id(4) new_phase(1) hp(4) max_hp(4)]
+    BOSS_SPECIAL_ATTACK   = 272, // S→C: [entity(8) boss_id(4) attack_type(1) damage(4)]
+    BOSS_ENRAGE           = 273, // S→C: [entity(8) boss_id(4)]
+    BOSS_DEFEATED         = 274, // S→C: [entity(8) boss_id(4) killer_entity(8)]
+
     STATS       = 99,  // 내부 진단
 };
 

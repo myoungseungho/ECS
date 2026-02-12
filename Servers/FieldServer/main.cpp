@@ -36,6 +36,7 @@
 #include "../../Components/QuestComponents.h"        // Session 28
 #include "../../Components/ChatComponents.h"          // Session 30
 #include "../../Components/ShopComponents.h"          // Session 32
+#include "../../Components/BossComponents.h"          // Session 34
 
 #include <cstdio>
 #include <cstdlib>
@@ -1134,6 +1135,11 @@ void SpawnMonsters(World& world) {
         printf("[Spawn] Monster '%s' (id=%u, lv%d) at (%.0f, %.0f) zone %d -> Entity %llu\n",
                spawn.name, spawn.monster_id, spawn.level, spawn.x, spawn.y, spawn.zone_id, e);
     }
+
+    // Session 34: 보스 몬스터 스폰
+    for (int i = 0; i < BOSS_COUNT; i++) {
+        SpawnBoss(world, BOSS_TEMPLATES[i]);
+    }
 }
 
 void SendZoneMonsters(World& world, Entity player_entity) {
@@ -1163,6 +1169,25 @@ void SendZoneMonsters(World& world, Entity player_entity) {
             auto pkt = BuildPacket(MsgType::MONSTER_SPAWN, buf, 36);
             g_network->SendTo(session.session_id,
                               pkt.data(), static_cast<int>(pkt.size()));
+
+            // Session 34: 보스면 BOSS_SPAWN도 추가 전송
+            if (world.HasComponent<BossComponent>(monster)) {
+                auto& bc = world.GetComponent<BossComponent>(monster);
+                auto* tmpl = FindBossTemplate(bc.boss_id);
+                if (tmpl) {
+                    char bbuf[57] = {};
+                    std::memcpy(bbuf, &monster, 8);
+                    std::memcpy(bbuf + 8, &bc.boss_id, 4);
+                    std::memcpy(bbuf + 12, tmpl->name, 32);
+                    std::memcpy(bbuf + 44, &ms.level, 4);
+                    std::memcpy(bbuf + 48, &ms.hp, 4);
+                    std::memcpy(bbuf + 52, &ms.max_hp, 4);
+                    bbuf[56] = static_cast<uint8_t>(bc.current_phase);
+                    auto bpkt = BuildPacket(MsgType::BOSS_SPAWN, bbuf, 57);
+                    g_network->SendTo(session.session_id,
+                                      bpkt.data(), static_cast<int>(bpkt.size()));
+                }
+            }
         }
     );
 }
@@ -1314,6 +1339,18 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
         SendStatSync(world, target);
     }
 
+    // Session 34: 보스 피격 시 전투 시작 + 페이즈 체크
+    if (target_is_monster && world.HasComponent<BossComponent>(target)) {
+        auto& boss = world.GetComponent<BossComponent>(target);
+        if (!boss.combat_started) {
+            boss.combat_started = true;
+            printf("[Boss] Combat started with %s!\n", world.GetComponent<MonsterComponent>(target).name);
+        }
+        if (tgt_stats.IsAlive()) {
+            CheckBossPhaseTransition(world, target);
+        }
+    }
+
     // 사망 처리
     if (!tgt_stats.IsAlive()) {
         printf("[Combat] Entity %llu killed by Entity %llu!\n", target, entity);
@@ -1342,6 +1379,12 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
             monster.state = MonsterState::DEAD;
             monster.death_timer = monster.respawn_time;
             monster.target_entity = 0;
+
+            // Session 34: 보스 처치 브로드캐스트
+            if (world.HasComponent<BossComponent>(target)) {
+                SendBossDefeated(world, target, entity);
+                printf("[Boss] %s DEFEATED by Entity %llu!\n", monster.name, entity);
+            }
         }
 
         // EXP 보상
@@ -1615,6 +1658,19 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     printf("[Skill] Entity %llu used %s(lv%d) on %llu: %d damage (HP: %d)\n",
            entity, skill->name, sk_level, target, damage, tgt_stats.hp);
 
+    // Session 34: 보스 피격 시 전투 시작 + 페이즈 체크
+    bool target_is_monster_sk = world.HasComponent<MonsterComponent>(target);
+    if (target_is_monster_sk && world.HasComponent<BossComponent>(target)) {
+        auto& boss = world.GetComponent<BossComponent>(target);
+        if (!boss.combat_started) {
+            boss.combat_started = true;
+            printf("[Boss] Combat started with %s!\n", world.GetComponent<MonsterComponent>(target).name);
+        }
+        if (tgt_stats.IsAlive()) {
+            CheckBossPhaseTransition(world, target);
+        }
+    }
+
     // 사망 처리 (OnAttackReq와 동일 수준으로 보강)
     if (!tgt_stats.IsAlive()) {
         printf("[Skill] Entity %llu killed by Entity %llu (skill %d)!\n", target, entity, skill_id);
@@ -1646,6 +1702,12 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
             mc.state = MonsterState::DEAD;
             mc.death_timer = mc.respawn_time;
             mc.target_entity = 0;
+
+            // Session 34: 보스 처치 브로드캐스트
+            if (world.HasComponent<BossComponent>(target)) {
+                SendBossDefeated(world, target, entity);
+                printf("[Boss] %s DEFEATED by Entity %llu (skill %d)!\n", mc.name, entity, skill_id);
+            }
         }
 
         // EXP 보상
@@ -1786,6 +1848,228 @@ void OnSkillLevelUp(World& world, Entity entity, const char* payload, int len) {
 
     printf("[Skill] Entity %llu upgraded skill %d to level %d (points left: %d)\n",
            entity, skill_id, new_level, slc.skill_points);
+}
+
+// ━━━ Session 34: Boss Mechanics 핸들러 ━━━
+
+// 보스 존 내 모든 플레이어에게 패킷 브로드캐스트
+void BroadcastToBossZone(World& world, Entity boss_entity, const char* data, int len) {
+    if (!world.HasComponent<PositionComponent>(boss_entity)) return;
+    auto& boss_pos = world.GetComponent<PositionComponent>(boss_entity);
+    int boss_zone = world.HasComponent<ZoneComponent>(boss_entity) ?
+        world.GetComponent<ZoneComponent>(boss_entity).zone_id : 1;
+
+    world.ForEach<SessionComponent, LoginComponent, ZoneComponent>([&](Entity e, SessionComponent& sess, LoginComponent& login, ZoneComponent& zone) {
+        if (login.state == LoginState::IN_GAME && zone.zone_id == boss_zone) {
+            g_network->SendTo(sess.session_id, data, len);
+        }
+    });
+}
+
+void SendBossSpawn(World& world, Entity boss_entity) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    if (!world.HasComponent<StatsComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+    auto& stats = world.GetComponent<StatsComponent>(boss_entity);
+    auto* tmpl = FindBossTemplate(bc.boss_id);
+    if (!tmpl) return;
+
+    char buf[57] = {};
+    std::memcpy(buf, &boss_entity, 8);
+    std::memcpy(buf + 8, &bc.boss_id, 4);
+    std::memcpy(buf + 12, tmpl->name, 32);
+    std::memcpy(buf + 44, &stats.level, 4);
+    std::memcpy(buf + 48, &stats.hp, 4);
+    std::memcpy(buf + 52, &stats.max_hp, 4);
+    buf[56] = static_cast<uint8_t>(bc.current_phase);
+    auto pkt = BuildPacket(MsgType::BOSS_SPAWN, buf, 57);
+    BroadcastToBossZone(world, boss_entity, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void SendBossPhaseChange(World& world, Entity boss_entity, int new_phase) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    if (!world.HasComponent<StatsComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+    auto& stats = world.GetComponent<StatsComponent>(boss_entity);
+
+    char buf[21] = {};
+    std::memcpy(buf, &boss_entity, 8);
+    std::memcpy(buf + 8, &bc.boss_id, 4);
+    buf[12] = static_cast<uint8_t>(new_phase);
+    std::memcpy(buf + 13, &stats.hp, 4);
+    std::memcpy(buf + 17, &stats.max_hp, 4);
+    auto pkt = BuildPacket(MsgType::BOSS_PHASE_CHANGE, buf, 21);
+    BroadcastToBossZone(world, boss_entity, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void SendBossSpecialAttack(World& world, Entity boss_entity, BossAttackType atk_type, int32_t damage) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+
+    char buf[17] = {};
+    std::memcpy(buf, &boss_entity, 8);
+    std::memcpy(buf + 8, &bc.boss_id, 4);
+    buf[12] = static_cast<uint8_t>(atk_type);
+    std::memcpy(buf + 13, &damage, 4);
+    auto pkt = BuildPacket(MsgType::BOSS_SPECIAL_ATTACK, buf, 17);
+    BroadcastToBossZone(world, boss_entity, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void SendBossEnrage(World& world, Entity boss_entity) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+
+    char buf[12] = {};
+    std::memcpy(buf, &boss_entity, 8);
+    std::memcpy(buf + 8, &bc.boss_id, 4);
+    auto pkt = BuildPacket(MsgType::BOSS_ENRAGE, buf, 12);
+    BroadcastToBossZone(world, boss_entity, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+void SendBossDefeated(World& world, Entity boss_entity, Entity killer) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+
+    char buf[20] = {};
+    std::memcpy(buf, &boss_entity, 8);
+    std::memcpy(buf + 8, &bc.boss_id, 4);
+    std::memcpy(buf + 12, &killer, 8);
+    auto pkt = BuildPacket(MsgType::BOSS_DEFEATED, buf, 20);
+    BroadcastToBossZone(world, boss_entity, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// 보스 스폰 함수
+Entity SpawnBoss(World& world, const BossTemplate& tmpl) {
+    Entity entity = world.CreateEntity();
+
+    // MonsterComponent
+    MonsterComponent mc;
+    mc.monster_id = tmpl.boss_id;
+    std::strncpy(mc.name, tmpl.name, 31);
+    mc.state = MonsterState::IDLE;
+    mc.spawn_x = tmpl.spawn_x;
+    mc.spawn_y = tmpl.spawn_y;
+    mc.spawn_z = tmpl.spawn_z;
+    mc.aggro_range = 300.0f;
+    mc.death_timer = 0;
+    mc.respawn_time = 60.0f;  // 보스 리스폰: 60초
+    mc.loot_table_id = tmpl.loot_table_id;
+    world.AddComponent(entity, mc);
+
+    // Stats
+    auto stats = CreateMonsterStats(tmpl.level, tmpl.hp, tmpl.attack, tmpl.defense);
+    world.AddComponent(entity, stats);
+
+    // Position
+    PositionComponent pos;
+    pos.x = tmpl.spawn_x;
+    pos.y = tmpl.spawn_y;
+    pos.z = tmpl.spawn_z;
+    world.AddComponent(entity, pos);
+
+    // Zone
+    ZoneComponent zone;
+    zone.zone_id = tmpl.zone_id;
+    world.AddComponent(entity, zone);
+
+    // BossComponent
+    BossComponent bc;
+    bc.boss_id = tmpl.boss_id;
+    bc.current_phase = 0;
+    bc.enrage_timer = 0;
+    bc.is_enraged = false;
+    bc.special_timer = tmpl.phases[0].special_cooldown;
+    bc.combat_started = false;
+    world.AddComponent(entity, bc);
+
+    printf("[Boss] Spawned %s (ID=%d, Entity=%llu) at zone %d (%.0f,%.0f)\n",
+           tmpl.name, tmpl.boss_id, entity, tmpl.zone_id, tmpl.spawn_x, tmpl.spawn_y);
+    return entity;
+}
+
+// 보스 페이즈 체크 (데미지 받을 때마다 호출)
+void CheckBossPhaseTransition(World& world, Entity boss_entity) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    if (!world.HasComponent<StatsComponent>(boss_entity)) return;
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+    auto& stats = world.GetComponent<StatsComponent>(boss_entity);
+
+    auto* tmpl = FindBossTemplate(bc.boss_id);
+    if (!tmpl) return;
+
+    float hp_pct = static_cast<float>(stats.hp) / static_cast<float>(stats.max_hp);
+
+    // 다음 페이즈 체크 (현재 페이즈+1이 존재하고, HP가 임계치 이하인 경우)
+    int next = bc.current_phase + 1;
+    if (next < tmpl->phase_count && hp_pct <= tmpl->phases[next].hp_threshold) {
+        bc.current_phase = next;
+        bc.special_timer = tmpl->phases[next].special_cooldown;
+
+        // 페이즈 전환 시 ATK 배율 적용
+        int32_t base_atk = tmpl->attack;
+        stats.attack = base_atk * tmpl->phases[next].atk_multiplier / 100;
+
+        printf("[Boss] %s phase %d → %d (HP: %.1f%%)\n",
+               tmpl->name, next - 1, next, hp_pct * 100);
+        SendBossPhaseChange(world, boss_entity, next);
+    }
+}
+
+// 보스 특수 공격 실행 (타이머 기반)
+void ExecuteBossSpecialAttack(World& world, Entity boss_entity, float dt) {
+    if (!world.HasComponent<BossComponent>(boss_entity)) return;
+    if (!world.HasComponent<StatsComponent>(boss_entity)) return;
+    if (!world.HasComponent<MonsterComponent>(boss_entity)) return;
+
+    auto& bc = world.GetComponent<BossComponent>(boss_entity);
+    auto& stats = world.GetComponent<StatsComponent>(boss_entity);
+    auto& mc = world.GetComponent<MonsterComponent>(boss_entity);
+
+    if (!stats.IsAlive() || mc.state == MonsterState::DEAD) return;
+    if (!bc.combat_started) return;
+
+    auto* tmpl = FindBossTemplate(bc.boss_id);
+    if (!tmpl || bc.current_phase >= tmpl->phase_count) return;
+
+    auto& phase = tmpl->phases[bc.current_phase];
+
+    // 인레이지 타이머
+    if (!bc.is_enraged) {
+        bc.enrage_timer += dt;
+        if (bc.enrage_timer >= tmpl->enrage_time) {
+            bc.is_enraged = true;
+            int32_t bonus = stats.attack * tmpl->enrage_atk_bonus / 100;
+            stats.attack += bonus;
+            printf("[Boss] %s ENRAGED! ATK +%d%%\n", tmpl->name, tmpl->enrage_atk_bonus);
+            SendBossEnrage(world, boss_entity);
+        }
+    }
+
+    // 특수 공격 쿨다운
+    bc.special_timer -= dt;
+    if (bc.special_timer <= 0) {
+        bc.special_timer = phase.special_cooldown;
+
+        // 특수 공격 범위 내 플레이어에게 데미지
+        int32_t sp_damage = phase.special_damage;
+        if (bc.is_enraged) sp_damage = sp_damage * 3 / 2;  // 인레이지 시 1.5배
+
+        int boss_zone = world.HasComponent<ZoneComponent>(boss_entity) ?
+            world.GetComponent<ZoneComponent>(boss_entity).zone_id : 1;
+
+        // 같은 존 플레이어 전체에게 특수 공격 데미지 (간소화)
+        world.ForEach<SessionComponent, LoginComponent, ZoneComponent, StatsComponent>(
+            [&](Entity e, SessionComponent& sess, LoginComponent& login, ZoneComponent& zone, StatsComponent& ps) {
+                if (login.state == LoginState::IN_GAME && zone.zone_id == boss_zone && ps.IsAlive()) {
+                    ps.TakeDamage(sp_damage);
+                    SendStatSync(world, e);
+                }
+            });
+
+        printf("[Boss] %s used special attack %d: %d damage to zone\n",
+               tmpl->name, static_cast<int>(phase.special), sp_damage);
+        SendBossSpecialAttack(world, boss_entity, phase.special, sp_damage);
+    }
 }
 
 // ━━━ Session 20: Party System 핸들러 ━━━
@@ -3681,6 +3965,14 @@ int main(int argc, char* argv[]) {
 
             // 모든 System을 등록된 순서대로 실행
             world.Update(dt);
+
+            // Session 34: 보스 AI 업데이트 (특수 공격 + 인레이지 타이머)
+            world.ForEach<BossComponent, StatsComponent, MonsterComponent>(
+                [&](Entity e, BossComponent& bc, StatsComponent& bs, MonsterComponent& bm) {
+                    if (bs.IsAlive() && bm.state != MonsterState::DEAD) {
+                        ExecuteBossSpecialAttack(world, e, dt);
+                    }
+                });
 
             // Session 17: Gate 하트비트 전송
             if (gate_client.IsConnected()) {
