@@ -83,7 +83,7 @@ def git_pull():
         result = subprocess.run(
             ["git", "pull", "origin", "main", "--no-edit"],
             capture_output=True, text=True, timeout=30,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT), encoding="utf-8", errors="replace"
         )
         if result.returncode != 0:
             if "CONFLICT" in result.stdout or "CONFLICT" in result.stderr:
@@ -121,7 +121,8 @@ def git_push(message):
             # 변경사항 있는지 확인
             status = subprocess.run(
                 ["git", "status", "--porcelain", "_comms/"],
-                capture_output=True, text=True, cwd=str(REPO_ROOT)
+                capture_output=True, text=True, cwd=str(REPO_ROOT),
+                encoding="utf-8", errors="replace"
             )
             if not status.stdout.strip():
                 return True  # 변경 없음
@@ -134,7 +135,7 @@ def git_push(message):
             result = subprocess.run(
                 ["git", "push", "origin", "main"],
                 capture_output=True, text=True, timeout=30,
-                cwd=str(REPO_ROOT)
+                cwd=str(REPO_ROOT), encoding="utf-8", errors="replace"
             )
             if result.returncode == 0:
                 return True
@@ -248,7 +249,8 @@ def invoke_claude(prompt, role, context_files=None):
             ["claude", "-p", full_prompt],
             capture_output=True, text=True,
             timeout=CLAUDE_TIMEOUT,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            encoding="utf-8", errors="replace"
         )
 
         if result.returncode != 0:
