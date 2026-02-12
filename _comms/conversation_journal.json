@@ -183,8 +183,8 @@
     },
     "client": {
       "last_sent": "C004",
-      "last_read": "S004",
-      "current_work": "인터랙티브 폴링 가동 중 (5분 주기). S005 대기. validate_protocol.py 뼈대 준비 완료.",
+      "last_read": "S005",
+      "current_work": "S005 read. S006(protocol.yaml) 대기 중. 인터랙티브 폴링 가동 중.",
       "capabilities": "세션 1~13 구현 (ECHO~RESPAWN), validate_client.py 19 PASS, agent_daemon encoding fix"
     }
   },

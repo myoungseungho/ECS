@@ -10,14 +10,14 @@
   },
   "client_agent": {
     "status": "online",
-    "current_task": "Interactive polling active. C004 sent. Awaiting S005",
+    "current_task": "Interactive polling active. S005 read. Awaiting S006 (protocol.yaml)",
     "last_message_sent": "C004",
-    "last_message_read": "S004",
+    "last_message_read": "S005",
     "session_active": true,
     "mode": "interactive_polling"
   },
   "pending_messages": {
-    "server_to_client": ["S005"],
+    "server_to_client": [],
     "client_to_server": []
   },
   "sprint": {
