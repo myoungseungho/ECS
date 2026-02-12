@@ -54,6 +54,28 @@ namespace Network
         public event Action<RespawnResultData> OnRespawnResult;
         public event Action<MonsterSpawnData> OnMonsterSpawn;
         public event Action<MonsterRespawnData> OnMonsterRespawn;
+        public event Action<ZoneTransferResultData> OnZoneTransferResult;
+        public event Action<SkillInfo[]> OnSkillList;
+        public event Action<SkillResultData> OnSkillResult;
+        public event Action<PartyInfoData> OnPartyInfo;
+        public event Action<InstanceEnterData> OnInstanceEnter;
+        public event Action<InstanceLeaveResultData> OnInstanceLeaveResult;
+        public event Action<InstanceInfoData> OnInstanceInfo;
+        public event Action<MatchFoundData> OnMatchFound;
+        public event Action<MatchStatusData> OnMatchStatus;
+        public event Action<InventoryItemInfo[]> OnInventoryResp;
+        public event Action<ItemAddResultData> OnItemAddResult;
+        public event Action<ItemUseResultData> OnItemUseResult;
+        public event Action<ItemEquipResultData> OnItemEquipResult;
+        public event Action<BuffInfo[]> OnBuffList;
+        public event Action<BuffResultData> OnBuffResult;
+        public event Action<BuffRemoveRespData> OnBuffRemoveResp;
+        public event Action<byte> OnConditionResult;
+        public event Action<SpatialQueryEntry[]> OnSpatialQueryResp;
+        public event Action<LootItemEntry[]> OnLootResult;
+        public event Action<QuestInfo[]> OnQuestList;
+        public event Action<QuestAcceptResultData> OnQuestAcceptResult;
+        public event Action<QuestCompleteResultData> OnQuestCompleteResult;
         public event Action<string> OnError;
         public event Action OnDisconnected;
 
@@ -357,6 +379,184 @@ namespace Network
                     var data = PacketBuilder.ParseMonsterRespawn(payload);
                     Debug.Log($"[Net] MonsterRespawn: entity={data.EntityId}, hp={data.HP}/{data.MaxHP}");
                     OnMonsterRespawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ZONE_TRANSFER_RESULT:
+                {
+                    var data = PacketBuilder.ParseZoneTransferResult(payload);
+                    Debug.Log($"[Net] ZoneTransfer: result={data.Result}, zone={data.ZoneId}");
+                    if (data.Result == ZoneTransferResult.SUCCESS)
+                        CurrentZone = (int)data.ZoneId;
+                    OnZoneTransferResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SKILL_LIST_RESP:
+                {
+                    var skills = PacketBuilder.ParseSkillListResp(payload);
+                    Debug.Log($"[Net] SkillList: {skills.Length} skills");
+                    OnSkillList?.Invoke(skills);
+                    break;
+                }
+
+                case MsgType.SKILL_RESULT:
+                {
+                    var data = PacketBuilder.ParseSkillResult(payload);
+                    Debug.Log($"[Net] SkillResult: result={data.Result}, skill={data.SkillId}, dmg={data.Damage}");
+                    OnSkillResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PARTY_INFO:
+                {
+                    var data = PacketBuilder.ParsePartyInfo(payload);
+                    Debug.Log($"[Net] PartyInfo: result={data.Result}, partyId={data.PartyId}, members={data.Members.Length}");
+                    OnPartyInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_ENTER:
+                {
+                    var data = PacketBuilder.ParseInstanceEnter(payload);
+                    Debug.Log($"[Net] InstanceEnter: result={data.Result}, instanceId={data.InstanceId}");
+                    OnInstanceEnter?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_LEAVE_RESULT:
+                {
+                    var data = PacketBuilder.ParseInstanceLeaveResult(payload);
+                    Debug.Log($"[Net] InstanceLeave: result={data.Result}, zone={data.ZoneId}");
+                    OnInstanceLeaveResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INSTANCE_INFO:
+                {
+                    var data = PacketBuilder.ParseInstanceInfo(payload);
+                    Debug.Log($"[Net] InstanceInfo: id={data.InstanceId}, players={data.PlayerCount}, monsters={data.MonsterCount}");
+                    OnInstanceInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MATCH_FOUND:
+                {
+                    var data = PacketBuilder.ParseMatchFound(payload);
+                    Debug.Log($"[Net] MatchFound: matchId={data.MatchId}, players={data.PlayerCount}");
+                    OnMatchFound?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MATCH_STATUS:
+                {
+                    var data = PacketBuilder.ParseMatchStatus(payload);
+                    Debug.Log($"[Net] MatchStatus: status={data.Status}, pos={data.QueuePosition}");
+                    OnMatchStatus?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.INVENTORY_RESP:
+                {
+                    var items = PacketBuilder.ParseInventoryResp(payload);
+                    Debug.Log($"[Net] Inventory: {items.Length} items");
+                    OnInventoryResp?.Invoke(items);
+                    break;
+                }
+
+                case MsgType.ITEM_ADD_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemAddResult(payload);
+                    Debug.Log($"[Net] ItemAdd: result={data.Result}, slot={data.Slot}, item={data.ItemId}");
+                    OnItemAddResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ITEM_USE_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemUseResult(payload);
+                    Debug.Log($"[Net] ItemUse: result={data.Result}, slot={data.Slot}");
+                    OnItemUseResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ITEM_EQUIP_RESULT:
+                {
+                    var data = PacketBuilder.ParseItemEquipResult(payload);
+                    Debug.Log($"[Net] ItemEquip: result={data.Result}, slot={data.Slot}, equipped={data.Equipped}");
+                    OnItemEquipResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BUFF_LIST_RESP:
+                {
+                    var buffs = PacketBuilder.ParseBuffListResp(payload);
+                    Debug.Log($"[Net] BuffList: {buffs.Length} buffs");
+                    OnBuffList?.Invoke(buffs);
+                    break;
+                }
+
+                case MsgType.BUFF_RESULT:
+                {
+                    var data = PacketBuilder.ParseBuffResult(payload);
+                    Debug.Log($"[Net] BuffResult: result={data.Result}, buffId={data.BuffId}");
+                    OnBuffResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BUFF_REMOVE_RESP:
+                {
+                    var data = PacketBuilder.ParseBuffRemoveResp(payload);
+                    Debug.Log($"[Net] BuffRemove: result={data.Result}, buffId={data.BuffId}");
+                    OnBuffRemoveResp?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CONDITION_RESULT:
+                {
+                    byte result = payload[0];
+                    Debug.Log($"[Net] ConditionResult: {result}");
+                    OnConditionResult?.Invoke(result);
+                    break;
+                }
+
+                case MsgType.SPATIAL_QUERY_RESP:
+                {
+                    var entries = PacketBuilder.ParseSpatialQueryResp(payload);
+                    Debug.Log($"[Net] SpatialQuery: {entries.Length} results");
+                    OnSpatialQueryResp?.Invoke(entries);
+                    break;
+                }
+
+                case MsgType.LOOT_RESULT:
+                {
+                    var items = PacketBuilder.ParseLootResult(payload);
+                    Debug.Log($"[Net] Loot: {items.Length} items");
+                    OnLootResult?.Invoke(items);
+                    break;
+                }
+
+                case MsgType.QUEST_LIST_RESP:
+                {
+                    var quests = PacketBuilder.ParseQuestListResp(payload);
+                    Debug.Log($"[Net] QuestList: {quests.Length} quests");
+                    OnQuestList?.Invoke(quests);
+                    break;
+                }
+
+                case MsgType.QUEST_ACCEPT_RESULT:
+                {
+                    var data = PacketBuilder.ParseQuestAcceptResult(payload);
+                    Debug.Log($"[Net] QuestAccept: result={data.Result}, questId={data.QuestId}");
+                    OnQuestAcceptResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.QUEST_COMPLETE_RESULT:
+                {
+                    var data = PacketBuilder.ParseQuestCompleteResult(payload);
+                    Debug.Log($"[Net] QuestComplete: result={data.Result}, questId={data.QuestId}, exp={data.RewardExp}");
+                    OnQuestCompleteResult?.Invoke(data);
                     break;
                 }
 

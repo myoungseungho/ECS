@@ -30,7 +30,7 @@ PACKET_DEFINITIONS_CS = os.path.join(SCRIPT_DIR, "Assets", "Scripts", "Network",
 PACKET_BUILDER_CS = os.path.join(SCRIPT_DIR, "Assets", "Scripts", "Network", "PacketBuilder.cs")
 
 # 세션 1~13까지 구현 완료 (Build/Parse 메서드 존재해야 함)
-IMPLEMENTED_SESSION_MAX = 14
+IMPLEMENTED_SESSION_MAX = 28
 
 # 서버 전용 메시지 (클라이언트에 MsgType 불필요)
 # - STATS(99): 서버 진단용 디버그 패킷
@@ -46,6 +46,8 @@ SERVER_ONLY_MESSAGES = {
     "TIMER_INFO",      # session 11, 서버 내부
     "CONFIG_QUERY",    # session 11, 서버 내부
     "CONFIG_RESP",     # session 11, 서버 내부
+    "FIELD_REGISTER",  # session 17, S2S
+    "FIELD_HEARTBEAT", # session 17, S2S
 }
 
 # ━━━ 결과 카운터 ━━━
@@ -355,6 +357,84 @@ KNOWN_METHOD_MAP = {
     # Session 14: Monsters
     "MONSTER_SPAWN":     ("parse", "ParseMonsterSpawn"),
     "MONSTER_RESPAWN":   ("parse", "ParseMonsterRespawn"),
+
+    # Session 16: Zone Transfer
+    "ZONE_TRANSFER_REQ":    ("build", "ZoneTransferReq"),
+    "ZONE_TRANSFER_RESULT": ("parse", "ParseZoneTransferResult"),
+
+    # Session 17: Gate Server (server-internal, skip Build/Parse check)
+    "FIELD_REGISTER":       ("build", None),
+    "FIELD_HEARTBEAT":      ("build", None),
+    "GATE_SERVER_LIST":     ("build", None),
+    "GATE_SERVER_LIST_RESP": ("parse", None),
+
+    # Session 19: Skills
+    "SKILL_LIST_REQ":  ("build", "SkillListReq"),
+    "SKILL_LIST_RESP": ("parse", "ParseSkillListResp"),
+    "SKILL_USE":       ("build", "SkillUse"),
+    "SKILL_RESULT":    ("parse", "ParseSkillResult"),
+
+    # Session 20: Party
+    "PARTY_CREATE":    ("build", "PartyCreate"),
+    "PARTY_INVITE":    ("build", "PartyInvite"),
+    "PARTY_ACCEPT":    ("build", "PartyAccept"),
+    "PARTY_LEAVE":     ("build", "PartyLeave"),
+    "PARTY_INFO":      ("parse", "ParsePartyInfo"),
+    "PARTY_KICK":      ("build", "PartyKick"),
+
+    # Session 21: Instanced Dungeons
+    "INSTANCE_CREATE":       ("build", "InstanceCreate"),
+    "INSTANCE_ENTER":        ("parse", "ParseInstanceEnter"),
+    "INSTANCE_LEAVE":        ("build", "InstanceLeave"),
+    "INSTANCE_LEAVE_RESULT": ("parse", "ParseInstanceLeaveResult"),
+    "INSTANCE_INFO":         ("parse", "ParseInstanceInfo"),
+
+    # Session 22: Matchmaking
+    "MATCH_ENQUEUE":   ("build", "MatchEnqueue"),
+    "MATCH_DEQUEUE":   ("build", "MatchDequeue"),
+    "MATCH_FOUND":     ("parse", "ParseMatchFound"),
+    "MATCH_ACCEPT":    ("build", "MatchAccept"),
+    "MATCH_STATUS":    ("parse", "ParseMatchStatus"),
+
+    # Session 23: Inventory
+    "INVENTORY_REQ":    ("build", "InventoryReq"),
+    "INVENTORY_RESP":   ("parse", "ParseInventoryResp"),
+    "ITEM_ADD":         ("build", "ItemAdd"),
+    "ITEM_ADD_RESULT":  ("parse", "ParseItemAddResult"),
+    "ITEM_USE":         ("build", "ItemUse"),
+    "ITEM_USE_RESULT":  ("parse", "ParseItemUseResult"),
+    "ITEM_EQUIP":       ("build", "ItemEquip"),
+    "ITEM_UNEQUIP":     ("build", "ItemUnequip"),
+    "ITEM_EQUIP_RESULT": ("parse", "ParseItemEquipResult"),
+
+    # Session 24: Buffs
+    "BUFF_LIST_REQ":    ("build", "BuffListReq"),
+    "BUFF_LIST_RESP":   ("parse", "ParseBuffListResp"),
+    "BUFF_APPLY_REQ":   ("build", "BuffApplyReq"),
+    "BUFF_RESULT":      ("parse", "ParseBuffResult"),
+    "BUFF_REMOVE_REQ":  ("build", "BuffRemoveReq"),
+    "BUFF_REMOVE_RESP": ("parse", "ParseBuffRemoveResp"),
+
+    # Session 25: Condition Engine (complex payload, no helper needed)
+    "CONDITION_EVAL":   ("build", None),
+    "CONDITION_RESULT": ("parse", None),
+
+    # Session 26: Spatial Queries (complex payload, no build helper)
+    "SPATIAL_QUERY_REQ":  ("build", None),
+    "SPATIAL_QUERY_RESP": ("parse", "ParseSpatialQueryResp"),
+
+    # Session 27: Loot
+    "LOOT_ROLL_REQ":    ("build", "LootRollReq"),
+    "LOOT_RESULT":      ("parse", "ParseLootResult"),
+
+    # Session 28: Quests
+    "QUEST_LIST_REQ":        ("build", "QuestListReq"),
+    "QUEST_LIST_RESP":       ("parse", "ParseQuestListResp"),
+    "QUEST_ACCEPT":          ("build", "QuestAccept"),
+    "QUEST_ACCEPT_RESULT":   ("parse", "ParseQuestAcceptResult"),
+    "QUEST_PROGRESS":        ("build", "QuestProgress"),
+    "QUEST_COMPLETE":        ("build", "QuestComplete"),
+    "QUEST_COMPLETE_RESULT": ("parse", "ParseQuestCompleteResult"),
 }
 
 
