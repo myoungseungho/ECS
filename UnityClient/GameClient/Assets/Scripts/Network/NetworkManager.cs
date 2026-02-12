@@ -197,6 +197,158 @@ namespace Network
             ConnectToField(host, port);
         }
 
+        // ━━━ 세션 16~28 API ━━━
+
+        /// <summary>존 이동 요청</summary>
+        public void RequestZoneTransfer(int targetZoneId)
+        {
+            _field?.Send(PacketBuilder.ZoneTransferReq(targetZoneId));
+        }
+
+        /// <summary>스킬 목록 요청</summary>
+        public void RequestSkillList()
+        {
+            _field?.Send(PacketBuilder.SkillListReq());
+        }
+
+        /// <summary>스킬 사용</summary>
+        public void UseSkill(uint skillId, ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.SkillUse(skillId, targetEntity));
+        }
+
+        /// <summary>파티 생성</summary>
+        public void CreateParty()
+        {
+            _field?.Send(PacketBuilder.PartyCreate());
+        }
+
+        /// <summary>파티 초대</summary>
+        public void InviteToParty(ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.PartyInvite(targetEntity));
+        }
+
+        /// <summary>파티 수락</summary>
+        public void AcceptParty(uint partyId)
+        {
+            _field?.Send(PacketBuilder.PartyAccept(partyId));
+        }
+
+        /// <summary>파티 탈퇴</summary>
+        public void LeaveParty()
+        {
+            _field?.Send(PacketBuilder.PartyLeave());
+        }
+
+        /// <summary>파티 추방</summary>
+        public void KickFromParty(ulong targetEntity)
+        {
+            _field?.Send(PacketBuilder.PartyKick(targetEntity));
+        }
+
+        /// <summary>인스턴스 던전 생성</summary>
+        public void CreateInstance(uint dungeonType)
+        {
+            _field?.Send(PacketBuilder.InstanceCreate(dungeonType));
+        }
+
+        /// <summary>인스턴스 퇴장</summary>
+        public void LeaveInstance()
+        {
+            _field?.Send(PacketBuilder.InstanceLeave());
+        }
+
+        /// <summary>매칭 큐 등록</summary>
+        public void EnqueueMatch(uint dungeonType)
+        {
+            _field?.Send(PacketBuilder.MatchEnqueue(dungeonType));
+        }
+
+        /// <summary>매칭 큐 해제</summary>
+        public void DequeueMatch()
+        {
+            _field?.Send(PacketBuilder.MatchDequeue());
+        }
+
+        /// <summary>매칭 수락</summary>
+        public void AcceptMatch(uint matchId)
+        {
+            _field?.Send(PacketBuilder.MatchAccept(matchId));
+        }
+
+        /// <summary>인벤토리 요청</summary>
+        public void RequestInventory()
+        {
+            _field?.Send(PacketBuilder.InventoryReq());
+        }
+
+        /// <summary>아이템 사용</summary>
+        public void UseItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemUse(slot));
+        }
+
+        /// <summary>아이템 장착</summary>
+        public void EquipItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemEquip(slot));
+        }
+
+        /// <summary>아이템 해제</summary>
+        public void UnequipItem(byte slot)
+        {
+            _field?.Send(PacketBuilder.ItemUnequip(slot));
+        }
+
+        /// <summary>버프 목록 요청</summary>
+        public void RequestBuffList()
+        {
+            _field?.Send(PacketBuilder.BuffListReq());
+        }
+
+        /// <summary>버프 적용 요청</summary>
+        public void ApplyBuff(uint buffId)
+        {
+            _field?.Send(PacketBuilder.BuffApplyReq(buffId));
+        }
+
+        /// <summary>버프 제거 요청</summary>
+        public void RemoveBuff(uint buffId)
+        {
+            _field?.Send(PacketBuilder.BuffRemoveReq(buffId));
+        }
+
+        /// <summary>루트 굴림 요청</summary>
+        public void RequestLootRoll(uint tableId)
+        {
+            _field?.Send(PacketBuilder.LootRollReq(tableId));
+        }
+
+        /// <summary>퀘스트 목록 요청</summary>
+        public void RequestQuestList()
+        {
+            _field?.Send(PacketBuilder.QuestListReq());
+        }
+
+        /// <summary>퀘스트 수락</summary>
+        public void AcceptQuest(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestAccept(questId));
+        }
+
+        /// <summary>퀘스트 진행 확인</summary>
+        public void CheckQuestProgress(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestProgress(questId));
+        }
+
+        /// <summary>퀘스트 완료</summary>
+        public void CompleteQuest(uint questId)
+        {
+            _field?.Send(PacketBuilder.QuestComplete(questId));
+        }
+
         /// <summary>연결 끊기</summary>
         public void DisconnectAll()
         {
