@@ -24,6 +24,7 @@
 #include "../../Systems/CombatSystem.h"            // Session 13
 #include "../../Components/MonsterComponents.h"    // Session 14
 #include "../../Systems/MonsterAISystem.h"         // Session 14
+#include "../../NetworkEngine/TCPClient.h"          // Session 17
 
 #include <cstdio>
 #include <cstdlib>
@@ -43,6 +44,7 @@ IOCPServer* g_network = nullptr;
 EventBus* g_eventBus = nullptr;           // Session 11
 ConfigLoader* g_config = nullptr;         // Session 11
 int g_total_events_fired = 0;             // Session 11: 이벤트 발행 카운터
+constexpr float HEARTBEAT_INTERVAL = 2.0f; // Session 17: Gate 하트비트 주기 (초)
 
 // Session 14: 전방 선언
 void SpawnMonsters(World& world);
@@ -1503,14 +1505,23 @@ void OnEventSubCount(World& world, Entity entity, const char* payload, int len) 
 
 int main(int argc, char* argv[]) {
     // Session 10: 커맨드라인으로 포트 지정 가능 (기본 7777)
+    // Session 17: FieldServer.exe <port> [gate_port] [max_ccu]
     uint16_t port = SERVER_PORT;
     if (argc > 1) {
         port = static_cast<uint16_t>(std::atoi(argv[1]));
     }
+    uint16_t gate_port = 0;
+    uint32_t max_ccu = 200;
+    if (argc > 2) {
+        gate_port = static_cast<uint16_t>(std::atoi(argv[2]));
+    }
+    if (argc > 3) {
+        max_ccu = static_cast<uint32_t>(std::atoi(argv[3]));
+    }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 15\n");
-    printf("  Monster/NPC System (PvE Combat)\n");
+    printf("  ECS Field Server - Session 17\n");
+    printf("  Dynamic Load Balancing\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -1601,7 +1612,47 @@ int main(int argc, char* argv[]) {
     SpawnMonsters(world);
 
     printf("\n[Main] Server running. Press Ctrl+C to stop.\n");
-    printf("[Main] Listening on port %d, tick rate: %.0f/s\n\n", port, TICK_RATE);
+    printf("[Main] Listening on port %d, tick rate: %.0f/s\n", port, TICK_RATE);
+
+    // ━━━ Session 17: Gate 연결 + 등록 ━━━
+    TCPClient gate_client;
+    if (gate_port > 0) {
+        printf("[Main] Connecting to Gate at 127.0.0.1:%d...\n", gate_port);
+        bool connected = false;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            if (gate_client.Connect("127.0.0.1", gate_port)) {
+                connected = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        if (connected) {
+            // FIELD_REGISTER: [port(2) max_ccu(4) name_len(1) name(N)]
+            char reg_buf[64];
+            std::memcpy(reg_buf, &port, 2);
+            std::memcpy(reg_buf + 2, &max_ccu, 4);
+            const char* sname = "Field";
+            uint8_t name_len = static_cast<uint8_t>(std::strlen(sname));
+            reg_buf[6] = static_cast<char>(name_len);
+            std::memcpy(reg_buf + 7, sname, name_len);
+
+            auto pkt = BuildPacket(MsgType::FIELD_REGISTER, reg_buf, 7 + name_len);
+            gate_client.Send(pkt.data(), static_cast<int>(pkt.size()));
+
+            // FIELD_REGISTER_ACK 수신 대기
+            char ack_buf[256];
+            int ack_len = gate_client.RecvWithTimeout(ack_buf, 256, 2000);
+            if (ack_len > 0) {
+                printf("[Main] Registered with Gate (max_ccu=%d)\n", max_ccu);
+            }
+        } else {
+            printf("[Main] WARNING: Could not connect to Gate\n");
+        }
+    }
+
+    float heartbeat_timer = 0.0f;
+    printf("\n");
 
     // ━━━ 4. 게임 루프 ━━━
     auto prev_time = std::chrono::high_resolution_clock::now();
@@ -1615,6 +1666,29 @@ int main(int argc, char* argv[]) {
 
             // 모든 System을 등록된 순서대로 실행
             world.Update(dt);
+
+            // Session 17: Gate 하트비트 전송
+            if (gate_client.IsConnected()) {
+                heartbeat_timer += dt;
+                if (heartbeat_timer >= HEARTBEAT_INTERVAL) {
+                    heartbeat_timer = 0.0f;
+
+                    // CCU 계산: SessionComponent를 가진 Entity 수
+                    uint32_t ccu = 0;
+                    world.ForEach<SessionComponent>([&](Entity e, SessionComponent& s) {
+                        if (s.connected) ccu++;
+                    });
+
+                    // FIELD_HEARTBEAT: [port(2) ccu(4) max_ccu(4)]
+                    char hb[10];
+                    std::memcpy(hb, &port, 2);
+                    std::memcpy(hb + 2, &ccu, 4);
+                    std::memcpy(hb + 6, &max_ccu, 4);
+
+                    auto hb_pkt = BuildPacket(MsgType::FIELD_HEARTBEAT, hb, 10);
+                    gate_client.Send(hb_pkt.data(), static_cast<int>(hb_pkt.size()));
+                }
+            }
         } else {
             // CPU를 쉬게 하기
             auto sleep_ms = static_cast<int>((TICK_INTERVAL - dt) * 1000.0f);
@@ -1624,6 +1698,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    gate_client.Disconnect();
     printf("[Main] Server shutting down...\n");
     g_network = nullptr;
     g_eventBus = nullptr;

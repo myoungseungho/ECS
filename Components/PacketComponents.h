@@ -98,6 +98,13 @@ enum class MsgType : uint16_t {
     ZONE_TRANSFER_RESULT = 121, // S→C: [result(1) zone_id(4) x(4) y(4) z(4)] = 17바이트
                                 // result: 0=성공, 1=존재하지 않는 맵, 2=이미 같은 맵
 
+    // Session 17: Dynamic Load Balancing (서버 간 프로토콜)
+    FIELD_REGISTER      = 130, // Field→Gate: 서버 등록 [port(2) max_ccu(4) name_len(1) name(N)]
+    FIELD_HEARTBEAT     = 131, // Field→Gate: 상태 보고 [port(2) ccu(4) max_ccu(4)]
+    FIELD_REGISTER_ACK  = 132, // Gate→Field: 등록 확인 [result(1) server_index(4)]
+    GATE_SERVER_LIST    = 133, // C→Gate: 서버 목록 요청 (모니터링/테스트용)
+    GATE_SERVER_LIST_RESP = 134, // Gate→C: [count(1) {port(2) ccu(4) max_ccu(4) status(1)}...]
+
     STATS       = 99,  // 내부 진단
 };
 

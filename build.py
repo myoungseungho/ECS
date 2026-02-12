@@ -58,6 +58,7 @@ shared_sources = [
     ("Core\\World.cpp", "World.obj"),
     ("NetworkEngine\\IOCPServer.cpp", "IOCPServer.obj"),
     ("NetworkEngine\\Session.cpp", "Session.obj"),
+    ("NetworkEngine\\TCPClient.cpp", "TCPClient.obj"),
     ("Systems\\NetworkSystem.cpp", "NetworkSystem.obj"),
     ("Systems\\MessageDispatchSystem.cpp", "MessageDispatchSystem.obj"),
 ]
