@@ -41,8 +41,9 @@ except ImportError:
 # ─── 설정 ─────────────────────────────────────────────
 
 POLL_INTERVAL = 300         # 폴링 간격 (초) - 5분
-MAX_CONSECUTIVE_IDLE = 60   # 연속 idle 횟수 후 간격 늘림
-IDLE_POLL_INTERVAL = 120    # idle 상태일 때 폴링 간격 (초)
+MAX_CONSECUTIVE_IDLE = 999  # idle이어도 간격 안 늘림 (상대가 작업 중일 수 있음)
+IDLE_POLL_INTERVAL = 300    # idle이어도 동일한 5분 간격 유지
+CHECKIN_AFTER_IDLE = 12     # 12회 idle(=1시간) 후 안부 메시지
 MAX_RETRIES = 3             # git push 실패 시 재시도
 CLAUDE_TIMEOUT = 300        # Claude CLI 타임아웃 (초)
 
@@ -459,6 +460,98 @@ class AgentDaemon:
         tracker = COMMS_DIR / f".{self.role}_processed.json"
         tracker.write_text(json.dumps(list(self.processed_messages)))
 
+    def _build_conversation_history(self):
+        """대화 이력 컴팩트 요약 - 토큰 절약하면서 맥락 유지"""
+        all_messages = []
+
+        # 양쪽 메시지 수집
+        for folder, prefix in [(self.inbox, self.their_prefix),
+                                (self.outbox, self.my_prefix)]:
+            if not folder.exists():
+                continue
+            for f in folder.glob(f"{prefix}*_*.md"):
+                fm, body = parse_frontmatter(f)
+                msg_id = fm.get("id", f.stem)
+                sender = fm.get("from", "unknown")
+                msg_type = fm.get("type", "")
+                created = fm.get("created", "")
+                status = fm.get("status", "")
+
+                # 제목만 추출 (첫 번째 # 헤딩)
+                title = msg_id
+                for line in body.strip().split("\n"):
+                    if line.startswith("#"):
+                        title = line.strip("#").strip()
+                        break
+
+                all_messages.append({
+                    "id": msg_id,
+                    "sender": "서버" if "server" in sender else "클라",
+                    "type": msg_type,
+                    "title": title[:80],
+                    "status": status,
+                    "sort_key": msg_id
+                })
+
+        all_messages.sort(key=lambda m: m["sort_key"])
+
+        if not all_messages:
+            return ""
+
+        # 컴팩트 요약: 한 줄에 메시지 하나
+        lines = ["[대화 이력 요약]"]
+        for msg in all_messages:
+            lines.append(f"  {msg['id']}({msg['sender']},{msg['type']}): {msg['title']} [{msg['status']}]")
+
+        # 회의 결정사항 (핵심만)
+        decisions = self._get_meeting_summary()
+        if decisions:
+            lines.append("")
+            lines.append("[합의된 결정사항]")
+            lines.append(decisions)
+
+        # 직전 메시지는 좀 더 상세히 (최근 2개)
+        if len(all_messages) >= 2:
+            lines.append("")
+            lines.append("[직전 메시지 상세]")
+            for msg_info in all_messages[-2:]:
+                # 원본에서 본문 읽기
+                for folder in [self.inbox, self.outbox]:
+                    for f in folder.glob(f"{msg_info['id']}_*.md"):
+                        _, body = parse_frontmatter(f)
+                        # 300자로 제한
+                        brief = body.strip()[:300]
+                        if len(body.strip()) > 300:
+                            brief += "..."
+                        lines.append(f"\n[{msg_info['id']}] {brief}")
+                        break
+
+        return "\n".join(lines)
+
+    def _get_meeting_summary(self):
+        """회의록에서 결정사항만 추출"""
+        meetings_dir = COMMS_DIR / "meetings"
+        today = datetime.now().strftime("%Y-%m-%d")
+        meeting_file = meetings_dir / f"{today}.md"
+        if not meeting_file.exists():
+            return ""
+
+        content = meeting_file.read_text(encoding="utf-8")
+        # "결정사항" 섹션만 추출
+        decisions = []
+        in_decision = False
+        for line in content.split("\n"):
+            if "결정사항" in line:
+                in_decision = True
+                continue
+            if in_decision:
+                if line.startswith("##") or line.startswith("---"):
+                    in_decision = False
+                elif line.strip():
+                    decisions.append(line.strip())
+
+        return "\n".join(decisions) if decisions else ""
+
     def check_new_messages(self):
         """inbox에서 pending 상태 메시지 찾기"""
         new_msgs = []
@@ -487,16 +580,20 @@ class AgentDaemon:
         # 메시지 상태를 read로 변경
         update_frontmatter(msg_file, {"status": "read"})
 
-        # 맥락 포함하여 Claude에게 처리 요청
-        context_block = ""
+        # 전체 대화 이력 + 세션 맥락 포함
+        conversation_history = self._build_conversation_history()
+
+        session_block = ""
         if self.session_context:
-            context_block = f"""
-[이전 세션 맥락]
+            session_block = f"""
+[세션 맥락]
 {self.session_context}
----
 """
 
-        prompt = f"""{context_block}상대 에이전트로부터 메시지가 도착했어.
+        prompt = f"""{conversation_history}
+{session_block}
+---
+[지금 처리할 메시지]
 
 메시지 ID: {msg_id}
 타입: {msg_type}
@@ -505,7 +602,8 @@ class AgentDaemon:
 내용:
 {body}
 
-이 메시지에 대해 적절히 응답해줘.
+위 대화 이력을 충분히 이해한 상태에서 이 메시지에 대해 응답해줘.
+이전에 합의한 내용, 진행 중인 작업, 미결 사항을 고려해서 답해.
 
 중요 규칙:
 1. 너는 서버 코드만 건드린다. 클라이언트 코드는 절대 수정하지 않는다.
@@ -653,6 +751,57 @@ references: ["{msg_id}"]
         except Exception as e:
             log(f"회의록 기록 실패: {e}", "WARN")
 
+    def _send_checkin(self):
+        """1시간 응답 없을 때 가볍게 안부 메시지 전송"""
+        their_name = "클라" if self.role == "server" else "서버"
+        my_name = "서버" if self.role == "server" else "클라"
+
+        next_num = get_next_msg_number(self.outbox, self.my_prefix)
+        checkin_id = f"{self.my_prefix}{next_num:03d}"
+        checkin_file = self.outbox / f"{checkin_id}_checkin.md"
+
+        content = f"""---
+id: {checkin_id}
+from: {self.role}-agent
+to: {"client" if self.role == "server" else "server"}-agent
+type: status
+priority: P3
+status: pending
+created: {datetime.now().strftime('%Y-%m-%d')}
+references: []
+---
+
+# {their_name}아, 작업 잘 되고 있어?
+
+한 시간 정도 응답이 없길래 안부 차 물어봐.
+바쁘면 천천히 해도 돼! 급한 건 아니야.
+
+혹시 막히는 거 있으면 언제든 물어봐.
+나는 여기서 다음 작업 준비하고 있을게.
+
+— {my_name} 에이전트
+"""
+        checkin_file.write_text(content, encoding="utf-8")
+
+        # 회의록에도 기록
+        if HAS_RECORDER:
+            try:
+                recorder = MeetingRecorder()
+                recorder.record_exchange(
+                    msg_id=checkin_id,
+                    sender=f"{self.role}-agent",
+                    receiver=f"{'client' if self.role == 'server' else 'server'}-agent",
+                    msg_type="status",
+                    message_summary=f"{my_name} 에이전트가 {their_name}에게 안부 확인",
+                    response_summary="(응답 대기중)",
+                    sender_reasoning=f"1시간 동안 메시지가 없어서 가볍게 확인. 상대가 작업 중일 수 있으니 부담 안 주는 톤으로.",
+                )
+            except:
+                pass
+
+        git_push(f"comms: [{self.my_prefix}→{self.their_prefix}] {checkin_id} checkin")
+        log(f"안부 메시지 전송: {checkin_id}", "SEND")
+
     def run(self):
         """메인 루프"""
         log(f"{'='*50}")
@@ -698,8 +847,14 @@ references: ["{msg_id}"]
 
                 else:
                     self.idle_count += 1
-                    if self.idle_count % 10 == 0:
-                        log(f"대기 중... (idle {self.idle_count}회)")
+
+                    # 1시간 동안 응답 없으면 가볍게 안부 (1회만)
+                    if self.idle_count == CHECKIN_AFTER_IDLE:
+                        self._send_checkin()
+
+                    # 조용히 대기. 로그도 가끔만.
+                    if self.idle_count % 60 == 0:
+                        log(f"대기 중... (idle {self.idle_count}회, 정상)")
 
                 # 5. 다음 폴링까지 대기
                 interval = IDLE_POLL_INTERVAL if self.idle_count > MAX_CONSECUTIVE_IDLE else POLL_INTERVAL
