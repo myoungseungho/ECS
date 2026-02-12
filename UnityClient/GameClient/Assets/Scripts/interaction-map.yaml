@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_14
+version: session_28
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -165,6 +165,124 @@ managers:
       - SelectTarget(ulong)
       - Attack(ulong)
       - Respawn()
+
+  - name: SkillManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스킬 시스템 관리 — 스킬 목록, 쿨다운, 사용"
+    reads: []
+    writes:
+      - _skills (Dictionary<uint, SkillInfo>)
+      - _cooldowns (Dictionary<uint, float>)
+    fires_events:
+      - OnSkillListChanged()
+      - OnSkillUsed(SkillResultData)
+      - OnCooldownStarted(uint)
+    subscribes_to:
+      - NetworkManager.OnSkillList → 스킬 목록 갱신
+      - NetworkManager.OnSkillResult → 스킬 결과 + 쿨다운 시작
+      - NetworkManager.OnEnterGame → 자동 SKILL_LIST_REQ
+    public_api:
+      - UseSkill(uint, ulong)
+      - IsOnCooldown(uint) → bool
+      - GetCooldownRemaining(uint) → float
+      - GetSkill(uint) → SkillInfo
+
+  - name: InventoryManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "인벤토리 관리 — 아이템 목록, 사용, 장착/해제"
+    reads: []
+    writes:
+      - _items (Dictionary<byte, InventoryItemInfo>)
+    fires_events:
+      - OnInventoryChanged()
+      - OnItemAdded(ItemAddResultData)
+      - OnItemUsed(ItemUseResultData)
+      - OnItemEquipped(ItemEquipResultData)
+    subscribes_to:
+      - NetworkManager.OnInventoryResp → 인벤토리 목록 갱신
+      - NetworkManager.OnItemAddResult → 아이템 추가 결과
+      - NetworkManager.OnItemUseResult → 아이템 사용 결과
+      - NetworkManager.OnItemEquipResult → 아이템 장착 결과
+      - NetworkManager.OnEnterGame → 자동 INVENTORY_REQ
+    public_api:
+      - UseItem(byte)
+      - EquipItem(byte)
+      - UnequipItem(byte)
+      - GetItem(byte) → InventoryItemInfo
+
+  - name: PartyManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "파티 시스템 관리 — 생성, 초대, 수락, 탈퇴, 추방"
+    reads:
+      - NetworkManager.Instance.MyEntityId (리더 판정)
+    writes:
+      - PartyId, LeaderId, Members
+    fires_events:
+      - OnPartyChanged()
+    subscribes_to:
+      - NetworkManager.OnPartyInfo → 파티 정보 갱신
+    public_api:
+      - CreateParty()
+      - InviteToParty(ulong)
+      - AcceptParty(uint)
+      - LeaveParty()
+      - KickMember(ulong)
+    computed_properties:
+      - InParty (PartyId != 0)
+      - IsLeader (LeaderId == MyEntityId)
+
+  - name: BuffManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "버프 시스템 관리 — 목록, 적용, 제거, 타이머"
+    reads: []
+    writes:
+      - _buffs (Dictionary<uint, BuffInfo>)
+    fires_events:
+      - OnBuffListChanged()
+      - OnBuffApplied(BuffResultData)
+      - OnBuffRemoved(uint)
+    subscribes_to:
+      - NetworkManager.OnBuffList → 버프 목록 갱신
+      - NetworkManager.OnBuffResult → 버프 적용 결과
+      - NetworkManager.OnBuffRemoveResp → 버프 제거 결과
+      - NetworkManager.OnEnterGame → 자동 BUFF_LIST_REQ
+    public_api:
+      - ApplyBuff(uint)
+      - RemoveBuff(uint)
+      - HasBuff(uint) → bool
+      - GetBuff(uint) → BuffInfo
+
+  - name: QuestManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "퀘스트 시스템 관리 — 목록, 수락, 진행, 완료"
+    reads: []
+    writes:
+      - _quests (Dictionary<uint, QuestInfo>)
+    fires_events:
+      - OnQuestListChanged()
+      - OnQuestAccepted(QuestAcceptResultData)
+      - OnQuestCompleted(QuestCompleteResultData)
+    subscribes_to:
+      - NetworkManager.OnQuestList → 퀘스트 목록 갱신
+      - NetworkManager.OnQuestAcceptResult → 퀘스트 수락 결과
+      - NetworkManager.OnQuestCompleteResult → 퀘스트 완료 결과
+      - NetworkManager.OnEnterGame → 자동 QUEST_LIST_REQ
+    public_api:
+      - AcceptQuest(uint)
+      - CheckProgress(uint)
+      - CompleteQuest(uint)
+      - GetQuest(uint) → QuestInfo
+      - HasQuest(uint) → bool
 
 # ━━━ Entity 컴포넌트 ━━━
 
