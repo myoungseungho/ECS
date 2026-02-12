@@ -27,6 +27,12 @@ MSG_PING = 2
 MSG_MOVE = 10
 MSG_MOVE_BROADCAST = 11
 MSG_POS_QUERY = 12
+MSG_LOGIN = 60
+MSG_LOGIN_RESULT = 61
+MSG_CHAR_LIST_REQ = 62
+MSG_CHAR_LIST_RESP = 63
+MSG_CHAR_SELECT = 64
+MSG_ENTER_GAME = 65
 MSG_STATS = 99
 
 
@@ -134,6 +140,46 @@ def connect():
     return sock
 
 
+def connect_and_login(username):
+    """Connect, login, char select, enter game, drain packets"""
+    s = connect()
+
+    # Login
+    uname = username.encode('utf-8')
+    pw = b"pass123"
+    payload = bytes([len(uname)]) + uname + bytes([len(pw)]) + pw
+    s.sendall(build_packet(MSG_LOGIN, payload))
+
+    # Wait for login result
+    rtype, rpayload = recv_packet(s, timeout=5)
+    if rtype != MSG_LOGIN_RESULT:
+        raise Exception(f"Login failed for {username}, got type {rtype}")
+
+    # Get char list
+    s.sendall(build_packet(MSG_CHAR_LIST_REQ))
+    rtype, rpayload = recv_packet(s, timeout=5)
+    if rtype != MSG_CHAR_LIST_RESP:
+        raise Exception(f"Char list failed for {username}, got type {rtype}")
+
+    # Parse char_id (if count > 0, use first char, else auto-assign 2000+)
+    char_count = rpayload[0] if rpayload else 0
+    if char_count > 0:
+        char_id = struct.unpack('<I', rpayload[1:5])[0]
+    else:
+        char_id = 2000  # Auto-assign
+
+    # Select character
+    s.sendall(build_packet(MSG_CHAR_SELECT, struct.pack('<I', char_id)))
+    rtype, rpayload = recv_packet(s, timeout=5)
+    if rtype != MSG_ENTER_GAME:
+        raise Exception(f"Enter game failed for {username}, got type {rtype}")
+
+    # Drain all pending packets
+    recv_all_available(s, timeout=0.5)
+
+    return s
+
+
 # ── 테스트 프레임워크 ──
 
 passed = 0
@@ -171,9 +217,9 @@ try:
     print("--- S3-POSITION: Movement updates position ---")
     print()
 
-    c1 = connect()
+    c1 = connect_and_login("s3_pos1")
 
-    # 이동 전 위치 확인 (0, 0, 0 또는 PositionComponent 미부착)
+    # 이동 전 위치 확인
     c1.sendall(build_packet(MSG_POS_QUERY))
     rtype, rpayload = recv_packet(c1)
     pre_x, pre_y, pre_z = parse_pos_response(rpayload)
@@ -184,7 +230,7 @@ try:
 
     # 이동 패킷 전송
     c1.sendall(build_move_packet(100.0, 200.0, 0.0))
-    time.sleep(0.2)
+    time.sleep(0.3)
 
     # 이동 후 위치 확인
     c1.sendall(build_packet(MSG_POS_QUERY))
@@ -198,7 +244,7 @@ try:
 
     # 두 번째 이동
     c1.sendall(build_move_packet(-50.5, 300.25, 10.0))
-    time.sleep(0.2)
+    time.sleep(0.3)
 
     c1.sendall(build_packet(MSG_POS_QUERY))
     rtype3, rpayload3 = recv_packet(c1)
@@ -216,13 +262,22 @@ try:
     print("--- S3-BROADCAST: A moves, B receives ---")
     print()
 
-    cA = connect()
-    cB = connect()
+    cA = connect_and_login("s3_bcastA")
+    cB = connect_and_login("s3_bcastB")
     time.sleep(0.3)
 
-    # A가 이동
-    cA.sendall(build_move_packet(500.0, 600.0, 0.0))
-    time.sleep(0.3)
+    # Move both to same area to ensure Interest overlap
+    cA.sendall(build_move_packet(500.0, 500.0, 0.0))
+    cB.sendall(build_move_packet(501.0, 501.0, 0.0))
+    time.sleep(0.5)
+
+    # Drain all pending packets
+    recv_all_available(cA, timeout=0.5)
+    recv_all_available(cB, timeout=0.5)
+
+    # Now A moves again, B should receive broadcast
+    cA.sendall(build_move_packet(510.0, 510.0, 0.0))
+    time.sleep(0.5)
 
     # B가 브로드캐스트 수신
     bcast_type, bcast_payload = try_recv_packet(cB, timeout=2)
@@ -233,8 +288,8 @@ try:
              True,
              f"entity={eid}, pos=({bx}, {by}, {bz})")
         test("Broadcast position matches A's move",
-             abs(bx - 500.0) < 0.01 and abs(by - 600.0) < 0.01,
-             f"expected (500, 600), got ({bx}, {by})")
+             abs(bx - 510.0) < 0.01 and abs(by - 510.0) < 0.01,
+             f"expected (510, 510), got ({bx}, {by})")
     else:
         test("B receives A's MOVE_BROADCAST", False,
              f"expected type={MSG_MOVE_BROADCAST}, got type={bcast_type}")
@@ -249,12 +304,21 @@ try:
     print("--- S3-SELF-NO-ECHO: Mover doesn't receive own broadcast ---")
     print()
 
-    cSelf = connect()
-    cOther = connect()
+    cSelf = connect_and_login("s3_selfA")
+    cOther = connect_and_login("s3_selfB")
     time.sleep(0.3)
 
-    # cSelf가 이동
+    # Move both to same area
     cSelf.sendall(build_move_packet(999.0, 888.0, 0.0))
+    cOther.sendall(build_move_packet(1000.0, 888.0, 0.0))
+    time.sleep(0.5)
+
+    # Drain
+    recv_all_available(cSelf, timeout=0.5)
+    recv_all_available(cOther, timeout=0.5)
+
+    # cSelf가 이동
+    cSelf.sendall(build_move_packet(1010.0, 900.0, 0.0))
     time.sleep(0.5)
 
     # cOther는 수신해야 함 (확인용)
@@ -278,10 +342,21 @@ try:
     print("--- S3-MULTI-MOVE: 3 players move simultaneously ---")
     print()
 
-    c1 = connect()
-    c2 = connect()
-    c3 = connect()
+    c1 = connect_and_login("s3_m1")
+    c2 = connect_and_login("s3_m2")
+    c3 = connect_and_login("s3_m3")
     time.sleep(0.3)
+
+    # Move all to same area first
+    c1.sendall(build_move_packet(100.0, 100.0, 0.0))
+    c2.sendall(build_move_packet(101.0, 101.0, 0.0))
+    c3.sendall(build_move_packet(102.0, 102.0, 0.0))
+    time.sleep(0.5)
+
+    # Drain
+    recv_all_available(c1, timeout=0.5)
+    recv_all_available(c2, timeout=0.5)
+    recv_all_available(c3, timeout=0.5)
 
     # 3명 각각 다른 위치로 이동
     c1.sendall(build_move_packet(10.0, 10.0, 0.0))

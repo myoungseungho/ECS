@@ -238,8 +238,8 @@ try:
 
     if msg_type == MSG_LOGIN_RESULT and payload:
         result_code = payload[0]
-        test("Unknown account result = FAIL (1)",
-             result_code == 1,
+        test("Unknown account auto-registers = SUCCESS (0)",
+             result_code == 0,
              f"result_code={result_code}")
 
     c2.close()

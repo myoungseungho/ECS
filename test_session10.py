@@ -122,8 +122,18 @@ def start_field_server(port):
     return proc
 
 
-def start_gate_server(field_ports):
-    args = [str(GATE_EXE)] + [str(p) for p in field_ports]
+def start_field_server_with_gate(port, gate_port, max_ccu=200):
+    proc = subprocess.Popen(
+        [str(FIELD_EXE), str(port), str(gate_port), str(max_ccu)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+    )
+    return proc
+
+
+def start_gate_server(field_ports=None):
+    args = [str(GATE_EXE), str(GATE_PORT)]
     proc = subprocess.Popen(
         args,
         stdout=subprocess.DEVNULL,
@@ -142,12 +152,19 @@ def stop_server(proc):
             proc.kill()
 
 
-def connect(port, host=HOST):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(5)
-    sock.connect((host, port))
-    time.sleep(0.3)
-    return sock
+def connect(port, host=HOST, retries=5):
+    for attempt in range(retries):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect((host, port))
+            time.sleep(0.3)
+            return sock
+        except ConnectionRefusedError:
+            if attempt < retries - 1:
+                time.sleep(1.0)
+                continue
+            raise
 
 
 def parse_route_resp(payload):
@@ -189,13 +206,13 @@ print("  Gate Server (Load Balancing)")
 print("=" * 60)
 print()
 
-# 서버 시작: FieldServer x2 + GateServer x1
-field1 = start_field_server(FIELD_PORT_1)
-field2 = start_field_server(FIELD_PORT_2)
-time.sleep(2.5)
+# 서버 시작: GateServer 먼저, FieldServer가 Gate에 등록 (Session 17 dynamic mode)
+gate = start_gate_server([])  # Gate는 인자 없이 기본 포트 8888
+time.sleep(1.5)
 
-gate = start_gate_server([FIELD_PORT_1, FIELD_PORT_2])
-time.sleep(2.0)
+field1 = start_field_server_with_gate(FIELD_PORT_1, GATE_PORT)
+field2 = start_field_server_with_gate(FIELD_PORT_2, GATE_PORT)
+time.sleep(3.0)
 
 test("FieldServer 1 started", field1.poll() is None,
      f"exited {field1.returncode}" if field1.poll() is not None else "")

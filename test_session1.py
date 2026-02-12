@@ -148,9 +148,12 @@ try:
     c1 = connect()
     stats = get_stats(c1)
 
-    test("Entity count = 1",
-         stats.get('entity_count') == 1,
-         f"expected 1, got {stats.get('entity_count')}")
+    # Establish baseline (includes monsters + this 1 connection)
+    baseline = stats.get('entity_count', 0)
+
+    test("Entity count baseline established",
+         baseline > 0,
+         f"baseline={baseline} (includes monsters + 1 player)")
 
     test("SessionComponent attached",
          stats.get('has_session_comp') == 1,
@@ -180,23 +183,27 @@ try:
     time.sleep(0.3)
 
     stats_2 = get_stats(c2a)
-    test("2 connections -> Entity count = 2",
-         stats_2.get('entity_count') == 2,
-         f"expected 2, got {stats_2.get('entity_count')}")
+    current_count = stats_2.get('entity_count', 0)
+    test("2 connections -> Entity count = baseline+1",
+         current_count == baseline + 1,
+         f"expected {baseline + 1}, got {current_count}")
 
     c2b.close()
     time.sleep(0.5)
 
     stats_after = get_stats(c2a)
-    test("1 disconnect -> Entity count = 1",
-         stats_after.get('entity_count') == 1,
-         f"expected 1, got {stats_after.get('entity_count')}")
+    after_count = stats_after.get('entity_count', 0)
+    test("1 disconnect -> Entity count = baseline",
+         after_count == baseline,
+         f"expected {baseline}, got {after_count}")
 
     c2c = connect()
+    time.sleep(0.3)
     stats_rejoin = get_stats(c2a)
-    test("Reconnect -> Entity count = 2",
-         stats_rejoin.get('entity_count') == 2,
-         f"expected 2, got {stats_rejoin.get('entity_count')}")
+    rejoin_count = stats_rejoin.get('entity_count', 0)
+    test("Reconnect -> Entity count = baseline+1",
+         rejoin_count == baseline + 1,
+         f"expected {baseline + 1}, got {rejoin_count}")
 
     c2a.close()
     c2c.close()
@@ -214,9 +221,10 @@ try:
     time.sleep(0.3)
 
     stats_5 = get_stats(clients[0])
-    test("5 connections -> Entity count = 5",
-         stats_5.get('entity_count') == 5,
-         f"expected 5, got {stats_5.get('entity_count')}")
+    count_5 = stats_5.get('entity_count', 0)
+    test("5 connections -> Entity count = baseline+4",
+         count_5 == baseline + 4,
+         f"expected {baseline + 4}, got {count_5}")
 
     # Independent echo
     echo_ok = True
@@ -234,9 +242,10 @@ try:
     time.sleep(0.5)
 
     stats_3 = get_stats(clients[0])
-    test("2 disconnects -> Entity count = 3",
-         stats_3.get('entity_count') == 3,
-         f"expected 3, got {stats_3.get('entity_count')}")
+    count_3 = stats_3.get('entity_count', 0)
+    test("2 disconnects -> Entity count = baseline+2",
+         count_3 == baseline + 2,
+         f"expected {baseline + 2}, got {count_3}")
 
     remaining_ok = True
     for i in [0, 2, 4]:
@@ -260,9 +269,10 @@ try:
     # Clean reconnect
     c_final = connect()
     stats_final = get_stats(c_final)
-    test("Full disconnect + reconnect -> Entity count = 1",
-         stats_final.get('entity_count') == 1,
-         f"expected 1, got {stats_final.get('entity_count')}")
+    final_count = stats_final.get('entity_count', 0)
+    test("Full disconnect + reconnect -> Entity count = baseline",
+         final_count == baseline,
+         f"expected {baseline}, got {final_count}")
     c_final.close()
 
 except Exception as e:

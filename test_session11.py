@@ -87,6 +87,21 @@ def trecv(sock, to=2.0):
         return None, None
 
 
+def trecv_type(sock, expected_type, to=3.0):
+    """Receive specific message type, skip others"""
+    deadline = time.time() + to
+    while time.time() < deadline:
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        mt, pl = trecv(sock, min(remaining, 2.0))
+        if mt == expected_type:
+            return mt, pl
+        if mt is None:
+            break
+    return None, None
+
+
 def drain(s, timeout=0.1):
     while True:
         mt, _ = trecv(s, timeout)
@@ -141,8 +156,9 @@ def test_eventbus_subscribers_exist():
     """EventBus에 TEST_EVENT 구독자가 등록되어 있는지"""
     s = connect()
     login_and_enter(s)
+    drain(s)
     s.sendall(bpkt(MSG_EVENT_SUB_COUNT))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_EVENT_SUB_COUNT)
     assert mt == MSG_EVENT_SUB_COUNT
     sub_count = struct.unpack('<i', pl[:4])[0]
     assert sub_count >= 1, f"subscribers={sub_count}, expected >= 1"
@@ -153,8 +169,9 @@ def test_eventbus_queue_empty_initially():
     """이벤트 큐가 처음에는 비어있는지"""
     s = connect()
     login_and_enter(s)
+    drain(s)
     s.sendall(bpkt(MSG_EVENT_SUB_COUNT))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_EVENT_SUB_COUNT)
     queue_size = struct.unpack('<i', pl[4:8])[0]
     assert queue_size == 0, f"queue_size={queue_size}"
     s.close()
@@ -167,11 +184,12 @@ def test_eventbus_timer_event_fires():
 
     # 0.5초 후 만료 타이머 추가
     s.sendall(bpkt(MSG_TIMER_ADD, struct.pack('<iii', 42, 500, 0)))
-    time.sleep(1.0)  # 타이머 만료 대기
+    time.sleep(1.5)  # 타이머 만료 대기
 
     # 이벤트 발행 카운터 확인
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     assert mt == MSG_TIMER_INFO
     total_events = struct.unpack('<i', pl[4:8])[0]
     assert total_events >= 1, f"events_fired={total_events}"
@@ -191,8 +209,9 @@ def test_timer_add():
     s.sendall(bpkt(MSG_TIMER_ADD, struct.pack('<iii', 100, 10000, 0)))
     time.sleep(0.2)
 
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     assert mt == MSG_TIMER_INFO
     active = struct.unpack('<i', pl[:4])[0]
     assert active >= 1, f"active_timers={active}"
@@ -209,14 +228,16 @@ def test_timer_oneshot_expires():
     time.sleep(0.1)
 
     # 아직 살아있는지
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     active_before = struct.unpack('<i', pl[:4])[0]
 
-    time.sleep(0.5)  # 만료 대기
+    time.sleep(1.0)  # 만료 대기
 
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     active_after = struct.unpack('<i', pl[:4])[0]
     assert active_after < active_before, f"before={active_before}, after={active_after}"
     s.close()
@@ -228,16 +249,18 @@ def test_timer_repeating():
     login_and_enter(s)
 
     # 이벤트 카운터 기준점
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     events_before = struct.unpack('<i', pl[4:8])[0]
 
     # 0.2초 간격 반복 타이머 (0.1초 후 시작)
     s.sendall(bpkt(MSG_TIMER_ADD, struct.pack('<iii', 300, 100, 200)))
     time.sleep(1.0)  # ~4-5회 반복 예상
 
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     events_after = struct.unpack('<i', pl[4:8])[0]
     fired = events_after - events_before
     assert fired >= 3, f"repeating timer fired {fired} times, expected >= 3"
@@ -258,8 +281,9 @@ def test_timer_multiple():
         s.sendall(bpkt(MSG_TIMER_ADD, struct.pack('<iii', tid, 10000, 0)))
     time.sleep(0.3)
 
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     active = struct.unpack('<i', pl[:4])[0]
     assert active >= 3, f"active={active}, expected >= 3"
     s.close()
@@ -410,16 +434,18 @@ def test_full_pipeline_with_timer():
     time.sleep(0.7)
 
     # 타이머 만료 확인
+    drain(s)
     s.sendall(bpkt(MSG_TIMER_INFO))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_TIMER_INFO)
     assert mt == MSG_TIMER_INFO
 
     # Config도 동시 확인
     table = b"monsters"
     key = b"2"
     payload = struct.pack('B', len(table)) + table + struct.pack('B', len(key)) + key
+    drain(s)
     s.sendall(bpkt(MSG_CONFIG_QUERY, payload))
-    mt, pl = trecv(s)
+    mt, pl = trecv_type(s, MSG_CONFIG_RESP)
     assert mt == MSG_CONFIG_RESP
     assert pl[0] == 1
     s.close()

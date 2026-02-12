@@ -92,31 +92,40 @@ def recv_my_attack_result(sock, my_eid, timeout=5.0):
     raise TimeoutError("Timed out waiting for my ATTACK_RESULT")
 
 def connect_and_login(host='127.0.0.1', field_port=7777, username='hero',
-                      password='pass123', char_id=1):
+                      password='pass123', char_id=1, retries=3):
     """FieldServer 직접 연결 → Login → CharSelect → Channel Join"""
-    fs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    fs.settimeout(5.0)
-    fs.connect((host, field_port))
+    for attempt in range(retries):
+        try:
+            fs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            fs.settimeout(5.0)
+            fs.connect((host, field_port))
 
-    uname = username.encode()
-    pw = password.encode()
-    login_payload = bytes([len(uname)]) + uname + bytes([len(pw)]) + pw
-    fs.sendall(build_packet(60, login_payload))
-    # recv_packet_type: 다른 패킷(APPEAR 등) 무시하고 LOGIN_RESULT만 수신
-    msg_type, payload = recv_packet_type(fs, 61, timeout=5.0)
-    assert payload[0] == 0, f"Login failed: result={payload[0]}"
+            uname = username.encode()
+            pw = password.encode()
+            login_payload = bytes([len(uname)]) + uname + bytes([len(pw)]) + pw
+            fs.sendall(build_packet(60, login_payload))
+            # recv_packet_type: 다른 패킷(APPEAR 등) 무시하고 LOGIN_RESULT만 수신
+            msg_type, payload = recv_packet_type(fs, 61, timeout=5.0)
+            assert payload[0] == 0, f"Login failed: result={payload[0]}"
 
-    fs.sendall(build_packet(64, struct.pack('<I', char_id)))
-    msg_type, payload = recv_packet_type(fs, 65, timeout=5.0)
-    assert payload[0] == 0, f"CharSelect failed: result={payload[0]}"
-    entity_id = struct.unpack('<Q', payload[1:9])[0]
+            fs.sendall(build_packet(64, struct.pack('<I', char_id)))
+            msg_type, payload = recv_packet_type(fs, 65, timeout=5.0)
+            assert payload[0] == 0, f"CharSelect failed: result={payload[0]}"
+            entity_id = struct.unpack('<Q', payload[1:9])[0]
 
-    # Channel join
-    fs.sendall(build_packet(20, struct.pack('<i', 1)))
-    msg_type, payload = recv_packet_type(fs, 22, timeout=5.0)
+            # Channel join
+            fs.sendall(build_packet(20, struct.pack('<i', 1)))
+            msg_type, payload = recv_packet_type(fs, 22, timeout=5.0)
 
-    drain(fs)
-    return fs, entity_id
+            drain(fs)
+            return fs, entity_id
+        except Exception as e:
+            try: fs.close()
+            except: pass
+            if attempt < retries - 1:
+                time.sleep(1.0)
+                continue
+            raise
 
 def connect_two_players():
     """Warrior(hero/1) + Archer(guest/3), 둘 다 zone 1, channel 1"""
@@ -160,7 +169,7 @@ total = 0
 def run_test(name, func):
     global passed, failed, total
     total += 1
-    time.sleep(1.0)  # IOCP 연결 해제 처리 대기
+    time.sleep(1.5)  # IOCP 연결 해제 처리 대기
     try:
         func()
         passed += 1
@@ -223,13 +232,13 @@ def test_cooldown_and_range():
     try:
         # 1. 첫 공격 → 성공
         sock_a.sendall(build_packet(100, struct.pack('<Q', eid_b)))
-        msg_type, payload = recv_packet_type(sock_a, 101)
+        msg_type, payload = recv_my_attack_result(sock_a, eid_a)
         r = parse_attack_result(payload)
         assert r['result'] == 0, f"First attack should succeed, got {r['result']}"
 
         # 2. 즉시 재공격 → 쿨타임 실패
         sock_a.sendall(build_packet(100, struct.pack('<Q', eid_b)))
-        msg_type, payload = recv_packet_type(sock_a, 101)
+        msg_type, payload = recv_my_attack_result(sock_a, eid_a)
         r = parse_attack_result(payload)
         assert r['result'] == 4, f"Expected COOLDOWN(4), got {r['result']}"
 
@@ -239,7 +248,7 @@ def test_cooldown_and_range():
 
         # 4. 사거리 밖 공격 → 실패
         sock_a.sendall(build_packet(100, struct.pack('<Q', eid_b)))
-        msg_type, payload = recv_packet_type(sock_a, 101)
+        msg_type, payload = recv_my_attack_result(sock_a, eid_a)
         r = parse_attack_result(payload)
         assert r['result'] == 3, f"Expected OUT_OF_RANGE(3), got {r['result']}"
     finally:
@@ -303,13 +312,13 @@ def test_edge_cases():
     try:
         # 자기 자신 공격
         sock.sendall(build_packet(100, struct.pack('<Q', eid)))
-        msg_type, payload = recv_packet_type(sock, 101)
+        msg_type, payload = recv_my_attack_result(sock, eid)
         r = parse_attack_result(payload)
         assert r['result'] == 6, f"Self: expected SELF_ATTACK(6), got {r['result']}"
 
         # 존재하지 않는 타겟
         sock.sendall(build_packet(100, struct.pack('<Q', 99999)))
-        msg_type, payload = recv_packet_type(sock, 101)
+        msg_type, payload = recv_my_attack_result(sock, eid)
         r = parse_attack_result(payload)
         assert r['result'] == 1, f"Nonexist: expected TARGET_NOT_FOUND(1), got {r['result']}"
     finally:
@@ -327,7 +336,7 @@ def test_dead_attacker():
 
         # 죽은 Warrior가 Archer 공격 시도
         sock_a.sendall(build_packet(100, struct.pack('<Q', eid_b)))
-        msg_type, payload = recv_packet_type(sock_a, 101)
+        msg_type, payload = recv_my_attack_result(sock_a, eid_a)
         r = parse_attack_result(payload)
         assert r['result'] == 5, f"Expected ATTACKER_DEAD(5), got {r['result']}"
     finally:

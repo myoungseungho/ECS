@@ -199,6 +199,9 @@ void OnGateRouteReq(World& world, Entity entity, const char* payload, int len) {
     auto pkt = BuildPacket(MsgType::GATE_ROUTE_RESP, resp.data(), resp_size);
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
 
+    // 예측 CCU 증가 (하트비트 전까지 라우팅 분산 보장)
+    srv.current_ccu++;
+
     printf("[Gate] -> %s:%d (ccu: %d/%d)\n",
            srv.host.c_str(), srv.port, srv.current_ccu, srv.max_ccu);
 }
