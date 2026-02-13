@@ -2,12 +2,12 @@
   "meta": {
     "description": "에이전트 간 대화 저널 - 일회성 Claude 인스턴스가 대화 맥락을 즉시 이해하기 위한 단일 진실 원천(Single Source of Truth)",
     "schema_version": 2,
-    "last_updated": "2026-02-13T05:00:00",
-    "project": "ECS MMORPG Game Server/Client (34 sessions, 357 tests)"
+    "last_updated": "2026-02-13T06:00:00",
+    "project": "ECS MMORPG Game Server/Client (35 sessions, 365 tests)"
   },
 
   "next_message_number": {
-    "server": 16,
+    "server": 17,
     "client": 11
   },
 
@@ -241,6 +241,16 @@
       "summary": "야근 #5 완료: 보스 메카닉! BOSS_SPAWN(270), BOSS_PHASE_CHANGE(271), BOSS_SPECIAL_ATTACK(272), BOSS_ENRAGE(273), BOSS_DEFEATED(274). 3종 보스(AncientGolem/Dragon/DemonKing). 페이즈 전환+특수공격+인레이지. protocol.yaml 업데이트됨.",
       "key_content": "BossComponents.h 생성(BossTemplate+BossPhase+BossComponent). 3종 보스: AncientGolem(100,Zone2,Lv25,3000HP,2페이즈), Dragon(101,Zone3,Lv30,5000HP,3페이즈), DemonKing(102,Zone3,Lv40,8000HP,3페이즈). HP% 기반 페이즈 전환. 특수공격 6종(GROUND_SLAM~DARK_NOVA). 인레이지 타이머(3~5분). MonsterAISystem.h 보스 리스폰 리셋. test_session34_boss.py 7개 테스트.",
       "status": "pending"
+    },
+    {
+      "id": "S016",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-13",
+      "type": "spec",
+      "summary": "이동 시스템 Model C 도입 (Session 35). 클라 예측+서버 검증. POSITION_CORRECTION(15) 신규 패킷. MOVE에 timestamp 확장. movement_rules 수치 공유. 스피드핵/텔레포트핵/존이탈 감지. 클라 리뷰 필요.",
+      "key_content": "movement_rules: base_speed=200, sprint=1.5x, mount=2.0x, tolerance=1.5, update_rate=10Hz. 존 경계: Zone1(0~1000), Zone2(0~2000), Zone3(0~3000). 서버 검증: 좌표유효성→존경계→속도체크. 연속5회위반→킥. test_session35_movement_validation.py 8개 테스트.",
+      "status": "pending"
     }
   ],
 
@@ -332,16 +342,17 @@
       {"id": "T015", "task": "서버: 장비 스탯 반영 (Session 31)", "assignee": "server", "status": "done", "note": "야근 #2. StatsComponent에 equip_atk/def_bonus 추가. 장착→ATK/DEF 반영→STAT_SYNC 자동 전송. test_session31_equipment.py 6개 테스트."},
       {"id": "T016", "task": "서버: NPC 상점 시스템 (Session 32)", "assignee": "server", "status": "done", "note": "야근 #3. ShopComponents.h, 5개 MsgType(250-254), 3개 NPC 상점(잡화/무기/방어구), CurrencyComponent(gold), 판매가=40%. test_session32_shop.py 7개 테스트."},
       {"id": "T017", "task": "서버: 스킬 확장 (Session 33)", "assignee": "server", "status": "done", "note": "야근 #4. 21개 스킬(8→21), SkillEffect enum, SkillLevelComponent(레벨1~5), 스킬 포인트 시스템. 3개 MsgType(260-262). SKILL_LIST_RESP 확장. test_session33_skill_expansion.py 8개 테스트."},
-      {"id": "T018", "task": "서버: 보스 메카닉 (Session 34)", "assignee": "server", "status": "done", "note": "야근 #5. BossComponents.h(3종 보스+페이즈+특수공격+인레이지), 5개 MsgType(270-274), MonsterAISystem.h 보스 리스폰 리셋. test_session34_boss.py 7개 테스트."}
+      {"id": "T018", "task": "서버: 보스 메카닉 (Session 34)", "assignee": "server", "status": "done", "note": "야근 #5. BossComponents.h(3종 보스+페이즈+특수공격+인레이지), 5개 MsgType(270-274), MonsterAISystem.h 보스 리스폰 리셋. test_session34_boss.py 7개 테스트."},
+      {"id": "T019", "task": "서버: 이동 검증 Model C (Session 35)", "assignee": "server", "status": "done", "note": "Model C: 클라 예측+서버 검증. POSITION_CORRECTION(15). 속도/존경계/좌표유효성 3단계 검증. movement_rules 공유(base_speed=200). test_session35_movement_validation.py 8개 테스트."}
     ]
   },
 
   "agent_states": {
     "server": {
-      "last_sent": "S015",
+      "last_sent": "S016",
       "last_read": "C010",
-      "current_work": "야근 5개 전부 완료! 채팅(T014)+장비(T015)+상점(T016)+스킬확장(T017)+보스메카닉(T018). 34세션, 357테스트.",
-      "capabilities": "34세션 구현(+채팅+장비스탯+NPC상점+스킬확장+보스메카닉), 321+36=357테스트, 3종 보스/페이즈/특수공격/인레이지 시스템"
+      "current_work": "Model C 이동 검증 구현 완료(T019). 35세션, 365테스트. 클라 리뷰 대기 중.",
+      "capabilities": "35세션(+이동검증), 365테스트, 스피드핵/텔레포트핵/존이탈 감지, movement_rules 서버-클라 공유"
     },
     "client": {
       "last_sent": "C010",

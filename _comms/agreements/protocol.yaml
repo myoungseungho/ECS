@@ -55,7 +55,9 @@ messages:
       - { name: x, type: f32 }
       - { name: y, type: f32 }
       - { name: z, type: f32 }
-    total_size: 12
+      - { name: timestamp, type: u32, optional: true }
+    total_size: "12 (legacy) or 16 (Model C)"
+    note: "Session 35: timestamp 추가 (선택). 서버는 12/16 둘 다 수용. 초당 10회 전송 권장."
 
   MOVE_BROADCAST:
     id: 11
@@ -73,6 +75,17 @@ messages:
     session: 3
     direction: C2S
     payload: []
+
+  POSITION_CORRECTION:
+    id: 15
+    session: 35
+    direction: S2C
+    payload:
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 12
+    note: "서버가 핵 감지 or 존 이탈 시 강제 위치 보정. 클라는 즉시 이 좌표로 텔레포트."
 
   APPEAR:
     id: 13
@@ -1145,6 +1158,41 @@ result_codes:
     1: SPECIAL_ATTACK
     2: ENRAGE
     3: DEFEATED
+
+# ============================================================
+# Session 35: Movement Rules (Model C - 서버+클라 공유)
+# ============================================================
+# 서버와 클라이언트가 반드시 동일한 값을 사용해야 함.
+# 서버: 이 값으로 이동 검증 (스피드핵 감지)
+# 클라: 이 값으로 캐릭터 이동속도 설정
+
+movement_rules:
+  base_speed: 200.0              # 기본 이동속도 (units/sec)
+  sprint_multiplier: 1.5         # 달리기 배율
+  mount_multiplier: 2.0          # 탈것 배율
+  server_tolerance: 1.5          # 서버 검증 여유값 (50% - 네트워크 지터 허용)
+  update_rate_hz: 10             # 초당 위치 전송 횟수 (클라→서버)
+  correction_threshold: 50.0     # 이 거리(units) 이상 차이나면 보정 전송
+  max_violations: 5              # 연속 위반 허용 횟수 (초과 시 킥)
+  max_valid_coord: 10000.0       # 좌표 절대값 최대
+
+  zone_bounds:                   # 존별 이동 가능 범위
+    - { zone_id: 1, min_x: 0, min_y: 0, max_x: 1000, max_y: 1000 }
+    - { zone_id: 2, min_x: 0, min_y: 0, max_x: 2000, max_y: 2000 }
+    - { zone_id: 3, min_x: 0, min_y: 0, max_x: 3000, max_y: 3000 }
+
+  client_responsibilities:
+    - "내 캐릭터: 로컬 즉시 이동 (입력 반응성)"
+    - "초당 10회 MOVE 패킷 전송 (100ms 간격)"
+    - "POSITION_CORRECTION 수신 시 즉시 해당 좌표로 텔레포트"
+    - "다른 플레이어: MOVE_BROADCAST 받아서 Lerp 보간"
+    - "이동속도 = base_speed * (sprint/mount) multiplier"
+
+  server_responsibilities:
+    - "MOVE 수신 → 속도/경계/좌표 검증"
+    - "검증 실패 → POSITION_CORRECTION 전송"
+    - "검증 성공 → 위치 저장 + MOVE_BROADCAST"
+    - "연속 5회 위반 시 세션 킥"
 
 # ============================================================
 # Session 30: Chat System

@@ -97,8 +97,31 @@ void OnStats(World& world, Entity entity, const char* payload, int len) {
     g_network->SendTo(session.session_id, resp.data(), static_cast<int>(resp.size()));
 }
 
-// MOVE 핸들러 (Session 3): 위치 갱신 + dirty 표시
-// 페이로드: [x(4 float)] [y(4 float)] [z(4 float)] = 12바이트
+// ━━━ Session 35: 위치 보정 패킷 전송 ━━━
+void SendPositionCorrection(World& world, Entity entity, float x, float y, float z) {
+    if (!world.HasComponent<SessionComponent>(entity)) return;
+    auto& session = world.GetComponent<SessionComponent>(entity);
+    if (!session.connected) return;
+
+    char buf[12];
+    std::memcpy(buf, &x, 4);
+    std::memcpy(buf + 4, &y, 4);
+    std::memcpy(buf + 8, &z, 4);
+    auto pkt = BuildPacket(MsgType::POSITION_CORRECTION, buf, 12);
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ━━━ Session 35: 서버 시간 (ms) 획득 ━━━
+static uint32_t GetServerTimeMs() {
+    using namespace std::chrono;
+    static auto start = steady_clock::now();
+    auto now = steady_clock::now();
+    return static_cast<uint32_t>(duration_cast<milliseconds>(now - start).count());
+}
+
+// MOVE 핸들러 (Session 3 → Session 35: Model C 이동 검증)
+// 페이로드: [x(4)] [y(4)] [z(4)] = 12바이트 (하위호환)
+//           [x(4)] [y(4)] [z(4)] [timestamp(4)] = 16바이트 (Model C)
 void OnMove(World& world, Entity entity, const char* payload, int len) {
     if (len < 12) {
         printf("[Move] Invalid payload size: %d (need 12)\n", len);
@@ -111,12 +134,99 @@ void OnMove(World& world, Entity entity, const char* payload, int len) {
     }
 
     auto& pos = world.GetComponent<PositionComponent>(entity);
-    std::memcpy(&pos.x, payload, 4);
-    std::memcpy(&pos.y, payload + 4, 4);
-    std::memcpy(&pos.z, payload + 8, 4);
+
+    // 새 위치 파싱
+    float new_x, new_y, new_z;
+    std::memcpy(&new_x, payload, 4);
+    std::memcpy(&new_y, payload + 4, 4);
+    std::memcpy(&new_z, payload + 8, 4);
+
+    // 클라이언트 타임스탬프 (있으면)
+    uint32_t client_time = 0;
+    if (len >= 16) {
+        std::memcpy(&client_time, payload + 12, 4);
+    }
+
+    uint32_t now = GetServerTimeMs();
+
+    // ━━━ 검증 1: 좌표 유효성 (NaN, Inf, 범위 초과) ━━━
+    if (std::isnan(new_x) || std::isnan(new_y) || std::isnan(new_z) ||
+        std::isinf(new_x) || std::isinf(new_y) || std::isinf(new_z) ||
+        new_x < -MovementRules::MAX_VALID_COORD || new_x > MovementRules::MAX_VALID_COORD ||
+        new_y < -MovementRules::MAX_VALID_COORD || new_y > MovementRules::MAX_VALID_COORD) {
+        printf("[Move] Entity %llu REJECTED: invalid coords (%.1f, %.1f, %.1f)\n",
+               entity, new_x, new_y, new_z);
+        SendPositionCorrection(world, entity, pos.last_valid_x, pos.last_valid_y, pos.last_valid_z);
+        return;
+    }
+
+    // ━━━ 검증 2: 존 경계 체크 ━━━
+    if (world.HasComponent<ZoneComponent>(entity)) {
+        int zone_id = world.GetComponent<ZoneComponent>(entity).zone_id;
+        const ZoneBounds* bounds = GetZoneBounds(zone_id);
+        if (bounds) {
+            if (new_x < bounds->min_x || new_x > bounds->max_x ||
+                new_y < bounds->min_y || new_y > bounds->max_y) {
+                printf("[Move] Entity %llu REJECTED: out of zone %d bounds (%.1f, %.1f)\n",
+                       entity, zone_id, new_x, new_y);
+                // 경계 안으로 클램프
+                float clamped_x = std::fmax(bounds->min_x, std::fmin(new_x, bounds->max_x));
+                float clamped_y = std::fmax(bounds->min_y, std::fmin(new_y, bounds->max_y));
+                SendPositionCorrection(world, entity, clamped_x, clamped_y, new_z);
+                pos.x = clamped_x;
+                pos.y = clamped_y;
+                pos.z = new_z;
+                pos.last_valid_x = clamped_x;
+                pos.last_valid_y = clamped_y;
+                pos.last_valid_z = new_z;
+                pos.last_move_time = now;
+                pos.position_dirty = true;
+                return;
+            }
+        }
+    }
+
+    // ━━━ 검증 3: 속도 체크 (스피드핵 감지) ━━━
+    if (pos.last_move_time > 0) {
+        uint32_t elapsed_ms = now - pos.last_move_time;
+        if (elapsed_ms > 0 && elapsed_ms < 30000) {  // 30초 이내만 검증 (AFK 복귀 제외)
+            float dist = Distance2D(pos.last_valid_x, pos.last_valid_y, new_x, new_y);
+            float elapsed_sec = elapsed_ms / 1000.0f;
+            float max_speed = MovementRules::BASE_SPEED * MovementRules::MOUNT_MULTIPLIER;  // 최대 가능 속도
+            float max_dist = max_speed * elapsed_sec * MovementRules::TOLERANCE;
+
+            if (dist > max_dist && dist > MovementRules::CORRECTION_DIST) {
+                pos.violation_count++;
+                printf("[Move] Entity %llu SPEED VIOLATION #%d: dist=%.1f max=%.1f (%.1f units/sec)\n",
+                       entity, pos.violation_count, dist, max_dist, dist / elapsed_sec);
+
+                if (pos.violation_count >= MovementRules::MAX_VIOLATIONS) {
+                    printf("[Move] Entity %llu KICKED: %d consecutive speed violations!\n",
+                           entity, pos.violation_count);
+                    // TODO: 킥 처리 (세션 종료)
+                }
+
+                // 마지막 유효 위치로 보정
+                SendPositionCorrection(world, entity,
+                    pos.last_valid_x, pos.last_valid_y, pos.last_valid_z);
+                pos.last_move_time = now;
+                return;
+            }
+        }
+    }
+
+    // ━━━ 검증 통과: 위치 업데이트 ━━━
+    pos.violation_count = 0;  // 정상 이동 시 위반 카운터 리셋
+    pos.x = new_x;
+    pos.y = new_y;
+    pos.z = new_z;
+    pos.last_valid_x = new_x;
+    pos.last_valid_y = new_y;
+    pos.last_valid_z = new_z;
+    pos.last_move_time = now;
     pos.position_dirty = true;  // BroadcastSystem이 이번 틱에 전파할 것
 
-    printf("[Move] Entity %llu -> (%.1f, %.1f, %.1f)\n", entity, pos.x, pos.y, pos.z);
+    printf("[Move] Entity %llu -> (%.1f, %.1f, %.1f) OK\n", entity, new_x, new_y, new_z);
 }
 
 // POS_QUERY 핸들러 (Session 3): 내 현재 위치 조회

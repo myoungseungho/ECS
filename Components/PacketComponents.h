@@ -30,9 +30,12 @@ enum class MsgType : uint16_t {
     PING            = 2,   // 핑: PONG 응답
 
     // Session 3: 이동 + 브로드캐스트
-    MOVE            = 10,  // 클라이언트→서버: 이동 요청 [x(4) y(4) z(4)]
+    MOVE            = 10,  // 클라이언트→서버: 이동 요청 [x(4) y(4) z(4) timestamp(4)]
     MOVE_BROADCAST  = 11,  // 서버→클라이언트: 타인 이동 알림 [entity(8) x(4) y(4) z(4)]
     POS_QUERY       = 12,  // 내 위치 조회 (테스트용)
+
+    // Session 35: 이동 검증 (Model C)
+    POSITION_CORRECTION = 15, // S→C: [x(4) y(4) z(4)] 서버가 강제 위치 보정
 
     // Session 4: AOI (관심 영역)
     APPEAR          = 13,  // 서버→클라이언트: Entity가 시야에 들어옴 [entity(8) x(4) y(4) z(4)]
