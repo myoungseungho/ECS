@@ -1486,6 +1486,91 @@ movement_rules:
 # - Respawn resets: phase→0, enrage→false, ATK→base, timers→initial
 
 # ============================================================
+# Session 37: Admin / Hot-Reload
+# ============================================================
+
+  ADMIN_RELOAD:
+    id: 280
+    session: 37
+    direction: C2S
+    payload:
+      - { name: name_len, type: u8 }
+      - { name: name, type: "string(name_len)" }
+    note: "Request config reload. Empty name = reload all."
+
+  ADMIN_RELOAD_RESULT:
+    id: 281
+    session: 37
+    direction: S2C
+    payload:
+      - { name: result, type: u8, values: { 0: "fail", 1: "success" } }
+      - { name: version, type: u32 }
+      - { name: reload_count, type: u32 }
+      - { name: name_len, type: u8 }
+      - { name: name, type: "string(name_len)" }
+    note: "Response to ADMIN_RELOAD with current version and reload count."
+
+  ADMIN_GET_CONFIG:
+    id: 282
+    session: 37
+    direction: C2S
+    payload:
+      - { name: name_len, type: u8 }
+      - { name: name, type: "string(name_len)" }
+      - { name: key_len, type: u8 }
+      - { name: key, type: "string(key_len)" }
+    note: "Query a config value by name and key."
+
+  ADMIN_CONFIG_RESP:
+    id: 283
+    session: 37
+    direction: S2C
+    payload:
+      - { name: found, type: u8, values: { 0: "not_found", 1: "found" } }
+      - { name: value_len, type: u16 }
+      - { name: value, type: "string(value_len)" }
+    note: "Response to ADMIN_GET_CONFIG."
+
+# Session 37: Data-Driven Architecture
+data_driven:
+  data_files:
+    - { name: "monster_ai", type: "json", path: "data/monster_ai.json", hot_reload: true }
+    - { name: "movement_rules", type: "json", path: "data/movement_rules.json", hot_reload: true }
+    - { name: "monster_spawns", type: "csv", path: "data/monster_spawns.csv", hot_reload: true }
+    - { name: "zone_bounds", type: "csv", path: "data/zone_bounds.csv", hot_reload: true }
+    - { name: "server", type: "json", path: "data/server.json", hot_reload: true }
+
+  game_config:
+    monster_ai:
+      move_speed: 80.0
+      patrol_radius: 100.0
+      patrol_min_wait: 2.0
+      patrol_max_wait: 5.0
+      leash_range: 500.0
+      chase_speed_mult: 1.3
+      return_heal_rate: 0.1
+      move_broadcast_interval: 0.2
+      arrival_threshold: 10.0
+      attack_range: 200.0
+      attack_cooldown: 2.0
+      max_aggro_entries: 8
+
+    movement:
+      base_speed: 200.0
+      sprint_multiplier: 1.5
+      mount_multiplier: 2.0
+      tolerance: 1.5
+      update_rate_hz: 10
+      correction_dist: 50.0
+      max_violations: 5
+      max_valid_coord: 10000.0
+
+  hot_reload:
+    method: "ADMIN_RELOAD packet (280)"
+    flow: "modify file → send ADMIN_RELOAD → server re-reads file → GameConfig updated → next tick uses new values"
+    fallback: "if data file missing, constexpr defaults used"
+
+# ============================================================
 # Game Data (for mock_server.py)
 # ============================================================
 

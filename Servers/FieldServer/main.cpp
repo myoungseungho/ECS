@@ -37,6 +37,7 @@
 #include "../../Components/ChatComponents.h"          // Session 30
 #include "../../Components/ShopComponents.h"          // Session 32
 #include "../../Components/BossComponents.h"          // Session 34
+#include "../../Core/GameConfig.h"                     // Session 37
 
 #include <cstdio>
 #include <cstdlib>
@@ -56,6 +57,7 @@ constexpr float TICK_INTERVAL = 1.0f / TICK_RATE;
 IOCPServer* g_network = nullptr;
 EventBus* g_eventBus = nullptr;           // Session 11
 ConfigLoader* g_config = nullptr;         // Session 11
+GameConfig* g_gameConfig = nullptr;       // Session 37: 런타임 설정 캐시
 int g_total_events_fired = 0;             // Session 11: 이벤트 발행 카운터
 constexpr float HEARTBEAT_INTERVAL = 2.0f; // Session 17: Gate 하트비트 주기 (초)
 
@@ -3835,6 +3837,102 @@ void OnConfigQuery(World& world, Entity entity, const char* payload, int len) {
     g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
 }
 
+// ━━━ Session 37: Admin / Hot-Reload 핸들러 ━━━
+
+// ADMIN_RELOAD: 설정 핫리로드
+// 페이로드: [name_len(1)] [name(N)]  (name_len=0이면 전체 리로드)
+// 응답: ADMIN_RELOAD_RESULT [result(1) version(4) reload_count(4) name_len(1) name(N)]
+void OnAdminReload(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    std::string name;
+    if (len >= 1) {
+        uint8_t name_len = static_cast<uint8_t>(payload[0]);
+        if (name_len > 0 && 1 + name_len <= len) {
+            name = std::string(payload + 1, name_len);
+        }
+    }
+
+    uint8_t result = 0;
+    if (name.empty()) {
+        // 전체 리로드
+        int count = g_config->ReloadAll();
+        g_gameConfig->ApplyFrom(g_config);
+        result = (count > 0) ? 1 : 0;
+        printf("[Admin] ReloadAll: %d configs reloaded (version=%u)\n",
+               count, g_gameConfig->version);
+    } else {
+        // 단일 리로드
+        bool ok = g_config->Reload(name);
+        if (ok) {
+            g_gameConfig->ApplyFrom(g_config);
+            result = 1;
+            printf("[Admin] Reloaded '%s' (version=%u)\n",
+                   name.c_str(), g_gameConfig->version);
+        } else {
+            result = 0;
+            printf("[Admin] Reload failed: '%s'\n", name.c_str());
+        }
+    }
+
+    // 응답: [result(1) version(4) reload_count(4) name_len(1) name(N)]
+    uint8_t nlen = static_cast<uint8_t>(name.size());
+    std::vector<char> resp(10 + nlen);
+    resp[0] = result;
+    std::memcpy(resp.data() + 1, &g_gameConfig->version, 4);
+    std::memcpy(resp.data() + 5, &g_gameConfig->reload_count, 4);
+    resp[9] = static_cast<char>(nlen);
+    if (nlen > 0) std::memcpy(resp.data() + 10, name.c_str(), nlen);
+
+    auto pkt = BuildPacket(MsgType::ADMIN_RELOAD_RESULT, resp.data(), static_cast<int>(resp.size()));
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
+// ADMIN_GET_CONFIG: 설정값 조회
+// 페이로드: [name_len(1) name(N) key_len(1) key(N)]
+// 응답: ADMIN_CONFIG_RESP [found(1) value_len(2) value(N)]
+void OnAdminGetConfig(World& world, Entity entity, const char* payload, int len) {
+    auto& session = world.GetComponent<SessionComponent>(entity);
+
+    if (len < 2) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::ADMIN_CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    int off = 0;
+    uint8_t name_len = static_cast<uint8_t>(payload[off++]);
+    if (off + name_len > len) { char r[1]={0}; auto p=BuildPacket(MsgType::ADMIN_CONFIG_RESP,r,1); g_network->SendTo(session.session_id,p.data(),(int)p.size()); return; }
+    std::string name(payload + off, name_len);
+    off += name_len;
+
+    uint8_t key_len = (off < len) ? static_cast<uint8_t>(payload[off++]) : 0;
+    std::string key;
+    if (key_len > 0 && off + key_len <= len) key = std::string(payload + off, key_len);
+
+    std::string value;
+    auto* settings = g_config->GetSettings(name);
+    if (settings && !key.empty()) {
+        value = settings->GetString(key);
+    }
+
+    if (value.empty()) {
+        char resp[1] = {0};
+        auto pkt = BuildPacket(MsgType::ADMIN_CONFIG_RESP, resp, 1);
+        g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+        return;
+    }
+
+    uint16_t vlen = static_cast<uint16_t>(value.size());
+    std::vector<char> resp(3 + vlen);
+    resp[0] = 1;
+    std::memcpy(resp.data() + 1, &vlen, 2);
+    std::memcpy(resp.data() + 3, value.c_str(), vlen);
+    auto pkt = BuildPacket(MsgType::ADMIN_CONFIG_RESP, resp.data(), static_cast<int>(resp.size()));
+    g_network->SendTo(session.session_id, pkt.data(), static_cast<int>(pkt.size()));
+}
+
 // EVENT_SUB_COUNT: EventBus 상태 조회
 // 응답: [subscriber_count_for_test(4)] [queue_size(4)]
 void OnEventSubCount(World& world, Entity entity, const char* payload, int len) {
@@ -3867,8 +3965,8 @@ int main(int argc, char* argv[]) {
     }
 
     printf("======================================\n");
-    printf("  ECS Field Server - Session 29\n");
-    printf("  +Condition/Spatial/Loot/Quest/Integration\n");
+    printf("  ECS Field Server - Session 37\n");
+    printf("  +DataDriven/HotReload\n");
     printf("======================================\n\n");
 
     // ━━━ 1. 네트워크 엔진 (ECS 바깥) ━━━
@@ -3888,14 +3986,39 @@ int main(int argc, char* argv[]) {
     ConfigLoader config;
     g_config = &config;
 
-    // 기본 설정 로드 (테스트용 인메모리 데이터)
+    // Session 37: 런타임 설정 캐시
+    GameConfig gameConfig;
+    g_gameConfig = &gameConfig;
+
+    // Session 37: 데이터 파일에서 로드 (파일 없으면 인메모리 폴백)
+    if (!config.LoadJSON("monster_ai", "data/monster_ai.json")) {
+        printf("[Config] monster_ai.json not found, using defaults\n");
+    }
+    if (!config.LoadJSON("movement_rules", "data/movement_rules.json")) {
+        printf("[Config] movement_rules.json not found, using defaults\n");
+    }
+    if (!config.LoadCSV("monster_spawns", "data/monster_spawns.csv")) {
+        printf("[Config] monster_spawns.csv not found, using hardcoded spawns\n");
+    }
+    if (!config.LoadCSV("zone_bounds", "data/zone_bounds.csv")) {
+        printf("[Config] zone_bounds.csv not found, using hardcoded bounds\n");
+    }
+    if (!config.LoadJSON("server", "data/server.json")) {
+        config.LoadJSONFromString("server",
+            "{\"tick_rate\": 30, \"max_players\": 200, \"server_name\": \"Field-1\"}");
+    }
+
+    // 인메모리 테스트 데이터 (기존 호환)
     config.LoadCSVFromString("monsters",
         "id,name,hp,attack,defense\n"
         "1,Goblin,100,15,5\n"
         "2,Wolf,200,25,10\n"
         "3,Dragon,5000,200,100\n");
-    config.LoadJSONFromString("server",
-        "{\"tick_rate\": 30, \"max_players\": 200, \"server_name\": \"Field-1\"}");
+
+    // Session 37: GameConfig에 적용
+    gameConfig.ApplyFrom(&config);
+    printf("[Config] Loaded %d tables + %d settings (version=%u)\n",
+           config.GetTableCount(), config.GetSettingsCount(), config.GetVersion());
 
     // EventBus 구독: TIMER_EXPIRED 이벤트 카운트
     eventBus.Subscribe(EventType::TIMER_EXPIRED, [](const Event& e) {
@@ -4030,6 +4153,8 @@ int main(int argc, char* argv[]) {
     dispatch.RegisterHandler(MsgType::SHOP_OPEN, OnShopOpen);                // Session 32
     dispatch.RegisterHandler(MsgType::SHOP_BUY, OnShopBuy);                  // Session 32
     dispatch.RegisterHandler(MsgType::SHOP_SELL, OnShopSell);                // Session 32
+    dispatch.RegisterHandler(MsgType::ADMIN_RELOAD, OnAdminReload);          // Session 37
+    dispatch.RegisterHandler(MsgType::ADMIN_GET_CONFIG, OnAdminGetConfig);   // Session 37
 
     world.AddSystem<MonsterAISystem>(network);                   // Session 14
     world.AddSystem<InterestSystem>(network);
@@ -4142,5 +4267,6 @@ int main(int argc, char* argv[]) {
     g_network = nullptr;
     g_eventBus = nullptr;
     g_config = nullptr;
+    g_gameConfig = nullptr;
     return 0;
 }

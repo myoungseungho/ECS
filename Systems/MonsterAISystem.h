@@ -11,13 +11,18 @@
 #include "../Components/ZoneComponents.h"
 #include "../Components/PacketComponents.h"
 #include "../Components/BossComponents.h"
+#include "../Core/GameConfig.h"
 
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <algorithm>
 
+// Session 37: 전역 GameConfig 포인터 (main.cpp에서 설정)
+extern GameConfig* g_gameConfig;
+
 // ━━━ Session 36: Enhanced MonsterAISystem ━━━
+// ━━━ Session 37: 데이터 드리븐 전환 (constexpr → GameConfig) ━━━
 //
 // 6상태 FSM:
 //   IDLE   → 주변 플레이어 감지 / 순찰 전환
@@ -27,12 +32,19 @@
 //   RETURN → 스폰 복귀 + HP 회복, 도착 시 IDLE
 //   DEAD   → 리스폰 타이머 → IDLE
 //
-// 어그로 테이블: 데미지 기반 위협도, 탑 어그로 타겟팅
-// 이동: 직선 이동 (패스파인딩 없음), MONSTER_MOVE 브로드캐스트
+// Session 37: 모든 상수가 g_gameConfig->monster_ai에서 읽힘
+//             핫리로드 시 다음 틱부터 새 값 자동 적용
 //
 class MonsterAISystem : public ISystem {
 public:
     explicit MonsterAISystem(IOCPServer& server) : server_(server) {}
+
+    // Session 37: GameConfig에서 값 읽기 (없으면 Defaults 폴백)
+    const MonsterAIConfig& GetAIConfig() const {
+        if (g_gameConfig) return g_gameConfig->monster_ai;
+        static MonsterAIConfig default_config;
+        return default_config;
+    }
 
     void Update(World& world, float dt) override {
         world.ForEach<MonsterComponent, StatsComponent, PositionComponent>(
@@ -89,7 +101,7 @@ private:
         float dx = tx - pos.x;
         float dy = ty - pos.y;
         float dist = std::sqrt(dx * dx + dy * dy);
-        if (dist < MonsterAI::ARRIVAL_THRESHOLD) {
+        if (dist < GetAIConfig().arrival_threshold) {
             pos.x = tx; pos.y = ty;
             pos.position_dirty = true;
             return true;
@@ -134,8 +146,9 @@ private:
     }
 
     void GeneratePatrolTarget(MonsterComponent& monster) {
+        auto& cfg = GetAIConfig();
         float angle = PseudoRandom(0.0f, 6.2831853f);
-        float radius = PseudoRandom(MonsterAI::ARRIVAL_THRESHOLD, MonsterAI::PATROL_RADIUS);
+        float radius = PseudoRandom(cfg.arrival_threshold, cfg.patrol_radius);
         monster.patrol_target_x = monster.spawn_x + radius * std::cos(angle);
         monster.patrol_target_y = monster.spawn_y + radius * std::sin(angle);
     }
@@ -186,9 +199,10 @@ private:
         // 순찰 타이머
         monster.patrol_timer -= dt;
         if (monster.patrol_timer <= 0) {
+            auto& cfg = GetAIConfig();
             GeneratePatrolTarget(monster);
             monster.state = MonsterState::PATROL;
-            monster.patrol_timer = PseudoRandom(MonsterAI::PATROL_MIN_WAIT, MonsterAI::PATROL_MAX_WAIT);
+            monster.patrol_timer = PseudoRandom(cfg.patrol_min_wait, cfg.patrol_max_wait);
         }
     }
 
@@ -230,15 +244,16 @@ private:
                                   monster.move_speed, dt);
 
         // 이동 브로드캐스트
+        auto& cfg = GetAIConfig();
         monster.move_broadcast_timer -= dt;
         if (monster.move_broadcast_timer <= 0) {
-            monster.move_broadcast_timer = MonsterAI::MOVE_BROADCAST_INTERVAL;
+            monster.move_broadcast_timer = cfg.move_broadcast_interval;
             BroadcastMonsterMove(world, entity, pos, zone);
         }
 
         if (arrived) {
             monster.state = MonsterState::IDLE;
-            monster.patrol_timer = PseudoRandom(MonsterAI::PATROL_MIN_WAIT, MonsterAI::PATROL_MAX_WAIT);
+            monster.patrol_timer = PseudoRandom(cfg.patrol_min_wait, cfg.patrol_max_wait);
         }
     }
 
@@ -291,8 +306,9 @@ private:
         }
 
         // 리쉬 체크
+        auto& cfg = GetAIConfig();
         float dist_from_spawn = Dist2D(pos.x, pos.y, monster.spawn_x, monster.spawn_y);
-        if (dist_from_spawn > MonsterAI::LEASH_RANGE) {
+        if (dist_from_spawn > cfg.leash_range) {
             printf("[MonsterAI] %llu '%s' -> RETURN (leash, dist=%.1f)\n",
                    entity, monster.name, dist_from_spawn);
             monster.state = MonsterState::RETURN;
@@ -304,13 +320,13 @@ private:
 
         // 타겟을 향해 이동
         auto& tgt_pos = world.GetComponent<PositionComponent>(target);
-        float chase_speed = monster.move_speed * MonsterAI::CHASE_SPEED_MULT;
+        float chase_speed = monster.move_speed * cfg.chase_speed_mult;
         MoveToward(pos, tgt_pos.x, tgt_pos.y, chase_speed, dt);
 
         // 이동 브로드캐스트
         monster.move_broadcast_timer -= dt;
         if (monster.move_broadcast_timer <= 0) {
-            monster.move_broadcast_timer = MonsterAI::MOVE_BROADCAST_INTERVAL;
+            monster.move_broadcast_timer = cfg.move_broadcast_interval;
             BroadcastMonsterMove(world, entity, pos, zone);
         }
 
@@ -367,7 +383,7 @@ private:
 
         // 리쉬 체크
         float dist_from_spawn = Dist2D(pos.x, pos.y, monster.spawn_x, monster.spawn_y);
-        if (dist_from_spawn > MonsterAI::LEASH_RANGE) {
+        if (dist_from_spawn > GetAIConfig().leash_range) {
             monster.state = MonsterState::RETURN;
             monster.target_entity = 0;
             monster.ClearAggro();
@@ -457,8 +473,8 @@ private:
                 BroadcastAggroChange(world, entity, next, zone);
             } else {
                 monster.state = MonsterState::IDLE;
-                monster.patrol_timer = PseudoRandom(MonsterAI::PATROL_MIN_WAIT,
-                                                    MonsterAI::PATROL_MAX_WAIT);
+                monster.patrol_timer = PseudoRandom(GetAIConfig().patrol_min_wait,
+                                                    GetAIConfig().patrol_max_wait);
             }
         }
     }
@@ -469,7 +485,7 @@ private:
                       ZoneComponent& zone, float dt) {
         // HP 회복
         if (stats.hp < stats.max_hp) {
-            int32_t heal = static_cast<int32_t>(stats.max_hp * MonsterAI::RETURN_HEAL_RATE * dt);
+            int32_t heal = static_cast<int32_t>(stats.max_hp * GetAIConfig().return_heal_rate * dt);
             if (heal < 1) heal = 1;
             stats.hp = std::min(stats.hp + heal, stats.max_hp);
         }
@@ -485,15 +501,15 @@ private:
         // 이동 브로드캐스트
         monster.move_broadcast_timer -= dt;
         if (monster.move_broadcast_timer <= 0) {
-            monster.move_broadcast_timer = MonsterAI::MOVE_BROADCAST_INTERVAL;
+            monster.move_broadcast_timer = GetAIConfig().move_broadcast_interval;
             BroadcastMonsterMove(world, entity, pos, zone);
         }
 
         if (arrived) {
             stats.hp = stats.max_hp;
             monster.state = MonsterState::IDLE;
-            monster.patrol_timer = PseudoRandom(MonsterAI::PATROL_MIN_WAIT,
-                                                MonsterAI::PATROL_MAX_WAIT);
+            monster.patrol_timer = PseudoRandom(GetAIConfig().patrol_min_wait,
+                                                GetAIConfig().patrol_max_wait);
             printf("[MonsterAI] %llu '%s' RETURNED to spawn (%.0f, %.0f)\n",
                    entity, monster.name, pos.x, pos.y);
         }
@@ -513,8 +529,8 @@ private:
             monster.state = MonsterState::IDLE;
             monster.target_entity = 0;
             monster.ClearAggro();
-            monster.patrol_timer = PseudoRandom(MonsterAI::PATROL_MIN_WAIT,
-                                                MonsterAI::PATROL_MAX_WAIT);
+            monster.patrol_timer = PseudoRandom(GetAIConfig().patrol_min_wait,
+                                                GetAIConfig().patrol_max_wait);
 
             // Session 34: 보스 리스폰 시 BossComponent 리셋
             if (world.HasComponent<BossComponent>(entity)) {

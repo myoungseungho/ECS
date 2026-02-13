@@ -1,0 +1,10 @@
+{
+    "base_speed": 200.0,
+    "sprint_multiplier": 1.5,
+    "mount_multiplier": 2.0,
+    "tolerance": 1.5,
+    "update_rate_hz": 10,
+    "correction_dist": 50.0,
+    "max_violations": 5,
+    "max_valid_coord": 10000.0
+}

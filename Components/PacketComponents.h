@@ -213,6 +213,12 @@ enum class MsgType : uint16_t {
     BOSS_ENRAGE           = 273, // S→C: [entity(8) boss_id(4)]
     BOSS_DEFEATED         = 274, // S→C: [entity(8) boss_id(4) killer_entity(8)]
 
+    // Session 37: Admin / Hot-Reload
+    ADMIN_RELOAD        = 280, // C→S: [name_len(1) name(N)] 특정 설정 리로드 (빈 name = 전체 리로드)
+    ADMIN_RELOAD_RESULT = 281, // S→C: [result(1) version(4) reload_count(4) name_len(1) name(N)]
+    ADMIN_GET_CONFIG    = 282, // C→S: [name_len(1) name(N) key_len(1) key(N)] 설정값 조회
+    ADMIN_CONFIG_RESP   = 283, // S→C: [found(1) value_len(2) value(N)]
+
     STATS       = 99,  // 내부 진단
 };
 

@@ -1,9 +1,11 @@
 #pragma once
 
 // ━━━ ConfigLoader: CSV/JSON 기반 데이터 드리븐 설계 ━━━
+// ━━━ Session 37: 핫리로드 지원 추가 ━━━
 //
 // 목적: 하드코딩 대신 외부 파일에서 게임 데이터 로드
 //        코드 수정 없이 밸런스 조정 가능
+//        런타임 Reload()로 서버 재시작 없이 수치 변경
 //
 // CSV 포맷:
 //   첫 줄 = 헤더 (컬럼명)
@@ -18,9 +20,15 @@
 //
 // 사용법:
 //   ConfigLoader cfg;
-//   cfg.LoadCSV("monsters.csv");
-//   auto& row = cfg.GetRow("monsters", 0);
+//   cfg.LoadCSV("monsters", "data/monster_spawns.csv");
+//   cfg.LoadJSON("monster_ai", "data/monster_ai.json");
+//
+//   auto& row = cfg.GetTable("monsters")->GetRow(0);
 //   int hp = row.GetInt("hp");
+//
+//   // 핫리로드: 파일 수정 후
+//   cfg.Reload("monster_ai");  // 단일 리로드
+//   cfg.ReloadAll();           // 전체 리로드
 
 #include <string>
 #include <vector>
@@ -94,6 +102,21 @@ public:
     }
 };
 
+// Session 37: 로드 소스 타입
+enum class ConfigSourceType {
+    CSV_FILE,       // 파일에서 로드한 CSV
+    CSV_STRING,     // 메모리에서 로드한 CSV (리로드 불가)
+    JSON_FILE,      // 파일에서 로드한 JSON
+    JSON_STRING,    // 메모리에서 로드한 JSON (리로드 불가)
+};
+
+// Session 37: 로드 소스 정보 (리로드용)
+struct ConfigSource {
+    ConfigSourceType type;
+    std::string name;       // 설정 이름 ("monster_ai", "monsters" 등)
+    std::string filepath;   // 파일 경로 (파일 로드 시에만)
+};
+
 class ConfigLoader {
 public:
     // CSV 파일 로드
@@ -137,8 +160,13 @@ public:
         }
 
         tables_[name] = std::move(table);
+
+        // Session 37: 소스 추적
+        sources_[name] = { ConfigSourceType::CSV_FILE, name, filepath };
+
         printf("[Config] Loaded '%s': %d rows from %s\n",
                name.c_str(), GetTable(name)->GetRowCount(), filepath.c_str());
+        version_++;
         return true;
     }
 
@@ -165,17 +193,29 @@ public:
         }
 
         tables_[name] = std::move(table);
+        sources_[name] = { ConfigSourceType::CSV_STRING, name, "" };
+        version_++;
         return true;
     }
 
     // JSON 키-값 설정 로드 (간단한 flat JSON만 지원)
     bool LoadJSON(const std::string& name, const std::string& filepath) {
         std::ifstream file(filepath);
-        if (!file.is_open()) return false;
+        if (!file.is_open()) {
+            printf("[Config] Failed to open JSON: %s\n", filepath.c_str());
+            return false;
+        }
 
         std::string content((std::istreambuf_iterator<char>(file)),
                             std::istreambuf_iterator<char>());
-        return LoadJSONFromString(name, content);
+
+        bool result = LoadJSONFromString(name, content);
+        if (result) {
+            // Session 37: 소스를 파일로 덮어쓰기 (LoadJSONFromString이 STRING으로 기록하므로)
+            sources_[name] = { ConfigSourceType::JSON_FILE, name, filepath };
+            printf("[Config] Loaded '%s' from %s\n", name.c_str(), filepath.c_str());
+        }
+        return result;
     }
 
     // 메모리에서 JSON 로드 (테스트용)
@@ -235,6 +275,8 @@ public:
         }
 
         json_settings_[name] = std::move(settings);
+        sources_[name] = { ConfigSourceType::JSON_STRING, name, "" };
+        version_++;
         return true;
     }
 
@@ -250,9 +292,79 @@ public:
         return it != json_settings_.end() ? &it->second : nullptr;
     }
 
+    // 설정 존재 여부
+    bool HasTable(const std::string& name) const { return tables_.count(name) > 0; }
+    bool HasSettings(const std::string& name) const { return json_settings_.count(name) > 0; }
+
     // 로드된 테이블 수
     int GetTableCount() const { return static_cast<int>(tables_.size()); }
     int GetSettingsCount() const { return static_cast<int>(json_settings_.size()); }
+
+    // ━━━ Session 37: 핫리로드 ━━━
+
+    // 버전 번호 (로드/리로드 때마다 증가)
+    uint32_t GetVersion() const { return version_; }
+
+    // 단일 설정 리로드 (파일 기반만 가능)
+    bool Reload(const std::string& name) {
+        auto it = sources_.find(name);
+        if (it == sources_.end()) {
+            printf("[Config] Reload failed: '%s' not found\n", name.c_str());
+            return false;
+        }
+
+        auto& src = it->second;
+        switch (src.type) {
+            case ConfigSourceType::CSV_FILE:
+                printf("[Config] Reloading CSV '%s' from %s\n", name.c_str(), src.filepath.c_str());
+                return LoadCSV(name, src.filepath);
+
+            case ConfigSourceType::JSON_FILE:
+                printf("[Config] Reloading JSON '%s' from %s\n", name.c_str(), src.filepath.c_str());
+                return LoadJSON(name, src.filepath);
+
+            case ConfigSourceType::CSV_STRING:
+            case ConfigSourceType::JSON_STRING:
+                printf("[Config] Reload skipped: '%s' was loaded from memory (no file to reload)\n",
+                       name.c_str());
+                return false;
+        }
+        return false;
+    }
+
+    // 전체 리로드 (파일 기반만)
+    int ReloadAll() {
+        int reloaded = 0;
+        // 소스 목록 복사 (Reload가 sources_를 수정하므로)
+        std::vector<std::string> names;
+        for (auto& kv : sources_) {
+            if (kv.second.type == ConfigSourceType::CSV_FILE ||
+                kv.second.type == ConfigSourceType::JSON_FILE) {
+                names.push_back(kv.first);
+            }
+        }
+        for (auto& name : names) {
+            if (Reload(name)) reloaded++;
+        }
+        printf("[Config] ReloadAll: %d/%d configs reloaded\n",
+               reloaded, static_cast<int>(names.size()));
+        return reloaded;
+    }
+
+    // 로드된 설정 목록 (디버그용)
+    std::vector<std::string> GetLoadedNames() const {
+        std::vector<std::string> names;
+        for (auto& kv : sources_) {
+            names.push_back(kv.first);
+        }
+        return names;
+    }
+
+    // 소스 정보 조회
+    const ConfigSource* GetSource(const std::string& name) const {
+        auto it = sources_.find(name);
+        return it != sources_.end() ? &it->second : nullptr;
+    }
 
 private:
     std::vector<std::string> SplitCSV(const std::string& line) {
@@ -277,4 +389,8 @@ private:
 
     std::unordered_map<std::string, ConfigTable> tables_;
     std::unordered_map<std::string, ConfigRow> json_settings_;
+
+    // Session 37: 소스 추적 (리로드용)
+    std::unordered_map<std::string, ConfigSource> sources_;
+    uint32_t version_ = 0;
 };

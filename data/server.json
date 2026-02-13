@@ -1,0 +1,7 @@
+{
+    "tick_rate": 30,
+    "max_players": 200,
+    "server_name": "Field-1",
+    "port": 7777,
+    "worker_threads": 2
+}
