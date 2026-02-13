@@ -15,7 +15,7 @@ import json
 import shutil
 import tempfile
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 테스트용 경로 설정
 SCRIPT_DIR = Path(__file__).parent
@@ -136,6 +136,8 @@ def get_test_modules(comms_dir: Path):
     mod.CONFIG_FILE = comms_dir / "agent_config.json"
     mod.JOURNAL_FILE = comms_dir / "conversation_journal.json"
     mod.LOG_DIR = comms_dir / "daemon_logs"
+    mod.HUB_ACTIVE_FILE = comms_dir / ".hub_active"
+    mod.HUB_INBOX_FILE = comms_dir / ".hub_inbox.json"
 
     return mod
 
@@ -736,6 +738,157 @@ def test_24_bulk_messages():
 
 
 # ═══════════════════════════════════════════════════════
+# 하이브리드 모드 테스트
+# ═══════════════════════════════════════════════════════
+
+@test("하이브리드 - hub_active 하트비트 감지")
+def test_25_hub_heartbeat():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+
+    # 하트비트 없을 때
+    assert mod.is_hub_active() == False
+
+    # 하트비트 생성
+    hub_file = comms / ".hub_active"
+    hub_file.write_text(json.dumps({
+        "pid": 12345,
+        "timestamp": datetime.now().isoformat(),
+        "type": "claude_code_session"
+    }), encoding="utf-8")
+
+    assert mod.is_hub_active() == True
+
+    # 만료된 하트비트 (11분 전)
+    old_time = datetime.now() - timedelta(minutes=11)
+    hub_file.write_text(json.dumps({
+        "pid": 12345,
+        "timestamp": old_time.isoformat(),
+        "type": "claude_code_session"
+    }), encoding="utf-8")
+
+    assert mod.is_hub_active() == False
+    teardown_test_env()
+
+
+@test("하이브리드 - auto 모드: hub 살아있으면 알림만")
+def test_26_auto_mode_notify():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+    config = mod.load_config()
+
+    # 허브 활성 상태 만들기
+    hub_file = comms / ".hub_active"
+    hub_file.write_text(json.dumps({
+        "pid": 12345,
+        "timestamp": datetime.now().isoformat(),
+        "type": "claude_code_session"
+    }), encoding="utf-8")
+
+    daemon = mod.MultiAgentDaemon("server", config, mode="auto")
+    assert daemon._should_process() == False, "허브 활성 시 알림만 해야 함"
+    teardown_test_env()
+
+
+@test("하이브리드 - auto 모드: hub 죽으면 직접 처리")
+def test_27_auto_mode_full():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+    config = mod.load_config()
+
+    # 허브 없음
+    daemon = mod.MultiAgentDaemon("server", config, mode="auto")
+    assert daemon._should_process() == True, "허브 없으면 직접 처리해야 함"
+    teardown_test_env()
+
+
+@test("하이브리드 - full 모드: 항상 직접 처리")
+def test_28_full_mode():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+    config = mod.load_config()
+
+    # 허브 활성이어도 full이면 직접 처리
+    hub_file = comms / ".hub_active"
+    hub_file.write_text(json.dumps({
+        "pid": 12345,
+        "timestamp": datetime.now().isoformat()
+    }), encoding="utf-8")
+
+    daemon = mod.MultiAgentDaemon("server", config, mode="full")
+    assert daemon._should_process() == True, "full 모드는 항상 직접 처리"
+    teardown_test_env()
+
+
+@test("하이브리드 - notify 모드: 항상 알림만")
+def test_29_notify_mode():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+    config = mod.load_config()
+
+    # 허브 없어도 notify면 알림만
+    daemon = mod.MultiAgentDaemon("server", config, mode="notify")
+    assert daemon._should_process() == False, "notify 모드는 항상 알림만"
+    teardown_test_env()
+
+
+@test("하이브리드 - notify_hub 함수: inbox 파일 생성")
+def test_30_notify_hub_creates_inbox():
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+
+    msgs = [
+        {"id": "C011", "from": "client-agent", "to_role": "server",
+         "to": "server-agent", "type": "question", "priority": "P2",
+         "subject": "이거 어떻게 해?", "file": "test.md"},
+        {"id": "D001", "from": "db-agent", "to_role": "server",
+         "to": "server-agent", "type": "spec", "priority": "P1",
+         "subject": "스키마 완성", "file": "test2.md"}
+    ]
+
+    mod.notify_hub(msgs)
+
+    inbox_file = comms / ".hub_inbox.json"
+    assert inbox_file.exists(), ".hub_inbox.json이 생성되어야 함"
+
+    inbox = json.loads(inbox_file.read_text(encoding="utf-8"))
+    assert inbox["total_pending"] == 2
+    assert "server" in inbox["by_agent"]
+    assert len(inbox["by_agent"]["server"]) == 2
+    teardown_test_env()
+
+
+@test("E2E - 허브↔데몬 전환 시나리오")
+def test_31_hub_daemon_handoff():
+    """허브 활성→데몬 알림만 → 허브 종료 → 데몬 자체 처리"""
+    comms = setup_test_env()
+    mod = get_test_modules(comms)
+    config = mod.load_config()
+
+    hub_file = comms / ".hub_active"
+
+    # 1. 허브 활성 상태
+    hub_file.write_text(json.dumps({
+        "pid": 99999, "timestamp": datetime.now().isoformat()
+    }), encoding="utf-8")
+
+    daemon = mod.MultiAgentDaemon("server", config, mode="auto")
+    assert daemon._should_process() == False  # 알림만
+
+    # 2. 허브 종료 (하트비트 제거)
+    hub_file.unlink()
+    assert daemon._should_process() == True   # 직접 처리
+
+    # 3. 허브 다시 시작
+    hub_file.write_text(json.dumps({
+        "pid": 99998, "timestamp": datetime.now().isoformat()
+    }), encoding="utf-8")
+    assert daemon._should_process() == False  # 다시 알림만
+
+    teardown_test_env()
+
+
+# ═══════════════════════════════════════════════════════
 # 실행
 # ═══════════════════════════════════════════════════════
 
@@ -772,6 +925,14 @@ def main():
         test_22_no_double_processing,
         test_23_unique_prefixes,
         test_24_bulk_messages,
+        # 하이브리드 모드
+        test_25_hub_heartbeat,
+        test_26_auto_mode_notify,
+        test_27_auto_mode_full,
+        test_28_full_mode,
+        test_29_notify_mode,
+        test_30_notify_hub_creates_inbox,
+        test_31_hub_daemon_handoff,
     ]
 
     for t in tests:

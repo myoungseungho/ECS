@@ -1,25 +1,29 @@
 """
-Multi-Agent Communication Daemon v1.0
-======================================
+Multi-Agent Communication Daemon v2.0 (Hybrid)
+================================================
 6개 에이전트(server/client/db/design/qa/tool)가 메일박스 패턴으로
 비동기 협업하는 시스템.
 
-사용법:
-  python multi_agent_daemon.py --role server     # 서버 에이전트
-  python multi_agent_daemon.py --role client     # 클라 에이전트
-  python multi_agent_daemon.py --role db         # DB 에이전트
-  python multi_agent_daemon.py --role design     # 기획/밸런스 에이전트
-  python multi_agent_daemon.py --role qa         # QA 에이전트
-  python multi_agent_daemon.py --role tool       # 툴/인프라 에이전트
+하이브리드 모드:
+  --mode auto (기본값):
+    .hub_active 파일 확인 → 터미널 세션이 살아있으면 알림만,
+    세션이 죽었으면 claude -p로 자체 처리
 
-동작 방식:
-  1. git pull로 최신 상태 가져오기
-  2. 자기 mailbox/ 확인 (새 메시지?)
-  3. boards/blocking.md 확인 (블로킹?)
-  4. 메시지 처리 (Claude CLI 호출)
-  5. 결과를 상대방 mailbox/에 작성
-  6. conversation_journal.json 업데이트
-  7. git commit + push
+  --mode full:
+    항상 claude -p로 자체 처리 (터미널 없을 때)
+
+  --mode notify:
+    항상 알림만 (터미널이 처리한다고 가정)
+
+사용법:
+  # 기본: 자동 전환 (권장)
+  python multi_agent_daemon.py --role server
+
+  # 터미널 없이 독립 실행
+  python multi_agent_daemon.py --role server --mode full
+
+  # 터미널이 처리하므로 알림만
+  python multi_agent_daemon.py --role server --mode notify
 """
 
 import subprocess
@@ -44,8 +48,13 @@ CONTRACTS_DIR = COMMS_DIR / "contracts"
 CONFIG_FILE = COMMS_DIR / "agent_config.json"
 JOURNAL_FILE = COMMS_DIR / "conversation_journal.json"
 LOG_DIR = COMMS_DIR / "daemon_logs"
+HUB_ACTIVE_FILE = COMMS_DIR / ".hub_active"
+HUB_INBOX_FILE = COMMS_DIR / ".hub_inbox.json"
+
+HEARTBEAT_TIMEOUT = 600  # 10분 지나면 허브 만료
 
 VALID_ROLES = ["server", "client", "db", "design", "qa", "tool"]
+VALID_MODES = ["auto", "full", "notify"]
 
 
 # ─── 설정 로드 ────────────────────────────────────────
@@ -342,18 +351,47 @@ def update_journal(
 
 # ─── 멀티에이전트 데몬 ───────────────────────────────
 
-class MultiAgentDaemon:
-    """6-agent 메일박스 데몬"""
+def is_hub_active() -> bool:
+    """터미널 허브 세션이 살아있는지 확인"""
+    if not HUB_ACTIVE_FILE.exists():
+        return False
+    try:
+        data = json.loads(HUB_ACTIVE_FILE.read_text(encoding="utf-8"))
+        ts = datetime.fromisoformat(data["timestamp"])
+        age = (datetime.now() - ts).total_seconds()
+        return age < HEARTBEAT_TIMEOUT
+    except:
+        return False
 
-    def __init__(self, role: str, config: dict, poll_interval: int = 300):
+
+def notify_hub(messages: list):
+    """허브에 새 메시지 알림 (hub_inbox.json에 기록)"""
+    try:
+        inbox = {"scan_time": datetime.now().isoformat(), "hub_active": True,
+                 "new_messages": messages, "total_pending": len(messages), "by_agent": {}}
+        for msg_info in messages:
+            agent = msg_info.get("to_role", "unknown")
+            inbox["by_agent"].setdefault(agent, []).append(msg_info)
+        HUB_INBOX_FILE.write_text(json.dumps(inbox, indent=2, ensure_ascii=False), encoding="utf-8")
+    except:
+        pass
+
+
+class MultiAgentDaemon:
+    """6-agent 메일박스 데몬 (하이브리드)"""
+
+    def __init__(self, role: str, config: dict, poll_interval: int = 300, mode: str = "auto"):
         if role not in VALID_ROLES:
             raise ValueError(f"유효하지 않은 역할: {role}. 가능: {VALID_ROLES}")
+        if mode not in VALID_MODES:
+            raise ValueError(f"유효하지 않은 모드: {mode}. 가능: {VALID_MODES}")
 
         self.role = role
         self.config = config
         self.agent_config = config["agents"][role]
         self.prefix = self.agent_config["prefix"]
         self.poll_interval = poll_interval
+        self.mode = mode
         self.idle_count = 0
         self.processed = set()
         self.my_mailbox = MAILBOX_DIR / role
@@ -506,16 +544,28 @@ ID: {msg.id}
             log("Claude CLI 타임아웃 (300초)", "WARN")
             return None
 
+    def _should_process(self) -> bool:
+        """현재 모드에서 직접 처리해야 하는지 판단"""
+        if self.mode == "full":
+            return True
+        if self.mode == "notify":
+            return False
+        # auto 모드: 허브가 살아있으면 알림만, 죽었으면 직접 처리
+        return not is_hub_active()
+
     def run(self):
-        """메인 폴링 루프"""
+        """메인 폴링 루프 (하이브리드)"""
         agent_name = self.agent_config["name"]
         log(f"{'='*50}")
-        log(f"  Multi-Agent Daemon 시작")
+        log(f"  Multi-Agent Daemon v2.0 (Hybrid)")
         log(f"  역할: {self.role} ({agent_name})")
+        log(f"  모드: {self.mode}")
         log(f"  mailbox: {self.my_mailbox}")
         log(f"  poll: {self.poll_interval}초")
         log(f"  통신 가능: {self.agent_config['can_message']}")
         log(f"{'='*50}")
+
+        last_mode_log = ""
 
         try:
             while True:
@@ -524,7 +574,16 @@ ID: {msg.id}
                     time.sleep(self.poll_interval)
                     continue
 
-                # 2. 블로킹 확인
+                # 2. 모드 결정 (auto 시 매 사이클 판단)
+                should_process = self._should_process()
+                current_mode = "FULL (자체 처리)" if should_process else "NOTIFY (허브에 위임)"
+
+                if current_mode != last_mode_log:
+                    hub_status = "ACTIVE" if is_hub_active() else "INACTIVE"
+                    log(f"모드: {current_mode} (Hub: {hub_status})")
+                    last_mode_log = current_mode
+
+                # 3. 블로킹 확인
                 blocks = self.check_blocks()
                 if blocks:
                     for b in blocks:
@@ -532,17 +591,37 @@ ID: {msg.id}
                     time.sleep(self.poll_interval)
                     continue
 
-                # 3. 새 메시지 확인
+                # 4. 새 메시지 확인
                 msgs = self.check_messages()
 
                 if msgs:
                     self.idle_count = 0
                     log(f"새 메시지 {len(msgs)}개 발견")
 
-                    for msg in msgs:
-                        success = self.process_message(msg)
-                        if success:
-                            git_push(f"comms: [{self.role}] replied to {msg.id}")
+                    if should_process:
+                        # FULL 모드: 직접 처리
+                        for msg in msgs:
+                            success = self.process_message(msg)
+                            if success:
+                                git_push(f"comms: [{self.role}] replied to {msg.id}")
+                    else:
+                        # NOTIFY 모드: 허브에 알림만
+                        msg_infos = []
+                        for msg in msgs:
+                            msg_infos.append({
+                                "id": msg.id,
+                                "from": msg.sender,
+                                "to_role": self.role,
+                                "to": f"{self.role}-agent",
+                                "type": msg.msg_type,
+                                "priority": msg.priority,
+                                "subject": msg.body.strip().split("\n")[0].lstrip("#").strip()[:100],
+                                "file": str(msg.filepath)
+                            })
+                            log(f"  [알림] {msg.id} from {msg.sender} [{msg.msg_type}]", "RECV")
+                        notify_hub(msg_infos)
+                        log(f"허브에 {len(msg_infos)}건 알림 전달 완료")
+
                 else:
                     self.idle_count += 1
                     if self.idle_count % 12 == 0:
@@ -560,6 +639,8 @@ def main():
     parser = argparse.ArgumentParser(description="Multi-Agent Communication Daemon")
     parser.add_argument("--role", required=True, choices=VALID_ROLES,
                         help="에이전트 역할")
+    parser.add_argument("--mode", choices=VALID_MODES, default="auto",
+                        help="동작 모드: auto(기본)|full|notify")
     parser.add_argument("--interval", type=int, default=300,
                         help="폴링 간격 (초)")
     parser.add_argument("--test", action="store_true",
@@ -571,7 +652,7 @@ def main():
 
     args = parser.parse_args()
     config = load_config()
-    daemon = MultiAgentDaemon(args.role, config, args.interval)
+    daemon = MultiAgentDaemon(args.role, config, args.interval, args.mode)
 
     if args.send:
         to, msg_type, subject = args.send
