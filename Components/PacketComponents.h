@@ -94,6 +94,8 @@ enum class MsgType : uint16_t {
 
     // Session 14: Monster/NPC System
     MONSTER_SPAWN   = 110, // S→C: [entity(8) monster_id(4) level(4) hp(4) max_hp(4) x(4) y(4) z(4)] = 36바이트
+    MONSTER_MOVE    = 111, // S→C: [entity(8) x(4) y(4) z(4)] = 20바이트 (Session 36: 몬스터 이동)
+    MONSTER_AGGRO   = 112, // S→C: [monster_entity(8) target_entity(8)] = 16바이트 (Session 36: 어그로 변경)
     MONSTER_RESPAWN = 113, // S→C: [entity(8) hp(4) max_hp(4) x(4) y(4) z(4)] = 28바이트
 
     // Session 16: Zone Transfer (존 전환)

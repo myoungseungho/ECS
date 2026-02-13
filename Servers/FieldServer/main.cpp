@@ -1449,6 +1449,16 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
         SendStatSync(world, target);
     }
 
+    // Session 36: 몬스터 피격 시 어그로 추가
+    if (target_is_monster) {
+        auto& mc_aggro = world.GetComponent<MonsterComponent>(target);
+        mc_aggro.AddThreat(entity, static_cast<float>(damage));
+        if (mc_aggro.state == MonsterState::IDLE || mc_aggro.state == MonsterState::PATROL) {
+            mc_aggro.target_entity = mc_aggro.GetTopThreat();
+            mc_aggro.state = MonsterState::CHASE;
+        }
+    }
+
     // Session 34: 보스 피격 시 전투 시작 + 페이즈 체크
     if (target_is_monster && world.HasComponent<BossComponent>(target)) {
         auto& boss = world.GetComponent<BossComponent>(target);
@@ -1489,6 +1499,7 @@ void OnAttackReq(World& world, Entity entity, const char* payload, int len) {
             monster.state = MonsterState::DEAD;
             monster.death_timer = monster.respawn_time;
             monster.target_entity = 0;
+            monster.ClearAggro();  // Session 36: 어그로 초기화
 
             // Session 34: 보스 처치 브로드캐스트
             if (world.HasComponent<BossComponent>(target)) {
@@ -1768,8 +1779,18 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
     printf("[Skill] Entity %llu used %s(lv%d) on %llu: %d damage (HP: %d)\n",
            entity, skill->name, sk_level, target, damage, tgt_stats.hp);
 
-    // Session 34: 보스 피격 시 전투 시작 + 페이즈 체크
+    // Session 36: 몬스터 피격 시 어그로 추가
     bool target_is_monster_sk = world.HasComponent<MonsterComponent>(target);
+    if (target_is_monster_sk) {
+        auto& mc_aggro = world.GetComponent<MonsterComponent>(target);
+        mc_aggro.AddThreat(entity, static_cast<float>(damage));
+        if (mc_aggro.state == MonsterState::IDLE || mc_aggro.state == MonsterState::PATROL) {
+            mc_aggro.target_entity = mc_aggro.GetTopThreat();
+            mc_aggro.state = MonsterState::CHASE;
+        }
+    }
+
+    // Session 34: 보스 피격 시 전투 시작 + 페이즈 체크
     if (target_is_monster_sk && world.HasComponent<BossComponent>(target)) {
         auto& boss = world.GetComponent<BossComponent>(target);
         if (!boss.combat_started) {
@@ -1812,6 +1833,7 @@ void OnSkillUse(World& world, Entity entity, const char* payload, int len) {
             mc.state = MonsterState::DEAD;
             mc.death_timer = mc.respawn_time;
             mc.target_entity = 0;
+            mc.ClearAggro();  // Session 36: 어그로 초기화
 
             // Session 34: 보스 처치 브로드캐스트
             if (world.HasComponent<BossComponent>(target)) {

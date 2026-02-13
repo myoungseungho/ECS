@@ -483,6 +483,28 @@ messages:
       - { name: z, type: f32 }
     total_size: 36
 
+  MONSTER_MOVE:
+    id: 111
+    session: 36
+    direction: S2C
+    payload:
+      - { name: entity, type: u64 }
+      - { name: x, type: f32 }
+      - { name: y, type: f32 }
+      - { name: z, type: f32 }
+    total_size: 20
+    note: "몬스터 이동 브로드캐스트 (순찰/추적/귀환 시). 200ms 간격."
+
+  MONSTER_AGGRO:
+    id: 112
+    session: 36
+    direction: S2C
+    payload:
+      - { name: monster_entity, type: u64 }
+      - { name: target_entity, type: u64 }
+    total_size: 16
+    note: "어그로 타겟 변경. target=0이면 어그로 해제 (귀환 중)."
+
   MONSTER_RESPAWN:
     id: 113
     session: 14
@@ -495,6 +517,41 @@ messages:
       - { name: y, type: f32 }
       - { name: z, type: f32 }
     total_size: 28
+
+# ============================================================
+# Session 36: Monster AI Rules
+# ============================================================
+
+monster_ai:
+  fsm_states:
+    IDLE: 0      # 대기: 주변 감지 + 순찰 전환
+    PATROL: 1    # 순찰: 스폰 주변 이동
+    CHASE: 2     # 추적: 어그로 타겟 추적
+    ATTACK: 3    # 공격: 사거리 내 공격
+    RETURN: 4    # 귀환: 스폰 복귀 + HP 회복
+    DEAD: 5      # 사망: 리스폰 대기
+
+  movement:
+    move_speed: 80.0          # 기본 이동속도 (units/sec)
+    chase_speed_mult: 1.3     # 추적 속도 배율
+    patrol_radius: 100.0      # 순찰 반경
+    arrival_threshold: 10.0   # 도착 판정 거리
+
+  combat:
+    leash_range: 500.0        # 귀환 트리거 거리
+    attack_range: 200.0       # 공격 사거리
+    attack_cooldown: 2.0      # 공격 쿨다운 (초)
+    return_heal_rate: 0.1     # 귀환 중 HP 회복률 (초당 max_hp의 10%)
+
+  aggro:
+    max_entries: 8            # 최대 어그로 테이블 크기
+    detection_threat: 1.0     # 감지 시 초기 위협도
+    damage_threat: "damage"   # 데미지 = 위협도
+    note: "탑 어그로 타겟팅. 리쉬/귀환 시 테이블 초기화."
+
+  broadcast:
+    move_interval: 0.2        # 이동 브로드캐스트 간격 (초)
+    aggro_change: "즉시"       # 어그로 변경 시 즉시 전송
 
 # ============================================================
 # Session 16: Zone Transfer
