@@ -1,0 +1,75 @@
+# Server ↔ DB Agent Contract
+# 서버와 DB 에이전트 간 스키마/SP 계약
+
+contract:
+  name: server_db_schema
+  version: "1.0"
+  parties: [server-agent, db-agent]
+  status: draft  # 아직 DB 에이전트 미합류
+
+# 서버가 필요로 하는 데이터 영속성
+required_tables:
+  TCharacter:
+    description: "캐릭터 기본 정보"
+    fields:
+      - { name: CharUID, type: INT, pk: true }
+      - { name: Name, type: "NVARCHAR(32)" }
+      - { name: Level, type: SMALLINT }
+      - { name: Exp, type: INT }
+      - { name: HP, type: INT }
+      - { name: MaxHP, type: INT }
+      - { name: MP, type: INT }
+      - { name: MaxMP, type: INT }
+      - { name: ATK, type: INT }
+      - { name: DEF, type: INT }
+      - { name: PosX, type: FLOAT }
+      - { name: PosY, type: FLOAT }
+      - { name: ZoneID, type: INT }
+      - { name: Gold, type: INT }
+      - { name: SkillPoints, type: INT }
+    status: proposed
+
+  TInventory:
+    description: "캐릭터 인벤토리"
+    fields:
+      - { name: ItemUID, type: BIGINT, pk: true }
+      - { name: CharUID, type: INT, fk: TCharacter.CharUID }
+      - { name: SlotIndex, type: TINYINT }
+      - { name: ItemID, type: INT }
+      - { name: Count, type: INT }
+      - { name: IsEquipped, type: BIT }
+    status: proposed
+
+  TQuest:
+    description: "퀘스트 진행 상태"
+    fields:
+      - { name: CharUID, type: INT, fk: TCharacter.CharUID }
+      - { name: QuestID, type: INT }
+      - { name: Status, type: TINYINT }  # 0=inactive, 1=active, 2=completed
+      - { name: Progress, type: INT }
+    status: proposed
+
+required_procedures:
+  gp_SaveCharacter:
+    description: "캐릭터 전체 저장"
+    params: "모든 TCharacter 필드"
+    status: proposed
+
+  gp_LoadCharacter:
+    description: "캐릭터 로드"
+    params: "@CharUID INT"
+    returns: "TCharacter 1행"
+    status: proposed
+
+  gp_SaveInventory:
+    description: "인벤토리 저장 (MERGE)"
+    status: proposed
+
+  gp_LoadInventory:
+    description: "인벤토리 로드"
+    status: proposed
+
+# 합의 프로세스:
+# 1. 서버가 proposed로 등록
+# 2. DB 에이전트가 리뷰 후 approved/modified 응답
+# 3. 양쪽 agreed → 구현

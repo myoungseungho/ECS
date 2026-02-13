@@ -1,0 +1,21 @@
+# Server ↔ Client Contract
+# 기존 protocol.yaml 참조 - 이 파일은 링크/요약 역할
+# 상세 패킷 정의: _comms/agreements/protocol.yaml
+
+contract:
+  name: server_client_protocol
+  version: "2.0"
+  parties: [server-agent, client-agent]
+  reference: "../agreements/protocol.yaml"
+
+summary: |
+  96개 메시지 타입 정의 (세션 1~37)
+  패킷 형식: [type(2) payload_len(2) payload(N)]
+  바이트 오더: little-endian
+
+  최근 추가 (세션 30~37):
+  - CHAT_SEND(240) ~ SYSTEM_MESSAGE(244): 채팅
+  - SHOP_OPEN(250) ~ SHOP_RESULT(254): 상점
+  - SKILL_LEVEL_UP(260) ~ SKILL_POINT_INFO(262): 스킬 확장
+  - BOSS_SPAWN(270) ~ BOSS_DEFEATED(274): 보스
+  - ADMIN_RELOAD(280) ~ ADMIN_CONFIG_RESP(283): 핫리로드

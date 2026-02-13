@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "description": "멀티에이전트 시스템 설정 - 6개 에이전트의 역할/소유권/통신 규칙",
+
+  "agents": {
+    "server": {
+      "name": "서버 에이전트",
+      "role": "ECS 서버 스켈레톤, 네트워크, 시스템 로직, 패킷 처리",
+      "prefix": "S",
+      "owned_paths": [
+        "Systems/", "Core/", "Servers/", "Components/",
+        "World.h", "ECS.h"
+      ],
+      "read_only_paths": ["data/", "_comms/contracts/"],
+      "can_message": ["client", "db", "design", "qa", "tool"],
+      "model": "opus",
+      "color": "#4A90D9"
+    },
+    "client": {
+      "name": "클라이언트 에이전트",
+      "role": "Unity C# 클라이언트, 네트워크, UI, 렌더링, 입력 처리",
+      "prefix": "C",
+      "owned_paths": ["Client/"],
+      "read_only_paths": ["_comms/contracts/"],
+      "can_message": ["server", "qa", "design"],
+      "model": "opus",
+      "color": "#50C878"
+    },
+    "db": {
+      "name": "DB 에이전트",
+      "role": "데이터베이스 스키마 설계, 마이그레이션, 저장 프로시저, 데이터 영속성",
+      "prefix": "D",
+      "owned_paths": [
+        "Database/", "schema/", "migrations/", "stored_procedures/"
+      ],
+      "read_only_paths": [],
+      "can_message": ["server", "design", "qa"],
+      "model": "opus",
+      "color": "#E67E22"
+    },
+    "design": {
+      "name": "기획/밸런스 에이전트",
+      "role": "게임 규칙 정의, 수치 밸런싱, CSV/JSON 데이터 테이블 관리, 컨텐츠 기획",
+      "prefix": "G",
+      "owned_paths": [
+        "data/*.json", "data/*.csv", "docs/design/"
+      ],
+      "read_only_paths": [],
+      "can_message": ["server", "client", "db", "qa"],
+      "model": "sonnet",
+      "color": "#9B59B6"
+    },
+    "qa": {
+      "name": "QA/테스트 에이전트",
+      "role": "통합 테스트, 시나리오 테스트, E2E 검증, 부하 테스트, 버그 리포트",
+      "prefix": "Q",
+      "owned_paths": [
+        "tests/", "test_reports/", "test_*.py"
+      ],
+      "read_only_paths": ["*"],
+      "can_message": ["server", "client", "db", "design", "tool"],
+      "model": "sonnet",
+      "color": "#E74C3C"
+    },
+    "tool": {
+      "name": "툴/인프라 에이전트",
+      "role": "GM 도구, 어드민 웹 패널, 모니터링 대시보드, 배포 스크립트, 운영 도구",
+      "prefix": "T",
+      "owned_paths": [
+        "tools/", "admin/", "scripts/"
+      ],
+      "read_only_paths": ["_comms/contracts/"],
+      "can_message": ["server", "qa"],
+      "model": "haiku",
+      "color": "#1ABC9C"
+    }
+  },
+
+  "communication_rules": {
+    "mailbox_pattern": "각 에이전트는 자기 mailbox만 읽고, 상대방 mailbox에만 메시지를 생성한다",
+    "file_naming": "{sender_prefix}{seq:03d}_to_{receiver}_{topic}.md",
+    "conflict_prevention": "각 에이전트는 자기 owned_paths만 수정. 상대 영역은 메시지로 요청.",
+    "blocking_board": "_comms/boards/blocking.md에 등록된 블로킹 이슈는 해결 전까지 관련 작업 금지",
+    "contract_modification": "양자 계약 수정은 양쪽 합의 후에만. 한쪽이 제안 → 상대가 승인"
+  },
+
+  "message_format": {
+    "frontmatter_required": ["id", "from", "to", "type", "priority", "status", "created"],
+    "type_values": ["spec", "question", "answer", "bug", "task", "status", "review", "approval"],
+    "priority_values": ["P0-critical", "P1-high", "P2-normal", "P3-low"],
+    "status_values": ["pending", "read", "in-progress", "resolved", "blocked"]
+  },
+
+  "contracts": {
+    "server_client": {
+      "file": "_comms/contracts/server_client.yaml",
+      "description": "서버↔클라 패킷 프로토콜 (기존 protocol.yaml 링크)",
+      "parties": ["server", "client"]
+    },
+    "server_db": {
+      "file": "_comms/contracts/server_db.yaml",
+      "description": "서버↔DB 스키마/SP 계약",
+      "parties": ["server", "db"]
+    },
+    "design_server": {
+      "file": "_comms/contracts/design_server.yaml",
+      "description": "기획↔서버 데이터 포맷 계약",
+      "parties": ["design", "server"]
+    },
+    "design_db": {
+      "file": "_comms/contracts/design_db.yaml",
+      "description": "기획↔DB 데이터 테이블 계약",
+      "parties": ["design", "db"]
+    }
+  },
+
+  "polling": {
+    "default_interval_sec": 300,
+    "active_interval_sec": 60,
+    "idle_checkin_after": 12
+  }
+}

@@ -1,0 +1,17 @@
+# Design ↔ DB Agent Contract
+# 기획/밸런스 에이전트와 DB 에이전트 간 데이터 테이블 계약
+
+contract:
+  name: design_db_tables
+  version: "1.0"
+  parties: [design-agent, db-agent]
+  status: draft
+
+# 기획이 정의하는 게임 데이터 → DB가 테이블로 구현
+# 기획: "이런 데이터가 필요해" → DB: "이 스키마로 만들게"
+
+# 변경 프로세스:
+# 1. design-agent가 새 데이터 구조 제안
+# 2. db-agent가 스키마 설계 + 최적화
+# 3. 양쪽 합의 후 구현
+# 4. server-agent에 스키마 변경 통보
