@@ -314,7 +314,7 @@ async def run_tests(port: int):
         msg_type, resp = await c.recv_packet()
         assert msg_type == MsgType.SHOP_RESULT, f"Expected SHOP_RESULT, got {msg_type}"
         result = resp[0]
-        assert result == 1, f"Buy should succeed, got result={result}"
+        assert result == 0, f"Buy should succeed (ShopResult::SUCCESS=0), got result={result}"
         c.close()
 
     await test("SHOP: 상점 열기 + 구매", test_shop())

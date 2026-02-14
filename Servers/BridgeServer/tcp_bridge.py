@@ -1391,23 +1391,23 @@ class BridgeServer:
                 break
 
         if not target_session:
-            # 실패 응답
+            # 실패 응답: WhisperResult::TARGET_NOT_FOUND=1
             other_name = target_name.encode('utf-8')[:32].ljust(32, b'\x00')
             self._send(session, MsgType.WHISPER_RESULT,
-                        struct.pack('<BB', 0, 0) + other_name +
+                        struct.pack('<BB', 1, 1) + other_name +
                         struct.pack('<B', 0))
             return
 
-        # 발신자에게 (direction=0: sent)
+        # 발신자에게: WhisperResult::SUCCESS=0, WhisperDirection::SENT=1
         other_name = target_name.encode('utf-8')[:32].ljust(32, b'\x00')
         self._send(session, MsgType.WHISPER_RESULT,
-                    struct.pack('<BB', 1, 0) + other_name +
+                    struct.pack('<BB', 0, 1) + other_name +
                     struct.pack('<B', msg_len) + message.encode('utf-8')[:msg_len])
 
-        # 수신자에게 (direction=1: received)
+        # 수신자에게: WhisperResult::SUCCESS=0, WhisperDirection::RECEIVED=0
         sender_name = session.char_name.encode('utf-8')[:32].ljust(32, b'\x00')
         self._send(target_session, MsgType.WHISPER_RESULT,
-                    struct.pack('<BB', 1, 1) + sender_name +
+                    struct.pack('<BB', 0, 0) + sender_name +
                     struct.pack('<B', msg_len) + message.encode('utf-8')[:msg_len])
 
     # ━━━ 핸들러: 상점 ━━━
@@ -1432,33 +1432,38 @@ class BridgeServer:
         npc_id, item_id, count = struct.unpack('<IIH', payload[:10])
         shop = SHOPS.get(npc_id)
         if not shop:
+            # ShopResult::SHOP_NOT_FOUND=1, ShopAction::BUY=0
             self._send(session, MsgType.SHOP_RESULT,
-                        struct.pack('<BBIHH', 0, 1, item_id, count, 0) + struct.pack('<I', session.gold))
+                        struct.pack('<BBIH', 1, 0, item_id, count) + struct.pack('<I', session.gold))
             return
 
         item_data = next((i for i in shop["items"] if i["item_id"] == item_id), None)
         if not item_data:
+            # ShopResult::ITEM_NOT_FOUND=2, ShopAction::BUY=0
             self._send(session, MsgType.SHOP_RESULT,
-                        struct.pack('<BBIH', 0, 1, item_id, count) + struct.pack('<I', session.gold))
+                        struct.pack('<BBIH', 2, 0, item_id, count) + struct.pack('<I', session.gold))
             return
 
         total_price = item_data["price"] * count
         if session.gold < total_price:
+            # ShopResult::NOT_ENOUGH_GOLD=3, ShopAction::BUY=0
             self._send(session, MsgType.SHOP_RESULT,
-                        struct.pack('<BBIH', 0, 1, item_id, count) + struct.pack('<I', session.gold))
+                        struct.pack('<BBIH', 3, 0, item_id, count) + struct.pack('<I', session.gold))
             return
 
         slot = self._find_empty_slot(session)
         if slot < 0:
+            # ShopResult::INVENTORY_FULL=4, ShopAction::BUY=0
             self._send(session, MsgType.SHOP_RESULT,
-                        struct.pack('<BBIH', 0, 1, item_id, count) + struct.pack('<I', session.gold))
+                        struct.pack('<BBIH', 4, 0, item_id, count) + struct.pack('<I', session.gold))
             return
 
         session.gold -= total_price
         session.inventory[slot].item_id = item_id
         session.inventory[slot].count = count
+        # ShopResult::SUCCESS=0, ShopAction::BUY=0
         self._send(session, MsgType.SHOP_RESULT,
-                    struct.pack('<BBIH', 1, 1, item_id, count) + struct.pack('<I', session.gold))
+                    struct.pack('<BBIH', 0, 0, item_id, count) + struct.pack('<I', session.gold))
         self.log(f"ShopBuy: {session.char_name} bought {item_id}x{count} (-{total_price}g)", "GAME")
 
     async def _on_shop_sell(self, session: PlayerSession, payload: bytes):
@@ -1468,8 +1473,9 @@ class BridgeServer:
         count = struct.unpack('<H', payload[1:3])[0]
 
         if slot >= len(session.inventory) or session.inventory[slot].item_id == 0:
+            # ShopResult::EMPTY_SLOT=6, ShopAction::SELL=1
             self._send(session, MsgType.SHOP_RESULT,
-                        struct.pack('<BBIH', 0, 2, 0, 0) + struct.pack('<I', session.gold))
+                        struct.pack('<BBIH', 6, 1, 0, 0) + struct.pack('<I', session.gold))
             return
 
         item_id = session.inventory[slot].item_id
@@ -1481,8 +1487,9 @@ class BridgeServer:
         if session.inventory[slot].count <= 0:
             session.inventory[slot] = InventorySlot()
 
+        # ShopResult::SUCCESS=0, ShopAction::SELL=1
         self._send(session, MsgType.SHOP_RESULT,
-                    struct.pack('<BBIH', 1, 2, item_id, sell_count) + struct.pack('<I', session.gold))
+                    struct.pack('<BBIH', 0, 1, item_id, sell_count) + struct.pack('<I', session.gold))
 
     # ━━━ 핸들러: 기타 ━━━
 
