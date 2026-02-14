@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T00:15:00"
+last_session: "2026-02-15T01:00:00"
 
 # ── 현재 상태 ──
-current_status: "S035 처리 완료 — Phase 2 TCP 브릿지 연동 테스트 20/20 PASS (53 PASS / 0 FAIL)"
+current_status: "S038/S039 처리 완료 — Phase 3 던전/PvP 매니저+UI 구현 (57 PASS / 0 FAIL)"
 
 # ── 완료된 작업 ──
 completed:
@@ -93,22 +93,38 @@ completed:
     desc: "Phase 2 TCP 브릿지 연동 테스트 — 20/20 PASS"
     files:
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
+  - id: A16
+    desc: "Phase 3 던전/PvP 매니저+UI — DungeonManager/PvPManager + DungeonUI/PvPUI"
+    files:
+      - "Assets/Scripts/Managers/DungeonManager.cs"
+      - "Assets/Scripts/Managers/PvPManager.cs"
+      - "Assets/Scripts/UI/DungeonUI.cs"
+      - "Assets/Scripts/UI/PvPUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_tcp_bridge_client.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
-  - id: "phase3_advanced"
-    desc: "Phase 3 고급 기능 연동 (PvP, 던전 매칭, 레이드 등)"
+  - id: "phase3_bridge_test"
+    desc: "Phase 3 TCP 브릿지 테스트 실행 (서버에 Instance/Match/Guild/Mail 핸들러 추가 후)"
     priority: P1
     blocked: true
-    blocked_reason: "Phase 2 결과 리뷰 후 서버와 Phase 3 범위 합의 필요"
-  - id: "guild_trade_mail_bridge"
-    desc: "Guild/Trade/Mail TCP 브릿지 연동 테스트 추가"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 브릿지에 Guild/Trade/Mail 핸들러 구현 후 (T031)"
+    blocked_reason: "서버 브릿지에 Instance/Match/Guild/Mail 핸들러 구현 필요"
+  - id: "phase3_raid_ui"
+    desc: "레이드 전용 UI — 레이드 보스 페이즈/기믹 가이드 패널"
+    priority: P2
+    blocked: false
+    blocked_reason: ""
+  - id: "unity_play_integration"
+    desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
+    priority: P2
+    blocked: false
+    blocked_reason: ""
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -132,6 +148,10 @@ recent_decisions:
   - "새 매니저 3종: GuildManager, TradeManager, MailManager"
   - "새 UI 3종: GuildUI(G키), TradeUI, MailUI(M키)"
   - "Phase 2 TCP 브릿지 연동 테스트 20/20 PASS — 역사적 첫 실연동 성공"
+  - "Phase 3 던전/PvP 매니저 구현 — Instance(170-174)/Match(180-184) 기존 패킷 활용"
+  - "DungeonManager: 던전 타입(Story/Party/Chaos/Raid/Abyss) + 매칭 상태 머신"
+  - "PvPManager: PvP 모드(Arena1v1/3v3/Battleground) + DungeonType 100+로 PvP 구분"
+  - "Hub v2.0 이벤트 기반 시스템 확인 — agent_loop.py에서 hub.py로 전환"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -169,6 +189,8 @@ processed_messages:
   - "S033"
   - "S034"
   - "S035"
+  - "S038"
+  - "S039"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

@@ -16,6 +16,12 @@ import sys
 import time
 import argparse
 
+# Windows cp949 환경 UnicodeEncodeError 방지 (S038 권고)
+if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 
 # ━━━ 패킷 프로토콜 상수 ━━━
 HEADER_SIZE = 6  # 4(length LE) + 2(type LE)
@@ -80,6 +86,27 @@ class MsgType:
     NPC_DIALOG = 333
     ENHANCE_REQ = 340
     ENHANCE_RESULT = 341
+    # Phase 3: Instance/Matching
+    INSTANCE_CREATE = 170
+    INSTANCE_ENTER = 171
+    INSTANCE_LEAVE = 172
+    INSTANCE_LEAVE_RESULT = 173
+    INSTANCE_INFO = 174
+    MATCH_ENQUEUE = 180
+    MATCH_DEQUEUE = 181
+    MATCH_FOUND = 182
+    MATCH_ACCEPT = 183
+    MATCH_STATUS = 184
+    # Guild/Trade/Mail
+    GUILD_CREATE = 290
+    GUILD_INFO_REQ = 296
+    GUILD_INFO = 297
+    GUILD_LIST_REQ = 298
+    GUILD_LIST = 299
+    TRADE_REQUEST = 300
+    TRADE_RESULT = 307
+    MAIL_LIST_REQ = 311
+    MAIL_LIST = 312
 
 
 # ━━━ 패킷 빌드/파싱 ━━━
@@ -643,11 +670,95 @@ async def run_tests(host: str, port: int):
 
     await test("S035-20 LOBBY_FLOW: Full lobby flow", test_full_lobby_flow())
 
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # Phase 3 테스트 (던전/매칭/길드/우편)
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    # 21. INSTANCE_CREATE -> INSTANCE_ENTER
+    async def test_instance_create():
+        c = TestClient()
+        await c.login_and_enter(host, port, 'dungeon_test_01')
+        # dungeonType=2 (Party Dungeon)
+        await c.send(MsgType.INSTANCE_CREATE, struct.pack('<I', 2))
+        mt, pl = await c.recv_expect(MsgType.INSTANCE_ENTER, timeout=3.0)
+        assert mt == MsgType.INSTANCE_ENTER, f"Expected INSTANCE_ENTER, got {mt}"
+        result = pl[0]
+        instance_id = struct.unpack_from('<I', pl, 1)[0]
+        dungeon_type = struct.unpack_from('<I', pl, 5)[0]
+        assert result == 0, f"Instance create should succeed, got result={result}"
+        assert instance_id > 0, f"Instance ID should be > 0, got {instance_id}"
+        assert dungeon_type == 2, f"Expected dungeon_type=2, got {dungeon_type}"
+        c.close()
+
+    await test("P3-21 INSTANCE_CREATE: dungeon entry", test_instance_create())
+
+    # 22. INSTANCE_LEAVE -> INSTANCE_LEAVE_RESULT
+    async def test_instance_leave():
+        c = TestClient()
+        await c.login_and_enter(host, port, 'dungeon_leave_t')
+        # enter dungeon first
+        await c.send(MsgType.INSTANCE_CREATE, struct.pack('<I', 1))
+        mt, pl = await c.recv_expect(MsgType.INSTANCE_ENTER, timeout=3.0)
+        assert mt == MsgType.INSTANCE_ENTER, f"Expected INSTANCE_ENTER, got {mt}"
+        assert pl[0] == 0, f"Instance create failed: result={pl[0]}"
+        # now leave
+        await c.send(MsgType.INSTANCE_LEAVE)
+        mt, pl = await c.recv_expect(MsgType.INSTANCE_LEAVE_RESULT, timeout=3.0)
+        assert mt == MsgType.INSTANCE_LEAVE_RESULT, f"Expected INSTANCE_LEAVE_RESULT, got {mt}"
+        result = pl[0]
+        assert result == 0, f"Instance leave should succeed, got result={result}"
+        c.close()
+
+    await test("P3-22 INSTANCE_LEAVE: dungeon exit", test_instance_leave())
+
+    # 23. MATCH_ENQUEUE -> MATCH_STATUS
+    async def test_match_enqueue():
+        c = TestClient()
+        await c.login_and_enter(host, port, 'match_q_test01')
+        # enqueue for Party Dungeon
+        await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<I', 2))
+        mt, pl = await c.recv_expect(MsgType.MATCH_STATUS, timeout=3.0)
+        assert mt == MsgType.MATCH_STATUS, f"Expected MATCH_STATUS, got {mt}"
+        status = pl[0]
+        queue_pos = struct.unpack_from('<I', pl, 1)[0]
+        assert status in (0, 1), f"Expected status=0 or 1 (queued), got {status}"
+        # dequeue
+        await c.send(MsgType.MATCH_DEQUEUE)
+        c.close()
+
+    await test("P3-23 MATCH_ENQUEUE: matchmaking queue", test_match_enqueue())
+
+    # 24. GUILD_LIST_REQ -> GUILD_LIST
+    async def test_guild_list():
+        c = TestClient()
+        await c.login_and_enter(host, port, 'guild_list_tst')
+        await c.send(MsgType.GUILD_LIST_REQ)
+        mt, pl = await c.recv_expect(MsgType.GUILD_LIST, timeout=3.0)
+        assert mt == MsgType.GUILD_LIST, f"Expected GUILD_LIST, got {mt}"
+        count = pl[0]
+        assert count >= 0, f"Guild count should be >= 0, got {count}"
+        c.close()
+
+    await test("P3-24 GUILD_LIST: guild listing", test_guild_list())
+
+    # 25. MAIL_LIST_REQ -> MAIL_LIST
+    async def test_mail_list():
+        c = TestClient()
+        await c.login_and_enter(host, port, 'mail_list_test')
+        await c.send(MsgType.MAIL_LIST_REQ)
+        mt, pl = await c.recv_expect(MsgType.MAIL_LIST, timeout=3.0)
+        assert mt == MsgType.MAIL_LIST, f"Expected MAIL_LIST, got {mt}"
+        count = pl[0]
+        assert count >= 0, f"Mail count should be >= 0, got {count}"
+        c.close()
+
+    await test("P3-25 MAIL_LIST: mail listing", test_mail_list())
+
     # ━━━ 결과 요약 ━━━
     fail_count = total - passed
     print()
     print("=" * 55)
-    print(f"  Phase 2 TCP Bridge Client Test: {passed}/{total} PASSED, {fail_count} FAILED")
+    print(f"  Phase 2+3 TCP Bridge Client Test: {passed}/{total} PASSED, {fail_count} FAILED")
     print("=" * 55)
     if failed_names:
         print(f"\n  Failed tests:")
@@ -659,13 +770,13 @@ async def run_tests(host: str, port: int):
 
 
 async def main():
-    parser = argparse.ArgumentParser(description='Phase 2 TCP Bridge Client Test')
+    parser = argparse.ArgumentParser(description='Phase 2+3 TCP Bridge Client Test')
     parser.add_argument('--host', default='127.0.0.1', help='Bridge server host')
     parser.add_argument('--port', type=int, default=7777, help='Bridge server port')
     args = parser.parse_args()
 
     print("=" * 55)
-    print("  Phase 2 TCP Bridge - Client Integration Tests")
+    print("  Phase 2+3 TCP Bridge - Client Integration Tests")
     print(f"  Target: {args.host}:{args.port}")
     print("=" * 55)
     print()

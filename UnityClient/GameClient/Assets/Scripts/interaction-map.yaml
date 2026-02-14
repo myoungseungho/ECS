@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_s029_guild_trade_mail
+version: session_phase3_dungeon_pvp
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -515,6 +515,69 @@ managers:
     computed_properties:
       - Mails (IReadOnlyList<MailListEntry>)
 
+  - name: DungeonManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "던전 인스턴스 + 매칭 시스템 관리 — 생성/입장/퇴장/매칭 큐"
+    reads: []
+    writes:
+      - InDungeon (bool)
+      - CurrentInstanceId (uint)
+      - CurrentDungeonType (uint)
+      - PlayerCount (byte)
+      - MonsterCount (byte)
+      - CurrentMatchState (MatchState)
+      - QueuePosition (uint)
+    fires_events:
+      - OnDungeonEntered(InstanceEnterData)
+      - OnDungeonLeft()
+      - OnDungeonInfoUpdated(InstanceInfoData)
+      - OnMatchFound(MatchFoundData)
+      - OnMatchStateChanged(MatchState)
+    subscribes_to:
+      - NetworkManager.OnInstanceEnter → 던전 입장 결과
+      - NetworkManager.OnInstanceLeaveResult → 던전 퇴장 결과
+      - NetworkManager.OnInstanceInfo → 던전 정보 갱신
+      - NetworkManager.OnMatchFound → 매칭 발견
+      - NetworkManager.OnMatchStatus → 매칭 상태 갱신
+    public_api:
+      - CreateDungeon(uint)
+      - LeaveDungeon()
+      - EnqueueMatch(uint)
+      - DequeueMatch()
+      - AcceptMatch()
+
+  - name: PvPManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "PvP 아레나/전장 관리 — 매칭 큐/수락/입장/퇴장/전적"
+    reads: []
+    writes:
+      - CurrentState (PvPState)
+      - CurrentMode (PvPMode)
+      - QueuePosition (uint)
+      - Rating (int)
+      - Wins (int)
+      - Losses (int)
+    fires_events:
+      - OnStateChanged(PvPState)
+      - OnMatchFound(MatchFoundData)
+      - OnMatchEntered()
+      - OnMatchLeft()
+    subscribes_to:
+      - NetworkManager.OnMatchFound → PvP 매칭 발견 (DungeonType 100+)
+      - NetworkManager.OnMatchStatus → 매칭 상태
+      - NetworkManager.OnInstanceEnter → PvP 인스턴스 입장
+      - NetworkManager.OnInstanceLeaveResult → PvP 인스턴스 퇴장
+    public_api:
+      - QueueForMatch(PvPMode)
+      - DequeueMatch()
+      - AcceptMatch()
+      - LeaveMatch()
+      - IsPvPType(uint) → bool
+
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -836,6 +899,26 @@ data_flows:
     to: MailUI
     via: "C# events (OnMailListChanged, OnMailOpened, OnClaimResult, OnDeleteResult)"
     description: "우편함 UI 갱신 (M키 토글)"
+
+  - from: NetworkManager
+    to: DungeonManager
+    via: "C# events (OnInstanceEnter, OnInstanceLeaveResult, OnInstanceInfo, OnMatchFound, OnMatchStatus)"
+    description: "던전 입장/퇴장/정보/매칭 이벤트 수신"
+
+  - from: DungeonManager
+    to: DungeonUI
+    via: "C# events (OnDungeonEntered, OnDungeonLeft, OnDungeonInfoUpdated, OnMatchFound, OnMatchStateChanged)"
+    description: "던전 UI 갱신 (J키 토글)"
+
+  - from: NetworkManager
+    to: PvPManager
+    via: "C# events (OnMatchFound, OnMatchStatus, OnInstanceEnter, OnInstanceLeaveResult)"
+    description: "PvP 매칭/입장/퇴장 이벤트 수신 (DungeonType 100+ 필터)"
+
+  - from: PvPManager
+    to: PvPUI
+    via: "C# events (OnStateChanged, OnMatchFound)"
+    description: "PvP UI 갱신 (K키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 
