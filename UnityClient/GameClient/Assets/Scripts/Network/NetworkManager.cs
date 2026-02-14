@@ -117,6 +117,23 @@ namespace Network
         public event Action<MailReadData> OnMailRead;
         public event Action<MailClaimResultData> OnMailClaimResult;
         public event Action<MailDeleteResultData> OnMailDeleteResult;
+        // S036: PvP 아레나
+        public event Action<PvPQueueStatusData> OnPvPQueueStatus;
+        public event Action<PvPMatchFoundData> OnPvPMatchFound;
+        public event Action<PvPMatchStartData> OnPvPMatchStart;
+        public event Action<PvPAttackResultData> OnPvPAttackResult;
+        public event Action<PvPMatchEndData> OnPvPMatchEnd;
+        public event Action<PvPRatingInfoData> OnPvPRatingInfo;
+        // S036: 레이드 보스
+        public event Action<RaidBossSpawnData> OnRaidBossSpawn;
+        public event Action<RaidPhaseChangeData> OnRaidPhaseChange;
+        public event Action<RaidMechanicData> OnRaidMechanic;
+        public event Action<RaidMechanicResultData> OnRaidMechanicResult;
+        public event Action<RaidStaggerData> OnRaidStagger;
+        public event Action<uint> OnRaidEnrage;
+        public event Action<RaidWipeData> OnRaidWipe;
+        public event Action<RaidClearData> OnRaidClear;
+        public event Action<RaidAttackResultData> OnRaidAttackResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -617,6 +634,40 @@ namespace Network
         public void DeleteMail(uint mailId)
         {
             _field?.Send(PacketBuilder.MailDelete(mailId));
+        }
+
+        // ━━━ S036: PvP 아레나 API ━━━
+
+        /// <summary>PvP 큐 등록 (mode: 1=1v1, 2=3v3)</summary>
+        public void PvPQueueReq(byte mode)
+        {
+            _field?.Send(PacketBuilder.PvPQueueReq(mode));
+        }
+
+        /// <summary>PvP 큐 취소</summary>
+        public void PvPQueueCancel()
+        {
+            _field?.Send(PacketBuilder.PvPQueueCancel());
+        }
+
+        /// <summary>PvP 매치 수락</summary>
+        public void PvPMatchAccept(uint matchId)
+        {
+            _field?.Send(PacketBuilder.PvPMatchAccept(matchId));
+        }
+
+        /// <summary>PvP 공격</summary>
+        public void PvPAttack(uint matchId, byte targetTeam, byte targetIdx, ushort skillId, ushort damage)
+        {
+            _field?.Send(PacketBuilder.PvPAttack(matchId, targetTeam, targetIdx, skillId, damage));
+        }
+
+        // ━━━ S036: 레이드 API ━━━
+
+        /// <summary>레이드 보스 공격</summary>
+        public void RaidAttack(uint instanceId, ushort skillId, uint damage)
+        {
+            _field?.Send(PacketBuilder.RaidAttack(instanceId, skillId, damage));
         }
 
         /// <summary>연결 끊기</summary>
@@ -1250,6 +1301,130 @@ namespace Network
                     var data = PacketBuilder.ParseMailDeleteResult(payload);
                     Debug.Log($"[Net] MailDelete: result={data.Result}, id={data.MailId}");
                     OnMailDeleteResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S036: PvP 아레나 ━━━
+
+                case MsgType.PVP_QUEUE_STATUS:
+                {
+                    var data = PacketBuilder.ParsePvPQueueStatus(payload);
+                    Debug.Log($"[Net] PvPQueueStatus: mode={data.ModeId}, status={data.Status}, count={data.QueueCount}");
+                    OnPvPQueueStatus?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_MATCH_FOUND:
+                {
+                    var data = PacketBuilder.ParsePvPMatchFound(payload);
+                    Debug.Log($"[Net] PvPMatchFound: matchId={data.MatchId}, mode={data.ModeId}, team={data.TeamId}");
+                    OnPvPMatchFound?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_MATCH_START:
+                {
+                    var data = PacketBuilder.ParsePvPMatchStart(payload);
+                    Debug.Log($"[Net] PvPMatchStart: matchId={data.MatchId}, team={data.TeamId}, timeLimit={data.TimeLimit}s");
+                    OnPvPMatchStart?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_ATTACK_RESULT:
+                {
+                    var data = PacketBuilder.ParsePvPAttackResult(payload);
+                    Debug.Log($"[Net] PvPAttackResult: matchId={data.MatchId}, dmg={data.Damage}, hp={data.RemainingHP}");
+                    OnPvPAttackResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_MATCH_END:
+                {
+                    var data = PacketBuilder.ParsePvPMatchEnd(payload);
+                    Debug.Log($"[Net] PvPMatchEnd: matchId={data.MatchId}, won={data.Won}, rating={data.NewRating}, tier={data.Tier}");
+                    OnPvPMatchEnd?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_RATING_INFO:
+                {
+                    var data = PacketBuilder.ParsePvPRatingInfo(payload);
+                    Debug.Log($"[Net] PvPRatingInfo: rating={data.Rating}, tier={data.Tier}, W={data.Wins}/L={data.Losses}");
+                    OnPvPRatingInfo?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S036: 레이드 보스 ━━━
+
+                case MsgType.RAID_BOSS_SPAWN:
+                {
+                    var data = PacketBuilder.ParseRaidBossSpawn(payload);
+                    Debug.Log($"[Net] RaidBossSpawn: {data.BossName}, hp={data.CurrentHP}/{data.MaxHP}, phase={data.Phase}/{data.MaxPhases}, enrage={data.EnrageTimer}s");
+                    OnRaidBossSpawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_PHASE_CHANGE:
+                {
+                    var data = PacketBuilder.ParseRaidPhaseChange(payload);
+                    Debug.Log($"[Net] RaidPhaseChange: phase={data.Phase}/{data.MaxPhases}");
+                    OnRaidPhaseChange?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_MECHANIC:
+                {
+                    var data = PacketBuilder.ParseRaidMechanic(payload);
+                    Debug.Log($"[Net] RaidMechanic: id={data.MechanicId}, phase={data.Phase}");
+                    OnRaidMechanic?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_MECHANIC_RESULT:
+                {
+                    var data = PacketBuilder.ParseRaidMechanicResult(payload);
+                    Debug.Log($"[Net] RaidMechanicResult: id={data.MechanicId}, success={data.Success}");
+                    OnRaidMechanicResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_STAGGER:
+                {
+                    var data = PacketBuilder.ParseRaidStagger(payload);
+                    Debug.Log($"[Net] RaidStagger: gauge={data.StaggerGauge}");
+                    OnRaidStagger?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_ENRAGE:
+                {
+                    uint instanceId = BitConverter.ToUInt32(payload, 0);
+                    Debug.Log($"[Net] RaidEnrage: instance={instanceId}");
+                    OnRaidEnrage?.Invoke(instanceId);
+                    break;
+                }
+
+                case MsgType.RAID_WIPE:
+                {
+                    var data = PacketBuilder.ParseRaidWipe(payload);
+                    Debug.Log($"[Net] RaidWipe: instance={data.InstanceId}, phase={data.Phase}");
+                    OnRaidWipe?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_CLEAR:
+                {
+                    var data = PacketBuilder.ParseRaidClear(payload);
+                    Debug.Log($"[Net] RaidClear: gold={data.Gold}, exp={data.Exp}, tokens={data.Tokens}");
+                    OnRaidClear?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.RAID_ATTACK_RESULT:
+                {
+                    var data = PacketBuilder.ParseRaidAttackResult(payload);
+                    Debug.Log($"[Net] RaidAttackResult: dmg={data.Damage}, hp={data.CurrentHP}/{data.MaxHP}");
+                    OnRaidAttackResult?.Invoke(data);
                     break;
                 }
 

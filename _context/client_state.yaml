@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T01:00:00"
+last_session: "2026-02-15T02:00:00"
 
 # ── 현재 상태 ──
-current_status: "S038/S039 처리 완료 — Phase 3 던전/PvP 매니저+UI 구현 (57 PASS / 0 FAIL)"
+current_status: "S040 처리 완료 — PvP Arena(350-359) 리라이트 + Raid Boss(370-379) 신규 구현 (59 PASS / 0 FAIL)"
 
 # ── 완료된 작업 ──
 completed:
@@ -104,6 +104,25 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
+  - id: A17
+    desc: "PvP Arena 전용 패킷(350-359) 리라이트 — PvPManager/PvPUI 전면 교체"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/PvPManager.cs"
+      - "Assets/Scripts/UI/PvPUI.cs"
+  - id: A18
+    desc: "Raid Boss 시스템(370-379) 신규 — RaidManager + RaidUI + 패킷 연동"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/RaidManager.cs"
+      - "Assets/Scripts/UI/RaidUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -111,18 +130,18 @@ blocked: []
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
   - id: "phase3_bridge_test"
-    desc: "Phase 3 TCP 브릿지 테스트 실행 (서버에 Instance/Match/Guild/Mail 핸들러 추가 후)"
+    desc: "Phase 3 TCP 브릿지 테스트 실행 (Dungeon/PvP/Raid/Guild/Trade/Mail 전체)"
     priority: P1
-    blocked: true
-    blocked_reason: "서버 브릿지에 Instance/Match/Guild/Mail 핸들러 구현 필요"
-  - id: "phase3_raid_ui"
-    desc: "레이드 전용 UI — 레이드 보스 페이즈/기믹 가이드 패널"
-    priority: P2
     blocked: false
     blocked_reason: ""
   - id: "unity_play_integration"
     desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
     priority: P2
+    blocked: false
+    blocked_reason: ""
+  - id: "packetbuilder_cleanup"
+    desc: "PacketBuilder.cs T031/S029 중복 guild/trade/mail 메서드 정리"
+    priority: P3
     blocked: false
     blocked_reason: ""
 
@@ -152,6 +171,9 @@ recent_decisions:
   - "DungeonManager: 던전 타입(Story/Party/Chaos/Raid/Abyss) + 매칭 상태 머신"
   - "PvPManager: PvP 모드(Arena1v1/3v3/Battleground) + DungeonType 100+로 PvP 구분"
   - "Hub v2.0 이벤트 기반 시스템 확인 — agent_loop.py에서 hub.py로 전환"
+  - "S040 확인: PvP 전용 패킷(350-359)으로 전면 교체, Instance/Match 재활용 폐기"
+  - "Raid Boss 시스템(370-379) 신규 구현 — 3페이즈/6기믹/스태거/인레이지"
+  - "RaidManager: DungeonType==4로 레이드 진입 감지, OnInstanceEnter 구독"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -191,6 +213,7 @@ processed_messages:
   - "S035"
   - "S038"
   - "S039"
+  - "S040"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

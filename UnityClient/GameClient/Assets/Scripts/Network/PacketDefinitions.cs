@@ -238,6 +238,30 @@ namespace Network
         MAIL_CLAIM_RESULT  = 316,  // S→C: result(1) mail_id(4) = 5B
         MAIL_DELETE        = 317,  // C→S: mail_id(4)
         MAIL_DELETE_RESULT = 318,  // S→C: result(1) mail_id(4) = 5B
+
+        // PvP 아레나 (S036)
+        PVP_QUEUE_REQ      = 350,  // C→S: mode(1) (1=1v1, 2=3v3)
+        PVP_QUEUE_CANCEL   = 351,  // C→S: empty
+        PVP_QUEUE_STATUS   = 352,  // S→C: mode_id(1) status(1) queue_count(2)
+        PVP_MATCH_FOUND    = 353,  // S→C: match_id(4) mode_id(1) team_id(1)
+        PVP_MATCH_ACCEPT   = 354,  // C→S: match_id(4)
+        PVP_MATCH_START    = 355,  // S→C: match_id(4) team_id(1) time_limit(2)
+        PVP_MATCH_END      = 356,  // S→C: match_id(4) winner_team(1) won(1) new_rating(2) tier(16B)
+        PVP_ATTACK         = 357,  // C→S: match_id(4) target_team(1) target_idx(1) skill_id(2) damage(2)
+        PVP_ATTACK_RESULT  = 358,  // S→C: match_id(4) attacker_team(1) target_team(1) target_idx(1) damage(2) remaining_hp(4)
+        PVP_RATING_INFO    = 359,  // S→C: rating(2) tier(16B) wins(2) losses(2)
+
+        // 레이드 보스 (S036)
+        RAID_BOSS_SPAWN    = 370,  // S→C: instance_id(4) boss_name(32) max_hp(4) current_hp(4) phase(1) max_phases(1) enrage_timer(2)
+        RAID_PHASE_CHANGE  = 371,  // S→C: instance_id(4) phase(1) max_phases(1)
+        RAID_MECHANIC      = 372,  // S→C: instance_id(4) mechanic_id(1) phase(1)
+        RAID_MECHANIC_RESULT = 373, // S→C: instance_id(4) mechanic_id(1) success(1)
+        RAID_STAGGER       = 374,  // S→C: instance_id(4) stagger_gauge(1)
+        RAID_ENRAGE        = 375,  // S→C: instance_id(4)
+        RAID_WIPE          = 376,  // S→C: instance_id(4) phase(1)
+        RAID_CLEAR         = 377,  // S→C: instance_id(4) gold(4) exp(4) tokens(2)
+        RAID_ATTACK        = 378,  // C→S: instance_id(4) skill_id(2) damage(4)
+        RAID_ATTACK_RESULT = 379,  // S→C: instance_id(4) skill_id(2) damage(4) current_hp(4) max_hp(4)
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -1038,5 +1062,153 @@ namespace Network
     {
         public MailDeleteResult Result;
         public uint MailId;
+    }
+
+    // ━━━ S036: PvP 아레나 ━━━
+
+    /// <summary>PvP 큐 상태 코드</summary>
+    public enum PvPQueueStatus : byte
+    {
+        QUEUED        = 0,
+        INVALID_MODE  = 1,
+        LEVEL_TOO_LOW = 2,
+        ALREADY_QUEUED = 3,
+        CANCELLED     = 4,
+    }
+
+    /// <summary>PvP 큐 상태 데이터 (PVP_QUEUE_STATUS 파싱용)</summary>
+    public class PvPQueueStatusData
+    {
+        public byte ModeId;
+        public PvPQueueStatus Status;
+        public ushort QueueCount;
+    }
+
+    /// <summary>PvP 매치 발견 데이터 (PVP_MATCH_FOUND 파싱용)</summary>
+    public class PvPMatchFoundData
+    {
+        public uint MatchId;
+        public byte ModeId;
+        public byte TeamId;
+    }
+
+    /// <summary>PvP 매치 시작 데이터 (PVP_MATCH_START 파싱용)</summary>
+    public class PvPMatchStartData
+    {
+        public uint MatchId;
+        public byte TeamId;
+        public ushort TimeLimit;
+    }
+
+    /// <summary>PvP 공격 결과 데이터 (PVP_ATTACK_RESULT 파싱용)</summary>
+    public class PvPAttackResultData
+    {
+        public uint MatchId;
+        public byte AttackerTeam;
+        public byte TargetTeam;
+        public byte TargetIdx;
+        public ushort Damage;
+        public uint RemainingHP;
+    }
+
+    /// <summary>PvP 매치 종료 데이터 (PVP_MATCH_END 파싱용)</summary>
+    public class PvPMatchEndData
+    {
+        public uint MatchId;
+        public byte WinnerTeam;
+        public byte Won;
+        public ushort NewRating;
+        public string Tier;
+    }
+
+    /// <summary>PvP 레이팅 정보 (PVP_RATING_INFO 파싱용)</summary>
+    public class PvPRatingInfoData
+    {
+        public ushort Rating;
+        public string Tier;
+        public ushort Wins;
+        public ushort Losses;
+    }
+
+    // ━━━ S036: 레이드 보스 ━━━
+
+    /// <summary>레이드 기믹 ID</summary>
+    public enum RaidMechanicId : byte
+    {
+        SAFE_ZONE      = 1,
+        STAGGER_CHECK  = 2,
+        COUNTER_ATTACK = 3,
+        POSITION_SWAP  = 4,
+        DPS_CHECK      = 5,
+        COOPERATION    = 6,
+    }
+
+    /// <summary>레이드 보스 스폰 데이터 (RAID_BOSS_SPAWN 파싱용)</summary>
+    public class RaidBossSpawnData
+    {
+        public uint InstanceId;
+        public string BossName;
+        public uint MaxHP;
+        public uint CurrentHP;
+        public byte Phase;
+        public byte MaxPhases;
+        public ushort EnrageTimer;
+    }
+
+    /// <summary>레이드 페이즈 변경 데이터 (RAID_PHASE_CHANGE 파싱용)</summary>
+    public class RaidPhaseChangeData
+    {
+        public uint InstanceId;
+        public byte Phase;
+        public byte MaxPhases;
+    }
+
+    /// <summary>레이드 기믹 데이터 (RAID_MECHANIC 파싱용)</summary>
+    public class RaidMechanicData
+    {
+        public uint InstanceId;
+        public RaidMechanicId MechanicId;
+        public byte Phase;
+    }
+
+    /// <summary>레이드 기믹 결과 (RAID_MECHANIC_RESULT 파싱용)</summary>
+    public class RaidMechanicResultData
+    {
+        public uint InstanceId;
+        public RaidMechanicId MechanicId;
+        public bool Success;
+    }
+
+    /// <summary>레이드 스태거 데이터 (RAID_STAGGER 파싱용)</summary>
+    public class RaidStaggerData
+    {
+        public uint InstanceId;
+        public byte StaggerGauge;
+    }
+
+    /// <summary>레이드 공격 결과 (RAID_ATTACK_RESULT 파싱용)</summary>
+    public class RaidAttackResultData
+    {
+        public uint InstanceId;
+        public ushort SkillId;
+        public uint Damage;
+        public uint CurrentHP;
+        public uint MaxHP;
+    }
+
+    /// <summary>레이드 클리어 데이터 (RAID_CLEAR 파싱용)</summary>
+    public class RaidClearData
+    {
+        public uint InstanceId;
+        public uint Gold;
+        public uint Exp;
+        public ushort Tokens;
+    }
+
+    /// <summary>레이드 와이프 데이터 (RAID_WIPE 파싱용)</summary>
+    public class RaidWipeData
+    {
+        public uint InstanceId;
+        public byte Phase;
     }
 }

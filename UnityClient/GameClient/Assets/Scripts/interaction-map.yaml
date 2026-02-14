@@ -552,31 +552,80 @@ managers:
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "PvP 아레나/전장 관리 — 매칭 큐/수락/입장/퇴장/전적"
+    purpose: "PvP 아레나 관리 — S036 전용 패킷(350-359) 기반 매칭/전투/레이팅"
     reads: []
     writes:
       - CurrentState (PvPState)
       - CurrentMode (PvPMode)
-      - QueuePosition (uint)
-      - Rating (int)
-      - Wins (int)
-      - Losses (int)
+      - QueueCount (ushort)
+      - Rating (ushort)
+      - Tier (string)
+      - Wins (ushort)
+      - Losses (ushort)
     fires_events:
       - OnStateChanged(PvPState)
-      - OnMatchFound(MatchFoundData)
-      - OnMatchEntered()
-      - OnMatchLeft()
+      - OnMatchFound(PvPMatchFoundData)
+      - OnMatchStarted(PvPMatchStartData)
+      - OnAttackResult(PvPAttackResultData)
+      - OnMatchEnded(PvPMatchEndData)
+      - OnRatingUpdated(PvPRatingInfoData)
     subscribes_to:
-      - NetworkManager.OnMatchFound → PvP 매칭 발견 (DungeonType 100+)
-      - NetworkManager.OnMatchStatus → 매칭 상태
-      - NetworkManager.OnInstanceEnter → PvP 인스턴스 입장
-      - NetworkManager.OnInstanceLeaveResult → PvP 인스턴스 퇴장
+      - NetworkManager.OnPvPQueueStatus → 큐 상태
+      - NetworkManager.OnPvPMatchFound → PvP 매칭 발견
+      - NetworkManager.OnPvPMatchStart → 매치 시작
+      - NetworkManager.OnPvPAttackResult → 공격 결과
+      - NetworkManager.OnPvPMatchEnd → 매치 종료
+      - NetworkManager.OnPvPRatingInfo → 레이팅 정보
     public_api:
       - QueueForMatch(PvPMode)
-      - DequeueMatch()
+      - CancelQueue()
       - AcceptMatch()
+      - Attack(byte, byte, ushort, ushort)
       - LeaveMatch()
-      - IsPvPType(uint) → bool
+
+  - name: RaidManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "레이드 보스 관리 — S036 패킷(370-379) 기반 3페이즈/기믹6종/스태거/인레이지"
+    reads: []
+    writes:
+      - CurrentState (RaidState)
+      - InstanceId (uint)
+      - BossName (string)
+      - BossMaxHP (uint)
+      - BossCurrentHP (uint)
+      - CurrentPhase (byte)
+      - MaxPhases (byte)
+      - EnrageTimer (ushort)
+      - StaggerGauge (byte)
+      - IsEnraged (bool)
+    fires_events:
+      - OnBossSpawned(RaidBossSpawnData)
+      - OnPhaseChanged(RaidPhaseChangeData)
+      - OnMechanicStarted(RaidMechanicData)
+      - OnMechanicResult(RaidMechanicResultData)
+      - OnStaggerUpdated(byte)
+      - OnEnraged()
+      - OnWiped(RaidWipeData)
+      - OnCleared(RaidClearData)
+      - OnAttackResult(RaidAttackResultData)
+    subscribes_to:
+      - NetworkManager.OnRaidBossSpawn → 보스 스폰
+      - NetworkManager.OnRaidPhaseChange → 페이즈 변경
+      - NetworkManager.OnRaidMechanic → 기믹 발동
+      - NetworkManager.OnRaidMechanicResult → 기믹 결과
+      - NetworkManager.OnRaidStagger → 스태거 게이지
+      - NetworkManager.OnRaidEnrage → 인레이지
+      - NetworkManager.OnRaidWipe → 와이프
+      - NetworkManager.OnRaidClear → 클리어
+      - NetworkManager.OnRaidAttackResult → 공격 결과
+      - NetworkManager.OnInstanceEnter → 레이드 인스턴스 입장
+      - NetworkManager.OnInstanceLeaveResult → 퇴장
+    public_api:
+      - AttackBoss(ushort, uint)
+      - LeaveRaid()
+      - GetMechanicName(RaidMechanicId) → string
 
   - name: HitVFXManager
     namespace: (global)
@@ -912,13 +961,23 @@ data_flows:
 
   - from: NetworkManager
     to: PvPManager
-    via: "C# events (OnMatchFound, OnMatchStatus, OnInstanceEnter, OnInstanceLeaveResult)"
-    description: "PvP 매칭/입장/퇴장 이벤트 수신 (DungeonType 100+ 필터)"
+    via: "C# events (OnPvPQueueStatus, OnPvPMatchFound, OnPvPMatchStart, OnPvPAttackResult, OnPvPMatchEnd, OnPvPRatingInfo)"
+    description: "PvP 전용 패킷(350-359) 큐/매칭/전투/레이팅 수신"
 
   - from: PvPManager
     to: PvPUI
-    via: "C# events (OnStateChanged, OnMatchFound)"
+    via: "C# events (OnStateChanged, OnMatchFound, OnMatchEnded, OnRatingUpdated)"
     description: "PvP UI 갱신 (K키 토글)"
+
+  - from: NetworkManager
+    to: RaidManager
+    via: "C# events (OnRaidBossSpawn, OnRaidPhaseChange, OnRaidMechanic, OnRaidMechanicResult, OnRaidStagger, OnRaidEnrage, OnRaidWipe, OnRaidClear, OnRaidAttackResult, OnInstanceEnter, OnInstanceLeaveResult)"
+    description: "레이드 보스 패킷(370-379) + 인스턴스 입장/퇴장"
+
+  - from: RaidManager
+    to: RaidUI
+    via: "C# events (OnBossSpawned, OnPhaseChanged, OnMechanicStarted, OnMechanicResult, OnStaggerUpdated, OnEnraged, OnWiped, OnCleared, OnAttackResult)"
+    description: "레이드 보스 UI (HP바/페이즈/기믹/스태거/보상)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

@@ -592,6 +592,7 @@ public static class ProjectSetup
         var mailManagerGo = CreateManagerObject("MailManager", typeof(MailManager));
         var dungeonManagerGo = CreateManagerObject("DungeonManager", typeof(DungeonManager));
         var pvpManagerGo = CreateManagerObject("PvPManager", typeof(PvPManager));
+        var raidManagerGo = CreateManagerObject("RaidManager", typeof(RaidManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");
