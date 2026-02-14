@@ -626,6 +626,9 @@ public static class ProjectSetup
         var guildWarManagerGo = CreateManagerObject("GuildWarManager", typeof(GuildWarManager));
         var battlegroundUIGo = CreateManagerObject("BattlegroundUI", typeof(BattlegroundUI));
         var guildWarUIGo = CreateManagerObject("GuildWarUI", typeof(GuildWarUI));
+        var currencyManagerGo = CreateManagerObject("CurrencyManager", typeof(CurrencyManager));
+        var currencyUIGo = CreateManagerObject("CurrencyUI", typeof(CurrencyUI));
+        var tokenShopUIGo = CreateManagerObject("TokenShopUI", typeof(TokenShopUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

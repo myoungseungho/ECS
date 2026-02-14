@@ -213,6 +213,10 @@ namespace Network
         public event Action<BattlegroundStatusData> OnBattlegroundStatus;
         public event Action<BattlegroundScoreUpdateData> OnBattlegroundScoreUpdate;
         public event Action<GuildWarStatusData> OnGuildWarStatus;
+        // S054: 보조 화폐/토큰 상점
+        public event Action<CurrencyInfoData> OnCurrencyInfo;
+        public event Action<TokenShopData> OnTokenShop;
+        public event Action<TokenShopBuyResultData> OnTokenShopBuyResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1141,6 +1145,26 @@ namespace Network
         public void GuildWarAction(byte action, uint targetGuildId)
         {
             _field?.Send(PacketBuilder.GuildWarDeclare(action, targetGuildId));
+        }
+
+        // ━━━ S054: 보조 화폐/토큰 상점 API ━━━
+
+        /// <summary>전체 화폐 조회</summary>
+        public void RequestCurrencyQuery()
+        {
+            _field?.Send(PacketBuilder.CurrencyQuery());
+        }
+
+        /// <summary>토큰 상점 목록 요청 (shopType: 0=던전, 1=PvP, 2=길드)</summary>
+        public void RequestTokenShopList(byte shopType)
+        {
+            _field?.Send(PacketBuilder.TokenShopList(shopType));
+        }
+
+        /// <summary>토큰 상점 구매</summary>
+        public void RequestTokenShopBuy(ushort shopId, byte quantity)
+        {
+            _field?.Send(PacketBuilder.TokenShopBuy(shopId, quantity));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2431,6 +2455,30 @@ namespace Network
                     var data = PacketBuilder.ParseGuildWarStatus(payload);
                     Debug.Log($"[Net] GuildWarStatus: status={data.Status}, war={data.WarId}, hpA={data.CrystalHpA}, hpB={data.CrystalHpB}");
                     OnGuildWarStatus?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S054: 보조 화폐/토큰 상점 (TASK 10) ━━━
+
+                case MsgType.CURRENCY_INFO:
+                {
+                    var data = PacketBuilder.ParseCurrencyInfo(payload);
+                    Debug.Log($"[Net] CurrencyInfo: gold={data.Gold}, silver={data.Silver}, dt={data.DungeonToken}, pvp={data.PvpToken}, gc={data.GuildContribution}");
+                    OnCurrencyInfo?.Invoke(data);
+                    break;
+                }
+                case MsgType.TOKEN_SHOP:
+                {
+                    var data = PacketBuilder.ParseTokenShop(payload);
+                    Debug.Log($"[Net] TokenShop: type={data.ShopType}, items={data.Items.Length}");
+                    OnTokenShop?.Invoke(data);
+                    break;
+                }
+                case MsgType.TOKEN_SHOP_BUY_RESULT:
+                {
+                    var data = PacketBuilder.ParseTokenShopBuyResult(payload);
+                    Debug.Log($"[Net] TokenShopBuyResult: result={data.Result}, shopId={data.ShopId}, remaining={data.RemainingCurrency}");
+                    OnTokenShopBuyResult?.Invoke(data);
                     break;
                 }
 

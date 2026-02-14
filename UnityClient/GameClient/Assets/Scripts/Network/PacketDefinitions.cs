@@ -409,6 +409,14 @@ namespace Network
         GUILD_WAR_DECLARE           = 434,  // C→S: action(u8)+target_guild_id(u32) — action: 0=declare, 1=accept, 2=reject, 3=query
         GUILD_WAR_STATUS            = 435,  // S→C: status(u8)+war_id(u32)+guild_a(u32)+guild_b(u32)+crystal_hp_a(u32)+crystal_hp_b(u32)+time(u32)
 
+        // ━━━ S054: 보조 화폐/토큰 상점 (TASK 10, MsgType 468-473) ━━━
+        CURRENCY_QUERY          = 468,  // C→S: empty (전체 화폐 조회)
+        CURRENCY_INFO           = 469,  // S→C: gold(4u32)+silver(4u32)+dungeon_token(4u32)+pvp_token(4u32)+guild_contribution(4u32)
+        TOKEN_SHOP_LIST         = 470,  // C→S: shop_type(1u8) — 0=던전/1=PvP/2=길드
+        TOKEN_SHOP              = 471,  // S→C: shop_type(1)+count(1)+[shop_id(2u16)+price(4u32)+currency_type(1u8)+name_len(1)+name(utf8)]*N
+        TOKEN_SHOP_BUY          = 472,  // C→S: shop_id(2u16)+quantity(1u8)
+        TOKEN_SHOP_BUY_RESULT   = 473,  // S→C: result(1u8)+shop_id(2u16)+remaining_currency(4u32)
+
         // ━━━ S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405) ━━━
         DAILY_QUEST_LIST_REQ    = 400,  // C→S: empty
         DAILY_QUEST_LIST        = 401,  // S→C: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
@@ -2509,5 +2517,61 @@ namespace Network
         public uint CrystalHpA;
         public uint CrystalHpB;
         public uint TimeRemaining;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S054: 보조 화폐/토큰 상점 (TASK 10, MsgType 468-473)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>화폐 정보 데이터 (CURRENCY_INFO 파싱용)</summary>
+    public class CurrencyInfoData
+    {
+        public uint Gold;
+        public uint Silver;
+        public uint DungeonToken;
+        public uint PvpToken;
+        public uint GuildContribution;
+    }
+
+    /// <summary>토큰 상점 타입</summary>
+    public enum TokenShopType : byte
+    {
+        DUNGEON = 0,
+        PVP     = 1,
+        GUILD   = 2,
+    }
+
+    /// <summary>토큰 상점 아이템 정보 (TOKEN_SHOP 파싱용)</summary>
+    public class TokenShopItem
+    {
+        public ushort ShopId;
+        public uint Price;
+        public byte CurrencyType;
+        public string Name;
+    }
+
+    /// <summary>토큰 상점 목록 데이터 (TOKEN_SHOP 파싱용)</summary>
+    public class TokenShopData
+    {
+        public TokenShopType ShopType;
+        public TokenShopItem[] Items;
+    }
+
+    /// <summary>토큰 상점 구매 결과 코드</summary>
+    public enum TokenShopBuyResult : byte
+    {
+        SUCCESS             = 0,
+        INSUFFICIENT_TOKEN  = 1,
+        INVALID_ITEM        = 2,
+        CURRENCY_AT_MAX     = 3,
+        INVENTORY_FULL      = 4,
+    }
+
+    /// <summary>토큰 상점 구매 결과 데이터 (TOKEN_SHOP_BUY_RESULT 파싱용)</summary>
+    public class TokenShopBuyResultData
+    {
+        public TokenShopBuyResult Result;
+        public ushort ShopId;
+        public uint RemainingCurrency;
     }
 }

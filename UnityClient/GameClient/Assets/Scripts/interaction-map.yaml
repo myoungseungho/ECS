@@ -1562,6 +1562,78 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: CurrencyManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "보조 화폐/토큰 상점 관리 — S054 TASK 10 (MsgType 468-473) 화폐 5종 + 토큰 상점 3종"
+    reads: []
+    writes:
+      - _gold (uint)
+      - _silver (uint)
+      - _dungeonToken (uint)
+      - _pvpToken (uint)
+      - _guildContribution (uint)
+      - _isCurrencyPanelOpen (bool)
+      - _isTokenShopOpen (bool)
+      - _currentShopType (TokenShopType)
+      - _currentShopItems (TokenShopItem[])
+    fires_events:
+      - OnCurrencyChanged(CurrencyInfoData)
+      - OnTokenShopListReceived(TokenShopData)
+      - OnTokenShopBuyComplete(TokenShopBuyResultData)
+      - OnCurrencyPanelOpened()
+      - OnCurrencyPanelClosed()
+      - OnTokenShopOpened()
+      - OnTokenShopClosed()
+    subscribes_to:
+      - NetworkManager.OnCurrencyInfo → 화폐 정보 수신
+      - NetworkManager.OnTokenShop → 토큰 상점 목록 수신
+      - NetworkManager.OnTokenShopBuyResult → 구매 결과 수신
+    public_api:
+      - OpenCurrencyPanel()
+      - CloseCurrencyPanel()
+      - OpenTokenShop(shopType)
+      - CloseTokenShop()
+      - QueryCurrency()
+      - BuyTokenShopItem(shopId, quantity)
+      - GetCurrencyByType(shopType)
+      - GetCurrencyName(shopType)
+    computed_properties:
+      - Gold, Silver, DungeonToken, PvpToken, GuildContribution
+      - IsCurrencyPanelOpen, IsTokenShopOpen, CurrentShopType, CurrentShopItems
+
+  - name: CurrencyUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "화폐 표시 패널 — S054 TASK 10 (F9키 토글) 골드/실버/토큰 표시"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - CurrencyManager.OnCurrencyChanged → 화폐 갱신
+      - CurrencyManager.OnCurrencyPanelOpened → 패널 표시
+      - CurrencyManager.OnCurrencyPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
+  - name: TokenShopUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "토큰 상점 UI — S054 TASK 10 (Shift+F9키 토글) 던전/PvP/길드 상점"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - CurrencyManager.OnTokenShopListReceived → 상점 목록 갱신
+      - CurrencyManager.OnTokenShopBuyComplete → 구매 결과
+      - CurrencyManager.OnTokenShopOpened → 패널 표시
+      - CurrencyManager.OnTokenShopClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -2129,6 +2201,22 @@ data_flows:
     to: GuildWarUI
     via: "C# events (OnWarStatusChanged, OnWarStarted, OnWarEnded, OnPanelOpened, OnPanelClosed)"
     description: "길드전 UI 갱신 (F8키 토글)"
+
+  # S054: 보조 화폐/토큰 상점 (TASK 10)
+  - from: NetworkManager
+    to: CurrencyManager
+    via: "C# events (OnCurrencyInfo, OnTokenShop, OnTokenShopBuyResult)"
+    description: "화폐 정보/토큰 상점/구매 결과 수신 (468-473)"
+
+  - from: CurrencyManager
+    to: CurrencyUI
+    via: "C# events (OnCurrencyChanged, OnCurrencyPanelOpened, OnCurrencyPanelClosed)"
+    description: "화폐 UI 갱신 (F9키 토글)"
+
+  - from: CurrencyManager
+    to: TokenShopUI
+    via: "C# events (OnTokenShopListReceived, OnTokenShopBuyComplete, OnTokenShopOpened, OnTokenShopClosed)"
+    description: "토큰 상점 UI 갱신 (Shift+F9키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

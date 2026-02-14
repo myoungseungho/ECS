@@ -3221,5 +3221,72 @@ namespace Network
             d.TimeRemaining = BitConverter.ToUInt32(payload, 21);
             return d;
         }
+
+        // ━━━ S054: 보조 화폐/토큰 상점 (TASK 10, MsgType 468-473) ━━━
+
+        /// <summary>CURRENCY_QUERY 빌더: 빈 페이로드</summary>
+        public static byte[] CurrencyQuery()
+        {
+            return Build(MsgType.CURRENCY_QUERY, new byte[0]);
+        }
+
+        /// <summary>TOKEN_SHOP_LIST 빌더: shop_type(1)</summary>
+        public static byte[] TokenShopList(byte shopType)
+        {
+            return Build(MsgType.TOKEN_SHOP_LIST, new byte[] { shopType });
+        }
+
+        /// <summary>TOKEN_SHOP_BUY 빌더: shop_id(2) + quantity(1)</summary>
+        public static byte[] TokenShopBuy(ushort shopId, byte quantity)
+        {
+            byte[] payload = new byte[3];
+            BitConverter.GetBytes(shopId).CopyTo(payload, 0);
+            payload[2] = quantity;
+            return Build(MsgType.TOKEN_SHOP_BUY, payload);
+        }
+
+        /// <summary>CURRENCY_INFO 파싱: gold(4)+silver(4)+dungeon_token(4)+pvp_token(4)+guild_contribution(4)</summary>
+        public static CurrencyInfoData ParseCurrencyInfo(byte[] payload)
+        {
+            var d = new CurrencyInfoData();
+            d.Gold = BitConverter.ToUInt32(payload, 0);
+            d.Silver = BitConverter.ToUInt32(payload, 4);
+            d.DungeonToken = BitConverter.ToUInt32(payload, 8);
+            d.PvpToken = BitConverter.ToUInt32(payload, 12);
+            d.GuildContribution = BitConverter.ToUInt32(payload, 16);
+            return d;
+        }
+
+        /// <summary>TOKEN_SHOP 파싱: shop_type(1)+count(1)+[shop_id(2)+price(4)+currency_type(1)+name_len(1)+name(N)]*N</summary>
+        public static TokenShopData ParseTokenShop(byte[] payload)
+        {
+            var d = new TokenShopData();
+            int off = 0;
+            d.ShopType = (TokenShopType)payload[off]; off += 1;
+            byte count = payload[off]; off += 1;
+            d.Items = new TokenShopItem[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var item = new TokenShopItem();
+                item.ShopId = BitConverter.ToUInt16(payload, off); off += 2;
+                item.Price = BitConverter.ToUInt32(payload, off); off += 4;
+                item.CurrencyType = payload[off]; off += 1;
+                byte nameLen = payload[off]; off += 1;
+                item.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                d.Items[i] = item;
+            }
+            return d;
+        }
+
+        /// <summary>TOKEN_SHOP_BUY_RESULT 파싱: result(1)+shop_id(2)+remaining_currency(4)</summary>
+        public static TokenShopBuyResultData ParseTokenShopBuyResult(byte[] payload)
+        {
+            var d = new TokenShopBuyResultData();
+            d.Result = (TokenShopBuyResult)payload[0];
+            d.ShopId = BitConverter.ToUInt16(payload, 1);
+            d.RemainingCurrency = BitConverter.ToUInt32(payload, 3);
+            return d;
+        }
     }
 }
