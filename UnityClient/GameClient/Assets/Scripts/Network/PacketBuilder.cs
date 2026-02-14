@@ -1664,5 +1664,155 @@ namespace Network
             d.Phase = payload[4];
             return d;
         }
+
+        // ━━━ S041: 제작 (Crafting) ━━━
+
+        /// <summary>CRAFT_LIST_REQ 빌드: empty</summary>
+        public static byte[] CraftListReq()
+        {
+            return Build(MsgType.CRAFT_LIST_REQ);
+        }
+
+        /// <summary>CRAFT_EXECUTE 빌드: recipe_id(2)</summary>
+        public static byte[] CraftExecute(ushort recipeId)
+        {
+            return Build(MsgType.CRAFT_EXECUTE, BitConverter.GetBytes(recipeId));
+        }
+
+        /// <summary>CRAFT_LIST 파싱: count(1) {recipe_id(2) name(32) category(1) proficiency(1) material_count(1) success_pct(1) gold(4)}*N</summary>
+        public static CraftRecipeInfo[] ParseCraftList(byte[] payload)
+        {
+            byte count = payload[0];
+            var recipes = new CraftRecipeInfo[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var r = new CraftRecipeInfo();
+                r.RecipeId = BitConverter.ToUInt16(payload, off); off += 2;
+                int nameEnd = off;
+                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+                r.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 32;
+                r.Category = (CraftCategory)payload[off]; off += 1;
+                r.Proficiency = payload[off]; off += 1;
+                r.MaterialCount = payload[off]; off += 1;
+                r.SuccessPct = payload[off]; off += 1;
+                r.Gold = BitConverter.ToUInt32(payload, off); off += 4;
+                recipes[i] = r;
+            }
+            return recipes;
+        }
+
+        /// <summary>CRAFT_RESULT 파싱: status(1) recipe_id(2) item_id(4) count(2) bonus(1) = 10B</summary>
+        public static CraftResultData ParseCraftResult(byte[] payload)
+        {
+            var d = new CraftResultData();
+            d.Status = (CraftResult)payload[0];
+            d.RecipeId = BitConverter.ToUInt16(payload, 1);
+            d.ItemId = BitConverter.ToUInt32(payload, 3);
+            d.Count = BitConverter.ToUInt16(payload, 7);
+            d.Bonus = payload[9];
+            return d;
+        }
+
+        // ━━━ S041: 채집 (Gathering) ━━━
+
+        /// <summary>GATHER_START 빌드: node_type(1)</summary>
+        public static byte[] GatherStart(byte nodeType)
+        {
+            return Build(MsgType.GATHER_START, new byte[] { nodeType });
+        }
+
+        /// <summary>GATHER_RESULT 파싱: status(1) node_type(1) item_id(4) count(2) energy(2) = 10B</summary>
+        public static GatherResultData ParseGatherResult(byte[] payload)
+        {
+            var d = new GatherResultData();
+            d.Status = (GatherResult)payload[0];
+            d.NodeType = payload[1];
+            d.ItemId = BitConverter.ToUInt32(payload, 2);
+            d.Count = BitConverter.ToUInt16(payload, 6);
+            d.Energy = BitConverter.ToUInt16(payload, 8);
+            return d;
+        }
+
+        // ━━━ S041: 요리 (Cooking) ━━━
+
+        /// <summary>COOK_EXECUTE 빌드: recipe_id(1)</summary>
+        public static byte[] CookExecute(byte recipeId)
+        {
+            return Build(MsgType.COOK_EXECUTE, new byte[] { recipeId });
+        }
+
+        /// <summary>COOK_RESULT 파싱: status(1) recipe_id(1) buff_type(1) buff_value(2) buff_duration(2) = 7B</summary>
+        public static CookResultData ParseCookResult(byte[] payload)
+        {
+            var d = new CookResultData();
+            d.Status = (CookResult)payload[0];
+            d.RecipeId = payload[1];
+            d.BuffType = (CookBuffType)payload[2];
+            d.BuffValue = BitConverter.ToUInt16(payload, 3);
+            d.BuffDuration = BitConverter.ToUInt16(payload, 5);
+            return d;
+        }
+
+        // ━━━ S041: 인챈트 (Enchant) ━━━
+
+        /// <summary>ENCHANT_REQ 빌드: slot(1) element(1) level(1) = 3B</summary>
+        public static byte[] EnchantReq(byte slot, byte element, byte level)
+        {
+            return Build(MsgType.ENCHANT_REQ, new byte[] { slot, element, level });
+        }
+
+        /// <summary>ENCHANT_RESULT 파싱: status(1) slot(1) element(1) level(1) damage_pct(1) = 5B</summary>
+        public static EnchantResultData ParseEnchantResultData(byte[] payload)
+        {
+            var d = new EnchantResultData();
+            d.Status = (EnchantResult)payload[0];
+            d.Slot = payload[1];
+            d.Element = payload[2];
+            d.Level = payload[3];
+            d.DamagePct = payload[4];
+            return d;
+        }
+
+        // ━━━ S041: 보석 (Gem) ━━━
+
+        /// <summary>GEM_EQUIP 빌드: item_slot(1) gem_slot(1) gem_item_id(4) = 6B</summary>
+        public static byte[] GemEquip(byte itemSlot, byte gemSlot, uint gemItemId)
+        {
+            byte[] payload = new byte[6];
+            payload[0] = itemSlot;
+            payload[1] = gemSlot;
+            BitConverter.GetBytes(gemItemId).CopyTo(payload, 2);
+            return Build(MsgType.GEM_EQUIP, payload);
+        }
+
+        /// <summary>GEM_FUSE 빌드: gem_type(1) gem_tier(1) = 2B</summary>
+        public static byte[] GemFuse(byte gemType, byte gemTier)
+        {
+            return Build(MsgType.GEM_FUSE, new byte[] { gemType, gemTier });
+        }
+
+        /// <summary>GEM_EQUIP_RESULT 파싱: status(1) item_slot(1) gem_slot(1) gem_type(1) gem_tier(1) = 5B</summary>
+        public static GemEquipResultData ParseGemEquipResult(byte[] payload)
+        {
+            var d = new GemEquipResultData();
+            d.Status = (GemResult)payload[0];
+            d.ItemSlot = payload[1];
+            d.GemSlot = payload[2];
+            d.GemType = payload[3];
+            d.GemTier = payload[4];
+            return d;
+        }
+
+        /// <summary>GEM_FUSE_RESULT 파싱: status(1) gem_type(1) new_tier(1) = 3B</summary>
+        public static GemFuseResultData ParseGemFuseResult(byte[] payload)
+        {
+            var d = new GemFuseResultData();
+            d.Status = (GemResult)payload[0];
+            d.GemType = payload[1];
+            d.NewTier = payload[2];
+            return d;
+        }
     }
 }

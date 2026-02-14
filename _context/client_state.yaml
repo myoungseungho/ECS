@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T20:00:00"
+last_session: "2026-02-15T02:00:00"
 
 # ── 현재 상태 ──
-current_status: "GDD 전수 스캔 태스크 분해 완료 — GDD 씬 25개 + 심화 7개 = 총 32개 미구현 client_task → 120+ 서브태스크로 분해"
+current_status: "Phase 4 Batch 1 클라이언트 구현 완료 — Crafting(380-389) + Gem(450-453) UI/Manager/패킷 + TCP 테스트 14건"
 
 # ── 완료된 작업 ──
 completed:
@@ -108,901 +108,85 @@ completed:
     desc: "S040 Phase 3 브릿지 연동 테스트 25/25 ALL PASS + MATCH_ENQUEUE 테스트 수정"
     files:
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
+  - id: A18
+    desc: "S041 Phase 4 Batch 1 — CraftingManager/GatheringManager/GemManager + UI 3종 + 패킷 16종(380-389,450-453)"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/CraftingManager.cs"
+      - "Assets/Scripts/Managers/GatheringManager.cs"
+      - "Assets/Scripts/Managers/GemManager.cs"
+      - "Assets/Scripts/UI/CraftingUI.cs"
+      - "Assets/Scripts/UI/GatheringUI.cs"
+      - "Assets/Scripts/UI/GemUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase4_crafting_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
-
-  # ============================================================
-  # GROUP A: GDD 씬 태스크 — P0 게임 시작 & 로그인 (서버 의존 없음)
-  # ============================================================
-
-  # --- P0_S01: IntroScene (인트로 & 로고) ---
-  - id: "P0_S01_C01_sub01"
-    desc: "IntroScene.unity 빈 씬 생성 + Canvas(Screen Space-Overlay) + SceneFlowManager 연동 확인"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S01_C01_sub02"
-    desc: "IntroLogoController.cs — 로고 이미지 페이드인(2초)/유지(1초)/페이드아웃 DOTween 또는 코루틴. Assets/Scripts/UI/IntroLogoController.cs"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S01_C01_sub03"
-    desc: "타이틀 화면 구현 — 배경 이미지(상단 1/3 게임 로고) + 'Press Any Key' 텍스트 sin알파 깜빡임 + 아무키 입력 시 LoginScene 전환"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S01_C01_sub04"
-    desc: "IntroScene을 Build Settings 첫 번째 씬으로 등록 + SceneValidator.cs에 IntroScene 추가"
-    priority: P1
-    blocked: false
-    estimated_minutes: 5
-
-  # --- P0_S02: LoginScene (로그인 화면) ---
-  - id: "P0_S02_C01_sub01"
-    desc: "LoginScene.unity 생성 + 타이틀 배경 재사용 + Canvas 구성"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S02_C01_sub02"
-    desc: "LoginUI.cs — 중앙 로그인 패널 UI (TMP_InputField ID/PW + 로그인 버튼 + 회원가입 버튼(비활성) + 에러 텍스트). Assets/Scripts/UI/LoginUI.cs"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S02_C01_sub03"
-    desc: "LoginUI.cs — 로그인 버튼 클릭 → NetworkManager.SendLogin(id,pw) + LOGIN_RESULT 콜백 연동. result==0→ServerSelect, result!=0→에러 텍스트 표시"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S02_C01_sub04"
-    desc: "LoginScene Build Settings 등록 + SceneValidator + interaction-map.yaml 갱신"
-    priority: P0
-    blocked: false
-    estimated_minutes: 5
-
-  # --- P0_S03: ServerSelectScene (서버/채널 선택) ---
-  - id: "P0_S03_C01_sub01"
-    desc: "ServerSelectScene.unity 생성 + 서버 리스트 ScrollView UI 레이아웃"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S03_C01_sub02"
-    desc: "ServerSelectUI.cs 확장 — SERVER_LIST(321) 수신 → 서버 항목 동적 생성 (이름+상태뱃지+동접). 서버 클릭→채널 패널 표시. 채널 클릭→ENTER_GAME 패킷"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S03_C01_sub03"
-    desc: "서버 상태 뱃지 색상: 원활(초록)/혼잡(노랑)/점검(빨강). 현재 서버 1개이므로 하드코딩 fallback"
-    priority: P1
-    blocked: false
-    estimated_minutes: 5
-
-  # --- P0_S04: CharacterSelectScene (캐릭터 선택 & 생성) ---
-  - id: "P0_S04_C01_sub01"
-    desc: "CharacterSelectScene.unity 생성 + 왼쪽 캐릭터 슬롯 6개 (세로 리스트) UI 레이아웃"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S04_C01_sub02"
-    desc: "CharacterSelectUI.cs 확장 — CHARACTER_LIST(323) 수신 → 슬롯 동적 채우기 (Lv+직업+이름). 빈 슬롯은 [+생성] 버튼"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S04_C01_sub03"
-    desc: "캐릭터 선택 → 중앙 3D 프리뷰 표시 (RenderTexture + Mixamo Idle 캐릭터) + [게임시작]/[삭제] 버튼"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S04_C01_sub04"
-    desc: "삭제 확인 팝업 — 캐릭터 이름 입력으로 확인 + CHARACTER_DELETE(326) 패킷 전송"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S04_C02_sub01"
-    desc: "CharacterCreatePanel.cs — 직업 선택 카드 3종(전사/궁수/마법사) + 아이콘+이름+한줄설명"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P0_S04_C02_sub02"
-    desc: "캐릭터 이름 입력 TMP_InputField(2~8자 검증) + [생성] 버튼 → CHARACTER_CREATE(324) 패킷 + RESULT 콜백"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP B: GDD 씬 태스크 — P1 튜토리얼 (서버 의존 없음, 패킷 이미 구현)
-  # ============================================================
-
-  # --- P1_S01: TutorialZone (이동 학습) ---
-  - id: "P1_S01_C01_sub01"
-    desc: "TutorialZone.unity 씬 생성 — Plane(500x500) + 풀 머테리얼 + Directional Light(Warm, 45도)"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S01_C01_sub02"
-    desc: "플레이어 스폰 포인트 배치 + LocalPlayer 프리팹 인스턴스화 확인"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S01_C01_sub03"
-    desc: "포스트 프로세싱 Volume 설정 — Bloom + Color Grading(따뜻한 톤) art_style.yaml 기반"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S01_C02_sub01"
-    desc: "TutorialManager.cs 확장 — Step별 진행 관리 (Step1:이동/Step2:공격/Step3:스킬/Step4:NPC접근). 각 Step 완료 감지 + TUTORIAL_STEP_COMPLETE(330) 패킷"
-    priority: P0
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "P1_S01_C02_sub02"
-    desc: "TutorialOverlayUI.cs — 화면 중앙 상단 지시 텍스트 + 하이라이트 UI. 단계별 텍스트 교체 + 완료 시 사라짐 연출"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S01_C03_sub01"
-    desc: "QuarterViewCamera.cs — Cinemachine VirtualCamera 설정 (Follow:플레이어, Transposer Y=15/Z=-10). 마우스 휠 줌(10~25). 고정 회전."
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P1_S02: 첫 전투 (허수아비 → 슬라임) ---
-  - id: "P1_S02_C01_sub01"
-    desc: "MonsterEntity 확장 — HP 바 (World Space Canvas, 머리 위). Slider + 빨강 Fill. 네임플레이트 TextMeshPro"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S02_C01_sub02"
-    desc: "MonsterEntity 피격 연출 — 빨간 플래시(Material color lerp 0.1초) + 데미지 텍스트 팝업(위로 떠오르며 사라짐, DamagePopup.cs)"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S02_C01_sub03"
-    desc: "MonsterEntity 사망 연출 — 사망 애니메이션 트리거 + 0.5초 후 알파 페이드아웃 + 디스폰"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S02_C02_sub01"
-    desc: "LevelUpEffect.cs — LEVEL_UP 패킷 수신 시: 화면 중앙 'LEVEL UP!' 텍스트(2초 스케일) + 캐릭터 금빛 파티클 + SFX"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P1_S03: 첫 스킬 학습 ---
-  - id: "P1_S03_C01_sub01"
-    desc: "SkillVFXManager.cs — 스킬ID→이펙트 프리팹 매핑 Dictionary. 스킬 사용 시 캐릭터 앞 이펙트 스폰. ParticleSystem 풀링."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S03_C01_sub02"
-    desc: "직업별 기본 스킬 이펙트 3종 — 전사:검기 슬래시(Arc, 흰→빨), 궁수:화살 궤적(Line+Trail), 마법사:파이어볼(Sphere+불꽃)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "P1_S03_C02_sub01"
-    desc: "SkillAcquireUI.cs — 새 스킬 획득 시: 화면 중앙 스킬 아이콘+'새 스킬:[이름]'(2초) + 스킬바 슬롯 하이라이트 반짝임 + 자동 툴팁"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P1_S04: 첫 NPC 대화 & 퀘스트 ---
-  - id: "P1_S04_C01_sub01"
-    desc: "NpcEntity.cs — NPC 프리팹 + 머리 위 퀘스트 마커(!/?) World UI. sin 바운스 애니메이션. 3m 이내 'F키로 대화' 프롬프트"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S04_C01_sub02"
-    desc: "NpcManager.cs 확장 — F키 입력 → NPC_INTERACT(332) 패킷 전송 + NPC_DIALOG(333) 응답 → DialogPanel 열기"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S04_C02_sub01"
-    desc: "NpcDialogUI.cs 확장 — 대화 패널 하단 표시. NPC 초상화+이름+대사 텍스트(타이핑 이펙트, 클릭→전체표시). [수락]/[거절] 버튼"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S04_C02_sub02"
-    desc: "대화 수락→QUEST_ACCEPT 패킷. 거절→대화 종료. 대화 완료 후 NPC 마커 변경(! → ?)"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S04_C03_sub01"
-    desc: "QuestTrackerUI.cs — 화면 우측 퀘스트 진행 패널. 퀘스트 이름+목표 텍스트('슬라임 처치 3/5'). QUEST_PROGRESS 패킷으로 실시간 갱신"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S04_C03_sub02"
-    desc: "퀘스트 완료 시 강조 표시(금색 테두리) + 완료 SFX + NPC 마커 ? 표시"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P1_S05: 첫 마을 도착 ---
-  - id: "P1_S05_C01_sub01"
-    desc: "VillageScene.unity 생성 — ProBuilder/Primitive로 마을 구조물(상점/대장장이/여관/광장) + 돌바닥 텍스처"
-    priority: P1
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "P1_S05_C01_sub02"
-    desc: "마을 NPC 3명 배치 (상점/대장장이/퀘스트보드) + 각 NPC 머리 위 기능 아이콘 + BGM AudioSource"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S05_C01_sub03"
-    desc: "존 경계 처리 — Collider 투명 벽 또는 안개 볼륨 + 존 이동 트리거(ZONE_CHANGE 패킷)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S05_C02_sub01"
-    desc: "MinimapUI.cs — 우상단 미니맵 구현. 별도 Camera(탑다운 Ortho) → RenderTexture → RawImage. 원형 마스크."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P1_S05_C02_sub02"
-    desc: "미니맵 위 플레이어 화살표(중앙) + NPC 점(컬러 구분) + 몬스터 적색 점. MinimapIcon.cs 컴포넌트"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP C: GDD 씬 태스크 — P2 성장 구간
-  # ============================================================
-
-  # --- P2_S01: FieldZone (필드 사냥터) ---
-  - id: "P2_S01_C01_sub01"
-    desc: "FieldZone.unity 씬 생성 — Terrain(1000x1000) + 풀/나무 + 언덕 지형. zone1(Lv3-8) 레이아웃"
-    priority: P1
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "P2_S01_C01_sub02"
-    desc: "몬스터 군집 스폰 시각화 — MonsterManager에서 SPAWN_MONSTER 패킷 기반 몬스터 배치 + 네임플레이트 + HP바"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P2_S01_C01_sub03"
-    desc: "필드 퀘스트 NPC 배치 + 사냥 구역별 레벨 경고 텍스트 + 존 경계 안개"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P2_S02: EnhanceUI (이미 A13에서 기본 구현, 확장 필요) ---
-  - id: "P2_S02_C01_sub01"
-    desc: "EnhanceUI.cs 확장 — 장비 슬롯 드래그앤드롭 + 성공확률 표시 + 비용(골드+재료) 표시"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P2_S02_C01_sub02"
-    desc: "강화 연출 — [강화] 버튼 클릭 시 빛 이펙트(성공:금빛, 실패:빨강) + 결과 텍스트 + SFX"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P2_S03: DungeonUI + 파티 매칭 (이미 A16에서 기본 구현, 확장 필요) ---
-  - id: "P2_S03_C01_sub01"
-    desc: "DungeonUI.cs 확장 — 던전 목록 ScrollView (이름+추천레벨+보상 아이콘) + 필터(난이도별)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P2_S03_C01_sub02"
-    desc: "매칭 대기 UI — 카운트다운 타이머 + 취소 버튼 + MATCH_FOUND 시 수락 팝업"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P2_S03_C01_sub03"
-    desc: "던전 내부 HUD — 스테이지 진행 바 + 보스 HP 대형 바 + 파티원 HP 리스트 (좌측)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP D: GDD 씬 태스크 — P3 엔드게임
-  # ============================================================
-
-  # --- P3_S01: PvP 아레나 (이미 A16에서 기본 구현, 확장 필요) ---
-  - id: "P3_S01_C01_sub01"
-    desc: "PvPUI.cs 확장 — 아레나 매칭 UI(1v1/3v3 선택) + ELO 레이팅 표시 + 매칭 대기"
+  - id: "phase3_raid_ui"
+    desc: "레이드 전용 UI — 레이드 보스 페이즈/기믹 가이드 패널"
     priority: P2
     blocked: false
-    estimated_minutes: 10
-
-  - id: "P3_S01_C01_sub02"
-    desc: "ArenaScene.unity — PvP 전용 씬 (좁은 원형 아레나) + 양 팀 스폰 포인트 + 카운트다운 UI"
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P3_S01_C01_sub03"
-    desc: "PvP 결과 화면 — 승패 표시 + 레이팅 변동(+/-) + 보상 목록 + [다시매칭]/[나가기]"
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  # --- P3_S02: 레이드 보스 ---
-  - id: "P3_S02_C01_sub01"
-    desc: "RaidUI.cs — 레이드 입장 UI (레이드 목록 + 8인 파티 구성 표시 + 입장 조건)"
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P3_S02_C01_sub02"
-    desc: "보스 HP 바 확장 — 페이즈 표시(Phase 1/2/3 구분선) + 현재 페이즈 하이라이트 + enrage 타이머"
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "P3_S02_C01_sub03"
-    desc: "기믹 경고 UI — safe_zone(안전지대 표시)/stagger(연타 게이지)/counter(타이밍 바)/position_swap(위치 표시)/dps_check(DPS 미터)/cooperation(협동 가이드)"
-    priority: P2
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "P3_S02_C01_sub04"
-    desc: "레이드 보상 화면 — 클리어 보상 목록 + 주간 횟수 표시 + 골드/토큰 획득량"
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP E: HUD & 공통 UI 시스템
-  # ============================================================
-
-  - id: "HUD_01_C01_sub01"
-    desc: "MainHUD.prefab — Canvas(1920x1080 Reference) + DontDestroyOnLoad + 레이아웃 영역 5개(LeftBottom/BottomCenter/RightTop/RightSide/RightBottom/LeftBottom채팅)"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C01_sub02"
-    desc: "HUD 아이콘 버튼 바 — 인벤(I)/스킬창(K)/문파(G)/우편(M)/도감(J) 하단 우측 아이콘. 각 버튼 → 해당 UI 토글"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C01_sub03"
-    desc: "ChatWindowUI.cs — 좌하단 채팅 입력창 + 채팅 로그 ScrollView + 채널 탭(전체/일반/파티/길드/귓속말)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C02_sub01"
-    desc: "HP/MP 바 — Slider UI (Fill Image) + HP:빨강/MP:파랑 + 수치 텍스트 '1500/2000'. Assets/Scripts/UI/StatusBarUI.cs"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C02_sub02"
-    desc: "HP 바 피격 연출 — 데미지 시 빨강→흰색 플래시(0.1초) + 부드러운 감소 Lerp 애니메이션"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C03_sub01"
-    desc: "SkillBarUI.cs — 8슬롯(1234+QWER) 스킬바. 각 슬롯: 스킬 아이콘(Image) + 키 표시(좌상단) + 쿨다운 오버레이(radial fill) + 쿨다운 초 텍스트"
-    priority: P0
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "HUD_01_C03_sub02"
-    desc: "스킬바 드래그앤드롭 — 슬롯 간 스킬 재배치 + EventTrigger(BeginDrag/Drag/EndDrag). V키 궁극기 별도 슬롯"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP F: 비주얼 / 사운드 시스템
-  # ============================================================
-
-  - id: "VIS_01_sub01"
-    desc: "라이팅 프리셋 코드 — ProjectSetup.cs에 Directional Light(#FFF5E1, 1.2, SoftShadow 2048, Rot50,-30,0) + Ambient Gradient(Sky#87CEEB/Equator#DEB887/Ground#8B7355) + Fog(Linear 80-200 #C8D8E8)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "VIS_02_sub01"
-    desc: "포스트프로세싱 Volume — Bloom(T:0.9/I:0.5/S:0.7) + ColorGrading(Temp+10/Sat+15/Contrast+10) + Vignette(I:0.25/S:0.5). 던전 전용 Volume(Temp-20/Bloom 0.8)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "VIS_03_sub01"
-    desc: "셰이더 설정 — 캐릭터 Outline(ShaderGraph Fresnel), 몬스터 피격 EmissionColor 플래시, 엘리트 보라 Emission, 보스 검정+빨강"
-    priority: P2
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "AUDIO_sub01"
-    desc: "AudioManager.cs 싱글톤 — BGM/SFX/환경음 3채널 관리. BGM 크로스페이드(1초). SFX 풀링(동시 8개). 볼륨 설정 저장(PlayerPrefs)"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "AUDIO_sub02"
-    desc: "BGM 재생 연동 — 씬별 BGM 자동 재생(title/tutorial/village/field/dungeon/boss). SceneFlowManager 전환 시 BGM 크로스페이드"
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP G: 서버 심화 태스크 대응 UI (서버 TASK 2~14)
-  # 서버 구현 완료 시 blocked→false로 변경
-  # ============================================================
-
-  # --- TASK 2: 제작/채집 UI (MsgType 380-389) ---
-  - id: "gdd_task2_crafting_sub01"
-    desc: "CraftingUI.cs — 제작 레시피 목록 UI. CRAFT_LIST(381) 수신 → ScrollView 채우기. 카테고리 탭(무기/방어구/소비/요리)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2 crafting_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task2_crafting_sub02"
-    desc: "CraftingUI.cs 제작 실행 — 레시피 선택 → 재료 슬롯 표시 + 성공률 + [제작] 버튼 → CRAFT_EXECUTE(382). 결과 연출(성공/실패)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2"
-    estimated_minutes: 10
-
-  - id: "gdd_task2_crafting_sub03"
-    desc: "GatheringUI.cs — 채집 포인트 월드 오브젝트 + 인터랙션 키 → GATHER_START(384). 프로그레스 바 + 에너지 표시(200/200)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2"
-    estimated_minutes: 10
-
-  - id: "gdd_task2_crafting_sub04"
-    desc: "CookingUI.cs — 요리 전용 탭. 레시피+재료+버프 효과 미리보기. COOK_EXECUTE(386) + 결과 연출"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2"
-    estimated_minutes: 10
-
-  - id: "gdd_task2_crafting_sub05"
-    desc: "EnchantUI.cs — 무기 원소 부여 UI(fire/ice/lightning/dark/holy/nature 선택). ENCHANT_REQ(388) + 결과 이펙트"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2"
-    estimated_minutes: 10
-
-  # --- TASK 3: 거래소 UI (MsgType 390-397) ---
-  - id: "gdd_task3_auction_sub01"
-    desc: "AuctionUI.cs — 거래소 메인 UI. AUCTION_LIST(391) 카테고리 필터 + 가격 정렬 + 페이지네이션(20개). 검색 InputField"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 3 economy_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task3_auction_sub02"
-    desc: "AuctionUI 등록 탭 — 인벤토리에서 아이템 선택 → 가격 설정 → 등록비 100골드 표시 → AUCTION_REGISTER(392)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 3"
-    estimated_minutes: 10
-
-  - id: "gdd_task3_auction_sub03"
-    desc: "AuctionUI 구매/입찰 — 즉시구매(AUCTION_BUY 394) + 경매입찰(AUCTION_BID 396) + 확인 팝업 + 수수료 5% 표시"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 3"
-    estimated_minutes: 10
-
-  # --- TASK 4: 일일/주간 퀘스트 UI (MsgType 400-405) ---
-  - id: "gdd_task4_daily_sub01"
-    desc: "DailyQuestUI.cs — 일일 퀘스트 3개 목록 + 완료 체크 + 보상 표시. DAILY_QUEST_LIST(401) 수신 → UI 갱신. 리셋 카운트다운"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 4 quest_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task4_daily_sub02"
-    desc: "WeeklyQuestUI.cs — 주간 퀘스트 패널. WEEKLY_QUEST(403) + 대량 보상 표시 + 수요일 리셋"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 4"
-    estimated_minutes: 10
-
-  - id: "gdd_task4_daily_sub03"
-    desc: "ReputationUI.cs — 세력별 평판 바 (neutral→exalted). REPUTATION_INFO(405) 수신 → 각 세력 이름+현재 tier+경험치 바"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 4"
-    estimated_minutes: 10
-
-  # --- TASK 5: 소셜 UI (MsgType 410-422) ---
-  - id: "gdd_task5_social_sub01"
-    desc: "FriendUI.cs — 친구 목록 ScrollView + 온라인 상태 표시 + 위치 공유. FRIEND_LIST(415) 수신 → 항목 생성"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5 social_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task5_social_sub02"
-    desc: "FriendUI 요청/수락 — 친구 추가 InputField + FRIEND_REQUEST(410). 수신 요청 알림 팝업 + 수락(412)/거절(413)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5"
-    estimated_minutes: 10
-
-  - id: "gdd_task5_social_sub03"
-    desc: "BlockListUI.cs — 차단 목록 관리 + BLOCK_PLAYER(416)/UNBLOCK(417) + 차단 시 채팅 필터"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5"
-    estimated_minutes: 10
-
-  - id: "gdd_task5_social_sub04"
-    desc: "PartyFinderUI.cs — 파티 찾기 게시판. 카테고리 5종 + 파티 목록 + [생성]/[참가] 버튼. PARTY_FINDER 420-422 연동"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5"
-    estimated_minutes: 10
-
-  # --- TASK 6: 전장/길드전 UI (MsgType 430-435) ---
-  - id: "gdd_task6_pvp_sub01"
-    desc: "BattlegroundUI.cs — 6v6 전장 매칭 UI + 모드 선택(거점점령/수레호위). BATTLEGROUND_QUEUE(430) + 대기 카운트"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 6 pvp_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task6_pvp_sub02"
-    desc: "BattlegroundScoreUI.cs — 실시간 점수판(양 팀 점수 + 거점 상태 아이콘). BATTLEGROUND_SCORE_UPDATE(433) 실시간 갱신"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 6"
-    estimated_minutes: 10
-
-  - id: "gdd_task6_pvp_sub03"
-    desc: "GuildWarUI.cs — 길드전 신청 UI + 참가자 목록 + 크리스탈 HP 표시. GUILD_WAR_DECLARE(434) + STATUS(435) 연동"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 6"
-    estimated_minutes: 10
-
-  # --- TASK 7: 칭호/도감/전직 UI (MsgType 440-447) ---
-  - id: "gdd_task7_prog_sub01"
-    desc: "TitleUI.cs — 칭호 목록 ScrollView + 장착 버튼. TITLE_LIST(441) → 획득/미획득 구분 표시. TITLE_EQUIP(442)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 7 progression_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task7_prog_sub02"
-    desc: "CollectionUI.cs — 도감 UI (몬스터 4카테고리 + 장비 5등급). COLLECTION_INFO(445) → 완성도 % + 보너스 스탯 표시"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 7"
-    estimated_minutes: 10
-
-  - id: "gdd_task7_prog_sub03"
-    desc: "JobChangeUI.cs — 2차 전직 UI. 전직 트리(전사→버서커/가디언 등) + 조건 표시(Lv20+) + JOB_CHANGE_REQ(446)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 7"
-    estimated_minutes: 10
-
-  # --- TASK 8: 보석/각인/초월 UI (MsgType 450-461) ---
-  - id: "gdd_task8_enhance_sub01"
-    desc: "GemUI.cs — 보석 장착 UI. 무기(2슬롯)+방어구(1슬롯) + 보석 목록 + 등급별 스탯 미리보기. GEM_EQUIP(450)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 8 enhance_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task8_enhance_sub02"
-    desc: "GemFuseUI.cs — 보석 합성 UI. 같은 보석 3개 선택 → 결과 미리보기 → GEM_FUSE(452) + 성공 이펙트"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 8"
-    estimated_minutes: 10
-
-  - id: "gdd_task8_enhance_sub03"
-    desc: "EngravingUI.cs — 각인 시스템 UI. 12종 각인 목록 + 포인트 배분 + 활성 레벨(Lv1/2/3) 표시. ENGRAVING_EQUIP(456)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 8"
-    estimated_minutes: 10
-
-  - id: "gdd_task8_enhance_sub04"
-    desc: "TranscendUI.cs — 초월 UI. +15 이상 장비 + 성공률/비용 표시 + TRANSCEND_REQ(458) + 성공/실패 연출"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 8"
-    estimated_minutes: 10
-
-  # --- TASK 9: 내구도/수리/리롤 UI (MsgType 462-467) ---
-  - id: "gdd_task9_durability_sub01"
-    desc: "장비 내구도 표시 — 인벤토리 장비 슬롯에 내구도 바(하단) + broken 상태 빨간 경고 아이콘"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 9 durability_sub01~04 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task9_durability_sub02"
-    desc: "RepairUI.cs — 대장장이 NPC 수리 UI. 장비별 수리비용 표시 + [개별수리]/[전체수리] + REPAIR_REQ(462)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 9"
-    estimated_minutes: 10
-
-  - id: "gdd_task9_durability_sub03"
-    desc: "RerollUI.cs — 랜덤 옵션 재설정 UI. 현재 옵션 표시 + 잠금 토글 + 비용(5000골드+아이템) + REROLL_REQ(464)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 9"
-    estimated_minutes: 10
-
-  # --- TASK 10: 보조 화폐 UI (MsgType 468-473) ---
-  - id: "gdd_task10_currency_sub01"
-    desc: "CurrencyUI.cs — HUD 상단 화폐 표시 (골드/실버/던전토큰/PvP토큰/길드기여). CURRENCY_INFO(469) 갱신"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 10 currency_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task10_currency_sub02"
-    desc: "TokenShopUI.cs — 토큰 상점 UI. 던전/PvP/길드 탭 + 교환 아이템 목록 + TOKEN_SHOP_BUY(472)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 10"
-    estimated_minutes: 10
-
-  # --- TASK 11: 캐시샵/배틀패스/이벤트 UI (MsgType 474-489) ---
-  - id: "gdd_task11_shop_sub01"
-    desc: "CashShopUI.cs — 캐시샵 메인 UI. 카테고리 탭(외형/편의) + 아이템 카드 + 크리스탈 잔액. CASH_SHOP_LIST(475)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 11 shop_sub01~08 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task11_shop_sub02"
-    desc: "BattlePassUI.cs — 배틀패스 UI. 50레벨 트랙(무료/프리미엄) + 현재 레벨+경험치 바 + 보상 수령. BATTLEPASS_INFO(479) + CLAIM(480)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 11"
-    estimated_minutes: 10
-
-  - id: "gdd_task11_shop_sub03"
-    desc: "EventUI.cs — 이벤트 패널. 출석 달력(14일) + 진행중 이벤트(더블경험치/보스러시) 카운트다운. EVENT_LIST(483) + CLAIM(484)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 11"
-    estimated_minutes: 10
-
-  # --- TASK 12: 월드 시스템 UI (MsgType 490-501) ---
-  - id: "gdd_task12_world_sub01"
-    desc: "WeatherUI.cs — HUD 미니맵 옆 날씨/시간 표시. 날씨 아이콘(6종) + 시간대 텍스트. WEATHER_INFO(491) 갱신"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 12 world_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task12_world_sub02"
-    desc: "날씨 비주얼 효과 — rain:파티클빗방울+화면 젖음, snow:눈 파티클, fog:포그 강화, storm:번개 플래시. WeatherVFXManager.cs"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 12"
-    estimated_minutes: 15
-
-  - id: "gdd_task12_world_sub03"
-    desc: "TeleportUI.cs — 워프 포인트 맵 UI. 발견한 포인트만 활성 + 이동비용(은화500) + 캐스팅(3초 바). TELEPORT_REQ(492) + WAYPOINT(494-495)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 12"
-    estimated_minutes: 10
-
-  - id: "gdd_task12_world_sub04"
-    desc: "DestructibleObject.cs — 파괴/상호작용 오브젝트 (barrel/crate/crystal/chest). HP바 + 루트 드롭 연출. DESTROY_OBJECT(496)/INTERACT(498)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 12"
-    estimated_minutes: 10
-
-  - id: "gdd_task12_world_sub05"
-    desc: "MountUI.cs — 탈것 소환 UI. 탈것 아이콘 + 소환 캐스팅(2초) + 속도 버프 표시. MOUNT_SUMMON(500)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 12"
-    estimated_minutes: 10
-
-  # --- TASK 13: 출석/리셋 UI (MsgType 502-509) ---
-  - id: "gdd_task13_login_sub01"
-    desc: "LoginRewardUI.cs — 14일 출석 보상 달력 UI + 오늘 수령 하이라이트 + [수령] 버튼. LOGIN_REWARD_INFO(503) + CLAIM(504)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 13 login_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task13_login_sub02"
-    desc: "DailyResetNotify.cs — DAILY_RESET_NOTIFY(506) 수신 시 화면 알림 '일일 초기화 완료' + 아이콘 갱신(퀘스트/던전/에너지)"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 13"
-    estimated_minutes: 10
-
-  - id: "gdd_task13_login_sub03"
-    desc: "ContentUnlockUI.cs — CONTENT_UNLOCK_NOTIFY(508) 수신 시 대형 팝업 '새 컨텐츠 해금!' + 컨텐츠 아이콘+설명 + [바로가기] 버튼"
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 13"
-    estimated_minutes: 10
-
-  # --- TASK 14: 스토리/대화 UI (MsgType 510-517) ---
-  - id: "gdd_task14_narrative_sub01"
-    desc: "DialogChoiceUI.cs — NPC 대화 중 선택지 표시 (2~4개 버튼). DIALOG_CHOICE(510) 선택 → 분기 대화 로드"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 14 narrative_sub01~05 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task14_narrative_sub02"
-    desc: "CutscenePlayer.cs — 컷씬 재생 시스템. CUTSCENE_DATA(513) → 배경 전환+NPC 대사+카메라 연출 시퀀스. 3종(opening/boss_intro/chapter)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 14"
-    estimated_minutes: 15
-
-  - id: "gdd_task14_narrative_sub03"
-    desc: "StoryProgressUI.cs — 메인 퀘스트 진행 패널. 챕터 1~4 + 봉인석 파편 수집 현황. CHAPTER_PROGRESS(515) 연동"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 14"
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP I: 브레인스토밍 신규 — Phase 4 심화 컨텐츠 UI
-  # 서버 TASK 15~18 대응 UI (서버 구현 완료 시 blocked→false)
-  # ============================================================
-
-  # --- TASK 15: 비급 & 트라이포드 UI (MsgType 520-524) ---
-  - id: "gdd_task15_tripod_sub01"
-    desc: "TripodUI.cs — 스킬창(K키) 내 [트라이포드] 탭. 스킬 선택→3단계 트리 표시. 해금/미해금 구분. 선택 시 스킬 설명 변경."
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 15 tripod_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task15_tripod_sub02"
-    desc: "ScrollDiscoverUI.cs — 비급 획득 연출. 두루마리 펼침 애니메이션(2초) + 스킬 트라이포드 해금 알림 + 도감 자동 등록 팝업."
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 15"
-    estimated_minutes: 10
-
-  - id: "gdd_task15_tripod_sub03"
-    desc: "ScrollCollectionUI.cs — 도감(J키) 내 [비급 도감] 탭. 직업별 비급 목록(획득/미획득) + 카테고리 완성도% + 획득 위치 힌트."
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 15"
-    estimated_minutes: 10
-
-  # --- TASK 16: 현상금 UI (MsgType 530-537) ---
-  - id: "gdd_task16_bounty_sub01"
-    desc: "BountyBoardUI.cs — 현상금 게시판. 일일 3장(몬스터 초상화+위치+보상) + 주간 대현상금 1장. [수락]→미니맵 위치 표시."
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 16 bounty_sub01~08 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task16_bounty_sub02"
-    desc: "BountyCompleteUI.cs — 현상금 처치 완료 연출 + 보상 획득. 일일 3개 전부 완료 시 추가 보상 팝업."
-    priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 16"
-    estimated_minutes: 10
-
-  - id: "gdd_task16_bounty_sub03"
-    desc: "PvPBountyUI.cs — PvP 존 현상금 UI. 킬스트릭 빨간 해골 아이콘 + 현상수배 알림 + 처치 보상 연출."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 16"
-    estimated_minutes: 10
-
-  - id: "gdd_task16_bounty_sub04"
-    desc: "BountyRankingUI.cs — 주간 현상금 랭킹(PvE/PvP TOP 10). BOUNTY_RANKING(536) 수신→순위표."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 16"
-    estimated_minutes: 10
-
-  # --- TASK 17: 비경 UI (MsgType 540-544) ---
-  - id: "gdd_task17_realm_sub01"
-    desc: "SecretRealmPortal.cs — 비경 포탈 월드 오브젝트. 동양풍 회전 문양 ParticleSystem + 미니맵 보라 다이아몬드 + F키 입장 팝업."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 17 realm_sub01~06 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task17_realm_sub02"
-    desc: "SecretRealmHUD.cs — 비경 내부 HUD. 제한시간 카운트다운 + 비경 유형 아이콘. 클리어 등급(S/A/B/C) + 보상 화면."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 17"
-    estimated_minutes: 10
-
-  - id: "gdd_task17_realm_sub03"
-    desc: "비경 5종 내부 시각화 — 시련(웨이브 카운터)/지혜(퍼즐 힌트)/보물(상자 카운트)/수련(콤보 가이드)/운명(선택지 UI)."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 17"
-    estimated_minutes: 15
-
-  # --- TASK 18: 사제 UI (MsgType 550-560) ---
-  - id: "gdd_task18_mentor_sub01"
-    desc: "MentorshipUI.cs — 소셜 패널 내 [사제] 탭. 사부/제자 프로필 + 진행도 바 + 사제 퀘스트 + [사부찾기]/[제자모집] + 사문 상점."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 18 mentor_sub01~07 구현 대기"
-    estimated_minutes: 10
-
-  - id: "gdd_task18_mentor_sub02"
-    desc: "GraduationUI.cs — 사제 졸업 연출. 꽃비 이펙트 + 사부/제자 초상화 + '사제 졸업!' 텍스트 + 보상 목록 + 칭호 획득."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 18"
-    estimated_minutes: 10
-
-  - id: "gdd_task18_mentor_sub03"
-    desc: "MentorShopUI.cs — 사문 기여도 상점 UI. 칭호재료/외형/비급/소모품/탈것 목록 + 기여도 잔액 표시."
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 18"
-    estimated_minutes: 10
-
-  # ============================================================
-  # GROUP H: 기존 유지 태스크
-  # ============================================================
-
+    blocked_reason: ""
   - id: "unity_play_integration"
     desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
     priority: P2
     blocked: false
     blocked_reason: ""
-
-  - id: "client_tcp_task2_test"
-    desc: "서버 TASK 2 완료 시 — 제작/채집 TCP 브릿지 연동 테스트 (test_phase4_crafting_tcp.py)"
+  - id: "gdd_task2_crafting_ui"
+    desc: "제작/채집 UI — CraftingUI + GatheringUI (서버 TASK 2 MsgType 380-389)"
+    priority: P1
+    blocked: false
+    blocked_reason: "완료 (A18)"
+    status: done
+  - id: "gdd_task8_gem_ui"
+    desc: "보석 UI — GemUI (서버 TASK 8 MsgType 450-453)"
+    priority: P1
+    blocked: false
+    blocked_reason: "완료 (A18)"
+    status: done
+  - id: "gdd_task3_auction_ui"
+    desc: "거래소 UI — AuctionUI (서버 TASK 3 MsgType 390-397)"
     priority: P1
     blocked: true
-    blocked_reason: "서버 TASK 2 구현 + 클라 UI 구현 후"
-    estimated_minutes: 15
+    blocked_reason: "서버 TASK 3 (거래소 핸들러) 구현 대기 — Batch 2"
+  - id: "gdd_task10_currency_ui"
+    desc: "화폐/재화 UI — CurrencyUI (서버 TASK 10 MsgType 468-473)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 10 (화폐 핸들러) 구현 대기 — Batch 2"
+  - id: "gdd_task4_daily_quest_ui"
+    desc: "일일/주간 퀘스트 UI — DailyQuestUI + ReputationUI (서버 TASK 4 MsgType 400-405)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 4 (일일/주간 퀘스트 핸들러) 구현 대기 — Batch 3"
+  - id: "gdd_task7_progression_ui"
+    desc: "칭호/도감 UI — TitleUI + CollectionUI + JobChangeUI (서버 TASK 7 MsgType 440-447)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 7 (칭호/도감/2차전직 핸들러) 구현 대기 — Batch 3"
+  - id: "gdd_task9_durability_ui"
+    desc: "내구도 UI — DurabilityUI (서버 TASK 9 MsgType 462-467)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 9 (내구도 핸들러) 구현 대기 — Batch 3"
+  - id: "gdd_task5_social_ui"
+    desc: "소셜 UI — FriendUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 5 (친구/차단/파티찾기 핸들러) 구현 대기 — Batch 4"
+  - id: "gdd_task6_pvp_extended_ui"
+    desc: "전장/길드전 UI — BattlegroundUI + GuildWarUI (서버 TASK 6 MsgType 430-435)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 6 (전장/길드전 핸들러) 구현 대기 — Batch 4"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -1020,26 +204,15 @@ recent_decisions:
   - "SceneFlowManager 선행 구현 — 모든 씬의 기반이므로 어떤 우선순위든 필요"
   - "S033 패킷 연동: SERVER_LIST(320-321), CHARACTER_CRUD(322-327), TUTORIAL(330-331)"
   - "S034 패킷 연동: NPC_INTERACT(332), NPC_DIALOG(333), ENHANCE(340-341)"
-  - "새 매니저 3종: NpcManager, EnhanceManager, TutorialManager"
-  - "새 UI 4종: NpcDialogUI, EnhanceUI, ServerSelectUI, CharacterSelectUI"
   - "S029 패킷 연동: GUILD(290-299), TRADE(300-307), MAIL(310-318)"
-  - "새 매니저 3종: GuildManager, TradeManager, MailManager"
-  - "새 UI 3종: GuildUI(G키), TradeUI, MailUI(M키)"
   - "Phase 2 TCP 브릿지 연동 테스트 20/20 PASS — 역사적 첫 실연동 성공"
   - "Phase 3 던전/PvP 매니저 구현 — Instance(170-174)/Match(180-184) 기존 패킷 활용"
-  - "DungeonManager: 던전 타입(Story/Party/Chaos/Raid/Abyss) + 매칭 상태 머신"
-  - "PvPManager: PvP 모드(Arena1v1/3v3/Battleground) + DungeonType 100+로 PvP 구분"
   - "Hub v2.0 이벤트 기반 시스템 확인 — agent_loop.py에서 hub.py로 전환"
   - "Phase 3 브릿지 연동 25/25 ALL PASS — 서버 46/46 + 클라 25/25 = 71/71 PASS"
-  - "MATCH_ENQUEUE 테스트: 레벨 부족(status=2)도 유효한 프로토콜 응답으로 수용"
-  - "GDD 심화 태스크 42개 확인 — 서버 구현 순서대로 클라 UI 대응 예정"
-  - "GDD 전수 스캔 태스크 분해 — 25개 GDD씬 client_task + 심화 7개 = 32개 미구현 → 120+ 서브태스크"
-  - "분해 우선순위: GROUP A(P0 씬)→GROUP B(P1 튜토리얼)→GROUP E(HUD)→GROUP F(비주얼)→GROUP C(P2)→GROUP D(P3)→GROUP G(심화)"
-  - "서버 TASK 2~14 대응 UI는 서버 구현 완료 시 blocked→false 전환"
-  - "서버에 TASK 2~14 빠른 구현 요청 outbox 메시지 발송"
-  - "D016: 브레인스토밍 세션 — 4개 신규 시스템 Phase 4 추가: 비급트라이포드(520-524), 현상금(530-537), 비경(540-544), 사제(550-560)"
-  - "클라 GROUP I 추가: TASK 15~18 UI 13개 서브태스크 (서버 구현 대기)"
-  - "신규 rules 4파일: tripod.yaml, bounty.yaml, secret_realm.yaml, mentorship.yaml"
+  - "GDD 심화 태스크 42개→55개 확인 — 서버 구현 순서대로 클라 UI 대응 예정"
+  - "ENHANCE_RESULT(341) vs ENCHANT_RESULT(389) — 별도 시스템 (기본강화 vs 원소인챈트)"
+  - "Phase 4 Batch 1: Crafting(380-389) + Gem(450-453) 클라 구현 완료"
+  - "Batch 순서: B1=제작+보석, B2=거래소+화폐, B3=퀘스트+직업+내구도, B4=소셜+전장"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
