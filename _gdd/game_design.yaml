@@ -1,0 +1,1055 @@
+# ============================================================
+# ECS MMORPG - Game Design Document (GDD)
+# Reference: Lost Ark (로스트아크)
+# Target: Indie ARPG Quality (Mixamo + AI Assets + Free Assets)
+# ============================================================
+#
+# 사용법:
+#   서버 에이전트: server_tasks 항목만 필터링하여 구현
+#   클라 에이전트: client_tasks + assets 항목을 구현
+#   대표: status 필드로 진행 상황 파악
+#
+# Status: todo → in_progress → done → verified
+# Priority: P0(블로커) → P1(핵심) → P2(있으면좋음) → P3(후순위)
+# ============================================================
+
+game:
+  title: "Lost Saga Online"
+  reference_game: "Lost Ark"
+  genre: "Isometric ARPG MMORPG"
+  camera: "탑다운 쿼터뷰 (45도, 고정 회전, 줌 가능)"
+  art_style: "다크 판타지 (Stylized Realism)"
+  target_resolution: "1920x1080"
+
+# ============================================================
+# PHASE 0: 게임 시작 ~ 로그인
+# 유저가 게임을 켰을 때 처음 보는 화면들
+# ============================================================
+phases:
+
+- id: "P0"
+  name: "게임 시작 & 로그인"
+  description: "실행 → 로고 → 로그인 → 서버선택 → 캐릭터선택/생성"
+
+  scenes:
+    # ----------------------------------------------------------
+    - id: "P0_S01"
+      name: "인트로 & 로고"
+      reference: "로아: 스마게/아마존 로고 → 타이틀 화면"
+      priority: P2
+      status: todo
+
+      description: |
+        게임 실행 시 1~2초짜리 스튜디오 로고가 나오고,
+        타이틀 화면으로 전환. 배경에 판타지 풍경 + 게임 로고.
+        아무 키나 누르면 로그인 화면으로.
+
+      assets:
+        - type: texture
+          name: "studio_logo.png"
+          desc: "스튜디오 로고 (1024x512, Midjourney 생성)"
+          source: "midjourney"
+          prompt: "minimalist game studio logo, dark fantasy style, golden emblem on black background"
+
+        - type: texture
+          name: "title_background.png"
+          desc: "타이틀 배경 (1920x1080, 판타지 성+하늘)"
+          source: "midjourney"
+          prompt: "epic fantasy castle landscape, aerial view, dark clouds, golden sunset, game title screen background, high detail"
+
+        - type: texture
+          name: "game_logo.png"
+          desc: "게임 제목 로고 (투명 배경 PNG)"
+          source: "midjourney"
+          prompt: "game title logo 'LOST SAGA' epic fantasy style, metallic gold text with dark glow, transparent background"
+
+        - type: audio
+          name: "title_bgm.mp3"
+          desc: "타이틀 BGM (오케스트라 판타지, 30초 루프)"
+          source: "suno_ai"
+          prompt: "epic orchestral fantasy game title theme, majestic, 120bpm"
+
+      client_tasks:
+        - id: "P0_S01_C01"
+          task: "IntroScene 씬 생성"
+          detail: |
+            - 빈 씬에 Canvas (Screen Space - Overlay)
+            - 로고 이미지 → 2초 페이드인 → 1초 유지 → 페이드아웃
+            - 타이틀 화면: 배경 이미지 + 게임 로고(상단 1/3)
+            - "Press Any Key" 텍스트 깜빡임 (sin 함수 alpha)
+            - 아무키 → LoginScene으로 전환
+          status: todo
+
+        - id: "P0_S01_C02"
+          task: "씬 전환 매니저 (SceneFlowManager)"
+          detail: |
+            - 씬 전환 순서 관리: Intro → Login → ServerSelect → CharacterSelect → GameWorld
+            - 페이드인/아웃 트랜지션 (0.5초 검정 오버레이)
+            - DontDestroyOnLoad 싱글톤
+          status: todo
+
+      server_tasks: []  # 서버 작업 없음
+
+    # ----------------------------------------------------------
+    - id: "P0_S02"
+      name: "로그인 화면"
+      reference: "로아: ID/PW 입력 → 로그인 버튼"
+      priority: P0
+      status: todo
+
+      description: |
+        판타지 배경 위에 로그인 패널.
+        ID/PW 입력 → 로그인 버튼 → 서버에 LOGIN 패킷 전송.
+        실패 시 에러 메시지 표시.
+
+      assets:
+        - type: texture
+          name: "login_panel.png"
+          desc: "로그인 패널 배경 (반투명 다크, 400x300)"
+          source: "midjourney"
+          prompt: "dark fantasy UI panel frame, ornate golden border, semi-transparent dark center, game UI element"
+
+        - type: texture
+          name: "btn_login.png"
+          desc: "로그인 버튼 (Normal/Hover/Pressed 3개 세트)"
+          source: "midjourney"
+          prompt: "fantasy game button, golden frame, dark center, 'Login' text, RPG style UI element"
+
+        - type: font
+          name: "NotoSansKR-Bold.ttf"
+          desc: "한글 UI 폰트"
+          source: "google_fonts"
+
+      client_tasks:
+        - id: "P0_S02_C01"
+          task: "LoginScene 씬 구현"
+          detail: |
+            - 타이틀 배경 재사용 (또는 별도 로그인 배경)
+            - 중앙에 로그인 패널 UI:
+              ┌─────────────────────┐
+              │     LOST SAGA       │ ← 게임 로고 (작게)
+              │                     │
+              │  ID:  [__________]  │ ← TMP_InputField
+              │  PW:  [__________]  │ ← TMP_InputField (password)
+              │                     │
+              │     [ 로그인 ]       │ ← Button
+              │     [ 회원가입 ]     │ ← Button (비활성)
+              │                     │
+              │  에러메시지 텍스트    │ ← 빨간색, 기본 비표시
+              └─────────────────────┘
+            - 로그인 버튼 클릭 → LOGIN 패킷 전송
+            - LOGIN_RESULT 수신 → result==0이면 ServerSelect로
+            - result!=0이면 에러 텍스트 표시
+          status: todo
+
+      server_tasks:
+        - id: "P0_S02_S01"
+          task: "LOGIN 핸들러 (이미 구현됨)"
+          detail: "tcp_bridge.py에 이미 있음. SUCCESS=0, FAIL=1."
+          status: done
+
+    # ----------------------------------------------------------
+    - id: "P0_S03"
+      name: "서버/채널 선택"
+      reference: "로아: 서버 목록 → 채널 선택 → 접속"
+      priority: P1
+      status: todo
+
+      description: |
+        서버 목록 표시 (이름 + 상태 + 동접수).
+        서버 선택 → 채널 목록 → 채널 선택 → 접속.
+        현재는 서버 1개, 채널 1개이므로 자동 선택도 OK.
+
+      assets:
+        - type: texture
+          name: "server_list_bg.png"
+          desc: "서버 목록 패널"
+          source: "midjourney"
+
+        - type: texture
+          name: "channel_btn.png"
+          desc: "채널 버튼 (Normal/Selected)"
+          source: "midjourney"
+
+      client_tasks:
+        - id: "P0_S03_C01"
+          task: "ServerSelectScene 씬 구현"
+          detail: |
+            - 서버 리스트 (ScrollView)
+            - 각 서버: 이름 + "원활/혼잡/점검" 상태 뱃지 + 동접수
+            - 서버 클릭 → 채널 목록 패널 표시
+            - 채널 클릭 → ENTER_GAME 패킷 전송
+            - 현재는 서버 1개뿐이니 하드코딩 OK
+          status: todo
+
+      server_tasks:
+        - id: "P0_S03_S01"
+          task: "SERVER_LIST 패킷 추가"
+          detail: |
+            새 MsgType: SERVER_LIST_REQ(320), SERVER_LIST(321)
+            응답: server_count(u8) + [name(32B) + status(u8) + population(u16)] * N
+          status: todo
+          priority: P1
+
+    # ----------------------------------------------------------
+    - id: "P0_S04"
+      name: "캐릭터 선택 & 생성"
+      reference: "로아: 캐릭터 슬롯 → 생성(직업선택+외형) → 삭제"
+      priority: P0
+      status: todo
+
+      description: |
+        보유 캐릭터 목록 표시 (최대 6슬롯).
+        빈 슬롯 클릭 → 캐릭터 생성 화면.
+        기존 캐릭터 클릭 → 게임 시작.
+        직업 선택: 전사/궁수/마법사 (현재 3종).
+        외형 커스텀: 현재는 스킵 (Mixamo 기본 모델 사용).
+
+      assets:
+        - type: model
+          name: "char_select_platform.fbx"
+          desc: "캐릭터가 서있는 원형 플랫폼"
+          source: "unity_primitive"
+          note: "Cylinder(0.1 height, 2 radius) + 발광 머테리얼로 대체 가능"
+
+        - type: texture
+          name: "class_warrior_icon.png"
+          desc: "전사 직업 아이콘"
+          source: "midjourney"
+          prompt: "warrior class icon, sword and shield, dark fantasy RPG style, square icon"
+
+        - type: texture
+          name: "class_archer_icon.png"
+          desc: "궁수 직업 아이콘"
+          source: "midjourney"
+
+        - type: texture
+          name: "class_mage_icon.png"
+          desc: "마법사 직업 아이콘"
+          source: "midjourney"
+
+        - type: model
+          name: "warrior_idle.fbx"
+          desc: "전사 Idle 포즈 (캐릭터 선택 화면용)"
+          source: "mixamo"
+          note: "X Bot 또는 다른 Mixamo 캐릭터"
+
+      client_tasks:
+        - id: "P0_S04_C01"
+          task: "CharacterSelectScene 씬 구현"
+          detail: |
+            왼쪽: 캐릭터 슬롯 6개 (세로 리스트)
+              ┌──────────────┐
+              │ Lv.35 전사    │ ← 기존 캐릭터
+              │ Lv.12 마법사  │
+              │ [ + 생성 ]    │ ← 빈 슬롯
+              │ [ + 생성 ]    │
+              │ [ + 생성 ]    │
+              │ [ + 생성 ]    │
+              └──────────────┘
+            중앙: 3D 캐릭터 프리뷰 (회전 가능)
+            하단: [게임 시작] [삭제] 버튼
+          status: todo
+
+        - id: "P0_S04_C02"
+          task: "CharacterCreatePanel 구현"
+          detail: |
+            직업 선택: 전사/궁수/마법사 3개 카드
+            각 카드: 직업 아이콘 + 이름 + 한줄 설명
+            이름 입력: TMP_InputField (2~8자)
+            [생성] 버튼 → CREATE_CHARACTER 패킷
+          status: todo
+
+      server_tasks:
+        - id: "P0_S04_S01"
+          task: "CHARACTER_LIST / CREATE / DELETE 패킷 추가"
+          detail: |
+            CHARACTER_LIST_REQ(322) → CHARACTER_LIST(323)
+            CHARACTER_CREATE(324) → CHARACTER_CREATE_RESULT(325)
+            CHARACTER_DELETE(326) → CHARACTER_DELETE_RESULT(327)
+            캐릭터 데이터: name(16B) + class(u8) + level(u16) + zone_id(u32)
+          status: todo
+          priority: P0
+
+# ============================================================
+# PHASE 1: 튜토리얼 (레벨 1~5)
+# 첫 전투, 첫 스킬, 첫 퀘스트, 기본 조작 학습
+# ============================================================
+- id: "P1"
+  name: "튜토리얼 (Lv.1~5)"
+  description: "기본 조작 학습 → 첫 전투 → 첫 스킬 → NPC 대화 → 첫 퀘스트"
+
+  scenes:
+    # ----------------------------------------------------------
+    - id: "P1_S01"
+      name: "튜토리얼 존 입장 & 이동 학습"
+      reference: "로아: 프롤로그 존, WASD 이동 튜토리얼 팝업"
+      priority: P0
+      status: todo
+
+      description: |
+        캐릭터 생성 후 첫 존 진입.
+        화면에 "WASD로 이동하세요" 튜토리얼 오버레이.
+        지정된 위치로 이동하면 완료 → 다음 단계.
+
+      assets:
+        - type: texture
+          name: "tutorial_arrow.png"
+          desc: "방향 지시 화살표 (발밑에 표시)"
+          source: "unity_sprite"
+          note: "간단한 화살표 스프라이트로 대체"
+
+        - type: texture
+          name: "tutorial_overlay_move.png"
+          desc: "WASD 키 안내 오버레이"
+          source: "midjourney"
+          prompt: "WASD keyboard keys tutorial overlay, dark fantasy game UI, semi-transparent"
+
+        - type: prefab
+          name: "tutorial_zone_terrain"
+          desc: "튜토리얼 존 지형"
+          source: "unity_terrain"
+          note: |
+            Unity Terrain (500x500)
+            잔디 텍스처 + 언덕 약간 + 길 하나
+            또는 ProBuilder로 간단한 바닥 + 벽
+
+        - type: material
+          name: "grass_ground.mat"
+          desc: "풀밭 바닥 머테리얼"
+          source: "unity_standard"
+          note: "Unity 기본 텍스처 또는 AI 생성 타일 텍스처"
+
+        - type: audio
+          name: "tutorial_bgm.mp3"
+          desc: "튜토리얼 존 BGM (평화로운 판타지)"
+          source: "suno_ai"
+          prompt: "peaceful fantasy RPG field music, harp and flute, ambient, loopable"
+
+      client_tasks:
+        - id: "P1_S01_C01"
+          task: "TutorialZone 씬 구현"
+          detail: |
+            - Terrain 또는 Plane(500x500) + 풀 머테리얼
+            - Directional Light (Warm, 45도)
+            - 시작 위치에 플레이어 스폰
+            - 카메라: Cinemachine 쿼터뷰 (높이 15, 각도 45, 거리 20)
+            - Post-Processing: Bloom + Color Grading (약간 따뜻한 톤)
+          status: todo
+
+        - id: "P1_S01_C02"
+          task: "TutorialManager 구현"
+          detail: |
+            단계별 튜토리얼 진행 관리:
+            Step 1: "WASD로 이동하세요" → 이동 감지 → 완료
+            Step 2: "마우스 클릭으로 공격" → 공격 감지 → 완료
+            Step 3: "Q키로 스킬 사용" → 스킬 사용 감지 → 완료
+            Step 4: "NPC에게 다가가세요" → NPC 근접 감지 → 완료
+            각 단계: 화면 중앙 상단에 지시 텍스트 + 하이라이트 UI
+          status: todo
+
+        - id: "P1_S01_C03"
+          task: "쿼터뷰 카메라 시스템"
+          detail: |
+            - Cinemachine Virtual Camera
+            - Follow: 플레이어
+            - Body: Transposer (offset Y=15, Z=-10)
+            - 마우스 휠: 줌 인/아웃 (10~25 범위)
+            - 카메라 회전 없음 (고정 쿼터뷰)
+          status: todo
+
+      server_tasks:
+        - id: "P1_S01_S01"
+          task: "TUTORIAL_PROGRESS 패킷 추가"
+          detail: |
+            TUTORIAL_STEP_COMPLETE(330): step_id(u8)
+            TUTORIAL_REWARD(331): step_id(u8) + reward_type(u8) + amount(u32)
+            서버에서 튜토리얼 진행 상태 저장 (재접속 시 복원)
+          status: todo
+          priority: P1
+
+    # ----------------------------------------------------------
+    - id: "P1_S02"
+      name: "첫 전투 (허수아비 → 슬라임)"
+      reference: "로아: 프롤로그 전투 튜토리얼"
+      priority: P0
+      status: todo
+
+      description: |
+        튜토리얼 존에 허수아비(무저항) 배치 → 클릭 공격 학습.
+        허수아비 파괴 후 슬라임 3마리 등장 → 실전 전투.
+        슬라임 처치 → 레벨 2 달성 → 스킬 포인트 획득.
+
+      assets:
+        - type: model
+          name: "dummy_target.fbx"
+          desc: "허수아비 (공격 연습용)"
+          source: "unity_primitive"
+          note: "Capsule + Cube 조합으로 허수아비 형태. 또는 무료 에셋"
+
+        - type: model
+          name: "slime.fbx"
+          desc: "슬라임 몬스터 (첫 적)"
+          source: "unity_primitive"
+          note: "Sphere(초록) + 스케일 애니메이션(통통 튀기). 3D 모델 없어도 Sphere로 대체"
+
+        - type: effect
+          name: "hit_effect"
+          desc: "타격 이펙트 (파티클)"
+          source: "unity_particle"
+          detail: |
+            ParticleSystem:
+            - 수명: 0.3초
+            - 크기: 0.5~1.0
+            - 색상: 흰색→노란색
+            - Shape: Sphere (radius 0.3)
+            - 개수: 10~15개
+            - Gravity: 0.5
+
+        - type: effect
+          name: "levelup_effect"
+          desc: "레벨업 이펙트"
+          source: "unity_particle"
+          detail: |
+            ParticleSystem:
+            - 빛 기둥 (Cylinder) + 파티클 상승
+            - 색상: 금색
+            - 수명: 2초
+            - 사운드: 레벨업 징글
+
+        - type: audio
+          name: "sfx_hit.wav"
+          desc: "타격 효과음"
+          source: "freesound"
+
+        - type: audio
+          name: "sfx_levelup.wav"
+          desc: "레벨업 효과음"
+          source: "freesound"
+
+      client_tasks:
+        - id: "P1_S02_C01"
+          task: "몬스터 비주얼 시스템"
+          detail: |
+            - MonsterEntity에 HP 바 (World Space Canvas, 머리 위)
+            - 피격 시 빨간 플래시 (SpriteRenderer.color 또는 Material)
+            - 사망 시 쓰러지는 애니메이션 + 0.5초 후 페이드아웃
+            - 데미지 텍스트 팝업 (위로 떠오르며 사라짐, TextMeshPro)
+          status: todo
+
+        - id: "P1_S02_C02"
+          task: "레벨업 연출"
+          detail: |
+            LEVEL_UP 패킷 수신 시:
+            - 화면 중앙 "LEVEL UP!" 텍스트 (2초, 스케일 애니메이션)
+            - 캐릭터 주변 금빛 파티클 이펙트
+            - 레벨업 효과음 재생
+            - HP/MP 전부 회복 표시
+          status: todo
+
+      server_tasks:
+        - id: "P1_S02_S01"
+          task: "튜토리얼 몬스터 스폰 설정"
+          detail: |
+            tutorial_zone(zone_id=0)에:
+            - 허수아비 1마리 (HP=100, ATK=0, 무반격)
+            - 슬라임 3마리 (HP=50, ATK=5, AI=IDLE only)
+            monster_spawns.csv 또는 zone_config에 추가
+          status: todo
+          priority: P0
+
+    # ----------------------------------------------------------
+    - id: "P1_S03"
+      name: "첫 스킬 학습"
+      reference: "로아: 스킬 획득 연출 + 스킬 슬롯 배치 안내"
+      priority: P0
+      status: todo
+
+      description: |
+        레벨 2 도달 → "새 스킬을 배웠습니다!" 팝업.
+        스킬바에 스킬 자동 배치 → "Q키를 눌러 스킬을 사용하세요" 안내.
+        슬라임에게 스킬 사용 → 강력한 데미지 + 이펙트 → 보상감.
+
+      assets:
+        - type: effect
+          name: "skill_basic_attack_effect"
+          desc: "기본 공격 스킬 이펙트 (직업별)"
+          source: "unity_particle"
+          detail: |
+            전사: 검기 슬래시 (Arc 형태, 흰색→빨강)
+            궁수: 화살 궤적 (Line Renderer + Trail)
+            마법사: 파이어볼 (Sphere + 불꽃 파티클)
+
+        - type: audio
+          name: "sfx_skill_warrior.wav"
+          desc: "전사 스킬 효과음 (검 휘두르기)"
+          source: "freesound"
+
+      client_tasks:
+        - id: "P1_S03_C01"
+          task: "스킬 이펙트 시스템 (VFXManager)"
+          detail: |
+            - 스킬 ID → 이펙트 프리팹 매핑 테이블
+            - 스킬 사용 시: 캐릭터 앞에 이펙트 스폰
+            - ParticleSystem 기반 (코드로 생성 가능)
+            - 직업별 기본 스킬 이펙트 3종
+          status: todo
+
+        - id: "P1_S03_C02"
+          task: "스킬 획득 연출"
+          detail: |
+            새 스킬 획득 시:
+            - 화면 중앙 스킬 아이콘 + "새 스킬: [이름]" (2초)
+            - 스킬바 해당 슬롯 반짝임 하이라이트
+            - 툴팁 자동 표시 (스킬 설명 + 키 안내)
+          status: todo
+
+      server_tasks: []  # 스킬 시스템은 이미 구현 (Session 33)
+
+    # ----------------------------------------------------------
+    - id: "P1_S04"
+      name: "첫 NPC 대화 & 퀘스트"
+      reference: "로아: NPC 머리 위 ! 마크 → 대화 → 퀘스트 수락"
+      priority: P0
+      status: todo
+
+      description: |
+        마을 입구에 NPC 배치. 머리 위 노란색 "!" 마크.
+        NPC 클릭 → 대화 UI 표시 → 퀘스트 수락.
+        퀘스트: "슬라임 5마리 처치" → 완료 시 경험치 + 장비 보상.
+
+      assets:
+        - type: model
+          name: "npc_tutorial_guide.fbx"
+          desc: "튜토리얼 가이드 NPC"
+          source: "mixamo"
+          note: "Mixamo 캐릭터 중 하나 (Idle 포즈만)"
+
+        - type: texture
+          name: "quest_marker_available.png"
+          desc: "퀘스트 수락 가능 마커 (!)"
+          source: "svg_icon"
+          note: "이미 있는 quest_available.svg 활용"
+
+        - type: texture
+          name: "quest_marker_complete.png"
+          desc: "퀘스트 완료 마커 (?)"
+          source: "svg_icon"
+
+        - type: texture
+          name: "dialog_panel.png"
+          desc: "NPC 대화 패널 UI"
+          source: "midjourney"
+          prompt: "dark fantasy RPG dialog box, ornate frame, parchment texture, bottom of screen"
+
+      client_tasks:
+        - id: "P1_S04_C01"
+          task: "NPC 인터랙션 시스템"
+          detail: |
+            - NPC Entity: 머리 위 퀘스트 마커 (! 또는 ?)
+            - 마커는 위아래로 살짝 바운스 (sin 함수)
+            - NPC 근접 (3m 이내) → "F키로 대화" 프롬프트
+            - F키 → DialogPanel 열림
+          status: todo
+
+        - id: "P1_S04_C02"
+          task: "DialogPanel UI 구현"
+          detail: |
+            ┌──────────────────────────────────────┐
+            │ [NPC 초상화]  NPC이름                   │
+            │                                        │
+            │ "모험가여, 마을 근처에 슬라임이 출몰하고  │
+            │  있소. 5마리를 처치해 주겠는가?"          │
+            │                                        │
+            │          [수락]    [거절]                │
+            └──────────────────────────────────────┘
+            - 텍스트 타이핑 효과 (1자씩 표시, 클릭 시 전체 표시)
+            - 수락 → QUEST_ACCEPT 패킷
+            - 거절 → 대화 종료
+          status: todo
+
+        - id: "P1_S04_C03"
+          task: "퀘스트 트래커 UI"
+          detail: |
+            화면 우측에 퀘스트 진행 상황:
+            ┌─────────────────┐
+            │ 📋 슬라임 토벌    │
+            │ 슬라임 처치 3/5   │
+            └─────────────────┘
+            - QUEST_PROGRESS 패킷으로 업데이트
+            - 완료 시 강조 표시 + NPC 마커 ? 로 변경
+          status: todo
+
+      server_tasks:
+        - id: "P1_S04_S01"
+          task: "NPC 대화 데이터 시스템"
+          detail: |
+            data/npc_dialogs.json:
+            - npc_id → dialog_lines[] → quest_offer
+            NPC_INTERACT(332) → NPC_DIALOG(333) 패킷 추가
+          status: todo
+          priority: P1
+
+    # ----------------------------------------------------------
+    - id: "P1_S05"
+      name: "첫 마을 도착"
+      reference: "로아: 루테란 성 도착, NPC들 소개"
+      priority: P1
+      status: todo
+
+      description: |
+        튜토리얼 완료 → 마을로 이동 (존 전환).
+        마을에 NPC 3명: 상점, 대장장이, 퀘스트보드.
+        각 NPC 위에 아이콘으로 기능 표시.
+
+      assets:
+        - type: prefab
+          name: "village_layout"
+          desc: "마을 레이아웃"
+          source: "unity_probuilder"
+          note: |
+            ProBuilder로 간단한 건물 3~4동:
+            - 상점 (간판: 🛒)
+            - 대장장이 (간판: 🔨)
+            - 여관 (간판: 🏠, 장식용)
+            - 광장 (중앙, NPC 배치)
+            바닥: 돌바닥 텍스처
+            벽: 목재/석재 텍스처
+
+        - type: texture
+          name: "stone_floor_tile.png"
+          desc: "마을 바닥 타일 텍스처"
+          source: "midjourney"
+          prompt: "medieval cobblestone floor texture, seamless tile, top-down view, 512x512"
+
+        - type: texture
+          name: "wood_wall.png"
+          desc: "목재 벽 텍스처"
+          source: "midjourney"
+          prompt: "medieval wooden wall planks texture, seamless tile, weathered, 512x512"
+
+        - type: model
+          name: "npc_shopkeeper.fbx"
+          desc: "상점 NPC"
+          source: "mixamo"
+
+        - type: model
+          name: "npc_blacksmith.fbx"
+          desc: "대장장이 NPC"
+          source: "mixamo"
+
+        - type: audio
+          name: "village_bgm.mp3"
+          desc: "마을 BGM (편안한 중세 분위기)"
+          source: "suno_ai"
+          prompt: "medieval village RPG music, lute and tavern ambience, peaceful, loopable"
+
+        - type: audio
+          name: "sfx_ambient_village.wav"
+          desc: "마을 환경음 (새, 바람, 사람들)"
+          source: "freesound"
+
+      client_tasks:
+        - id: "P1_S05_C01"
+          task: "VillageScene 씬 구현"
+          detail: |
+            - ProBuilder 또는 Primitive로 마을 구조물 배치
+            - Directional Light (따뜻한 톤)
+            - NPC 3명 배치 (각각 기능 아이콘)
+            - BGM + 환경음 AudioSource
+            - 존 경계 표시 (투명 벽 또는 안개)
+          status: todo
+
+        - id: "P1_S05_C02"
+          task: "미니맵 UI"
+          detail: |
+            우상단 미니맵:
+            - 별도 카메라 (탑다운, Orthographic)
+            - RenderTexture → RawImage
+            - 플레이어 화살표 (중앙)
+            - NPC 점 (컬러로 구분)
+            - 원형 마스크
+          status: todo
+
+      server_tasks:
+        - id: "P1_S05_S01"
+          task: "마을 존 설정 + NPC 스폰 데이터"
+          detail: |
+            zone_id=10 (village)
+            data/npc_spawns.csv: npc_id, zone_id, x, y, z, type(shop/quest/craft)
+            NPC는 공격 불가 엔티티로 처리
+          status: todo
+          priority: P1
+
+# ============================================================
+# PHASE 2: 성장 구간 (레벨 5~15)
+# 필드 사냥, 장비 강화, 파티 플레이, 던전 입장
+# ============================================================
+- id: "P2"
+  name: "성장 구간 (Lv.5~15)"
+  description: "필드 사냥터 → 장비 강화 → 파티 모집 → 첫 던전"
+
+  scenes:
+    - id: "P2_S01"
+      name: "필드 사냥터"
+      reference: "로아: 레온하트 평야 등 필드 존"
+      priority: P1
+      status: todo
+      description: "넓은 필드에 몬스터 군집. 사냥 → 경험치 + 루트. 퀘스트 NPC 산재."
+
+      assets:
+        - type: prefab
+          name: "field_zone_terrain"
+          desc: "필드 지형 (1000x1000)"
+          source: "unity_terrain"
+          note: "Terrain + 풀/나무 텍스처 + 언덕"
+
+        - type: model
+          name: "goblin.fbx"
+          desc: "고블린 몬스터"
+          source: "mixamo"
+          note: "Mixamo 캐릭터 + 초록 색상 변경"
+
+        - type: model
+          name: "wolf.fbx"
+          desc: "늑대 몬스터"
+          source: "free_asset"
+          note: "Unity Asset Store 무료 늑대 또는 Capsule+색상"
+
+      client_tasks:
+        - id: "P2_S01_C01"
+          task: "FieldZone 씬 + 몬스터 무리 표시"
+          detail: "넓은 지형 + 몬스터 군집 스폰 시각화 + 네임플레이트"
+          status: todo
+
+      server_tasks:
+        - id: "P2_S01_S01"
+          task: "필드 존 몬스터 스폰 테이블 확장"
+          detail: "zone_id=1 (field) 몬스터 다양화. 스폰 영역별 레벨 차등."
+          status: todo
+
+    - id: "P2_S02"
+      name: "장비 강화 시스템"
+      reference: "로아: 대장장이 NPC → 강화 UI"
+      priority: P1
+      status: todo
+      description: "대장장이 NPC → 강화 UI. 골드 + 재료 소모. 성공/실패 확률. 강화 단계별 이펙트."
+
+      client_tasks:
+        - id: "P2_S02_C01"
+          task: "EnhanceUI 구현"
+          detail: |
+            대장장이 NPC 인터랙션 → 강화 UI:
+            - 장비 슬롯 (드래그 앤 드롭)
+            - 성공 확률 표시
+            - 비용 표시 (골드 + 재료)
+            - [강화] 버튼 → 연출 (빛 + 결과)
+          status: todo
+
+      server_tasks:
+        - id: "P2_S02_S01"
+          task: "ENHANCE 패킷 + 강화 로직"
+          detail: |
+            ENHANCE_REQ(340) → ENHANCE_RESULT(341)
+            강화 단계별 성공률: +1(90%), +2(80%), +3(70%)...
+            실패 시 단계 유지 (파괴 없음, 초보자 친화)
+          status: todo
+          priority: P1
+
+    - id: "P2_S03"
+      name: "파티 던전 (첫 인스턴스)"
+      reference: "로아: 첫 어비스 던전"
+      priority: P1
+      status: todo
+      description: "파티 4인 매칭 → 던전 입장 → 3스테이지 → 보스 → 보상"
+
+      client_tasks:
+        - id: "P2_S03_C01"
+          task: "DungeonUI + 파티 매칭"
+          detail: |
+            던전 입장 게시판 UI:
+            - 던전 목록 (이름 + 추천레벨 + 보상)
+            - [혼자 입장] [파티 매칭] 버튼
+            - 매칭 대기 화면 (카운트다운)
+            - 던전 내부: 스테이지 진행 바 + 보스 HP
+          status: todo
+
+      server_tasks:
+        - id: "P2_S03_S01"
+          task: "던전 인스턴스 + 매칭 시스템 확장"
+          detail: "기존 던전 시스템(Session 21) 위에 매칭 큐 + 인스턴스 생성"
+          status: todo
+
+# ============================================================
+# PHASE 3: 엔드게임 (레벨 15+)
+# PvP, 보스 레이드, 길드 컨텐츠
+# ============================================================
+- id: "P3"
+  name: "엔드게임 (Lv.15+)"
+  description: "PvP 투기장, 레이드 보스, 길드 전쟁, 거래소"
+
+  scenes:
+    - id: "P3_S01"
+      name: "PvP 투기장"
+      reference: "로아: 증명의 전장"
+      priority: P2
+      status: todo
+      description: "1v1 또는 3v3 PvP. 매칭 → 별도 존 → 제한시간 → 승패"
+
+      client_tasks:
+        - id: "P3_S01_C01"
+          task: "PvP 아레나 UI + 씬"
+          detail: "매칭 UI + 아레나 씬 + 스코어보드 + 결과 화면"
+          status: todo
+
+      server_tasks:
+        - id: "P3_S01_S01"
+          task: "PVP_MATCH 패킷 + 아레나 로직"
+          detail: "매칭 큐 + 별도 존 생성 + 스탯 정규화 + 승패 판정"
+          status: todo
+
+    - id: "P3_S02"
+      name: "레이드 보스"
+      reference: "로아: 군단장 레이드"
+      priority: P2
+      status: todo
+      description: "8인 레이드. 3페이즈 보스. 기믹 패턴. 주간 보상."
+
+      client_tasks:
+        - id: "P3_S02_C01"
+          task: "레이드 UI + 보스 연출"
+          detail: "입장 UI + 보스 HP(페이즈 표시) + 기믹 경고 + 보상 화면"
+          status: todo
+
+      server_tasks:
+        - id: "P3_S02_S01"
+          task: "레이드 인스턴스 + 보스 기믹"
+          detail: "기존 보스(Session 34) 확장. 8인 파티. 기믹 패턴 추가."
+          status: todo
+
+# ============================================================
+# HUD & 공통 UI (모든 씬에서 사용)
+# ============================================================
+- id: "HUD"
+  name: "공통 HUD & UI 시스템"
+  description: "모든 게임 씬에서 표시되는 공통 UI 요소들"
+
+  scenes:
+    - id: "HUD_01"
+      name: "메인 HUD"
+      reference: "로아: 하단 스킬바 + 좌하단 HP/MP + 우상단 미니맵"
+      priority: P0
+      status: todo
+
+      description: |
+        게임 내 항상 표시되는 HUD:
+        ┌────────────────────────────────────────────────────┐
+        │ [미니맵]                              [퀘스트추적] │
+        │                                                    │
+        │                                                    │
+        │                   (게임 화면)                       │
+        │                                                    │
+        │ [HP바]                                             │
+        │ [MP바]    [1][2][3][4][Q][W][E][R]    [채팅]      │
+        │ [EXP바]   ────── 스킬바 ──────        [인벤]      │
+        └────────────────────────────────────────────────────┘
+
+      assets:
+        - type: texture
+          name: "hud_skillbar_bg.png"
+          desc: "스킬바 배경 (하단 가로 바)"
+          source: "midjourney"
+          prompt: "dark fantasy RPG skill bar UI, 8 slots, ornate golden frame, horizontal bar, game interface"
+
+        - type: texture
+          name: "hud_hp_bar.png"
+          desc: "HP 바 프레임"
+          source: "midjourney"
+          prompt: "RPG health bar frame, red fill, golden border, dark fantasy style"
+
+        - type: texture
+          name: "hud_mp_bar.png"
+          desc: "MP 바 프레임"
+          source: "midjourney"
+
+        - type: texture
+          name: "hud_exp_bar.png"
+          desc: "경험치 바 (하단 풀 너비)"
+          source: "midjourney"
+
+        - type: texture
+          name: "hud_minimap_frame.png"
+          desc: "미니맵 원형 프레임"
+          source: "midjourney"
+          prompt: "circular minimap frame, dark fantasy golden border, RPG game UI element"
+
+      client_tasks:
+        - id: "HUD_01_C01"
+          task: "MainHUD 프리팹 구현"
+          detail: |
+            Canvas (Screen Space - Overlay, 1920x1080 Reference)
+            - LeftBottom: HP바 + MP바 + EXP바 + 레벨 텍스트
+            - Bottom Center: 스킬바 (8슬롯: 1234+QWER)
+            - Right Top: 미니맵 (RenderTexture)
+            - Right Side: 퀘스트 트래커
+            - Right Bottom: 아이콘 버튼 (인벤/스킬창/문파/우편)
+            - Left Bottom: 채팅 윈도우
+            DontDestroyOnLoad
+          status: todo
+
+        - id: "HUD_01_C02"
+          task: "HP/MP 바 시스템"
+          detail: |
+            - Slider UI (Fill 이미지)
+            - HP: 빨강, MP: 파랑
+            - 데미지 시 빨간색→흰색 플래시 (0.1초)
+            - 수치 텍스트 "1500/2000"
+            - 부드러운 감소 애니메이션 (Lerp)
+          status: todo
+
+        - id: "HUD_01_C03"
+          task: "스킬바 시스템"
+          detail: |
+            8개 슬롯: 키보드 1,2,3,4,Q,W,E,R
+            각 슬롯:
+            - 스킬 아이콘 (Image)
+            - 쿨다운 오버레이 (radial fill, 어두운 반투명)
+            - 쿨다운 초 텍스트
+            - 키 표시 텍스트 (좌상단 작은 글씨)
+            - 드래그 앤 드롭으로 슬롯 재배치
+          status: todo
+
+      server_tasks: []
+
+# ============================================================
+# 라이팅 & 포스트프로세싱 (에이전트가 코드로 설정)
+# ============================================================
+- id: "VISUAL"
+  name: "비주얼 품질 설정"
+  description: "셰이더, 라이팅, 포스트프로세싱 — 전부 코드/설정으로 제어 가능"
+
+  settings:
+    - id: "VIS_01"
+      name: "라이팅 프리셋"
+      detail: |
+        Unity URP (Universal Render Pipeline) 사용
+        Directional Light:
+          - Color: #FFF5E1 (따뜻한 태양)
+          - Intensity: 1.2
+          - Shadow: Soft Shadows, Resolution 2048
+          - Rotation: (50, -30, 0) → 오후 느낌
+        Ambient:
+          - Source: Gradient
+          - Sky: #87CEEB
+          - Equator: #DEB887
+          - Ground: #8B7355
+        Fog:
+          - Mode: Linear
+          - Start: 80, End: 200
+          - Color: #C8D8E8 (옅은 파란 안개)
+      assignee: client
+      status: todo
+
+    - id: "VIS_02"
+      name: "포스트프로세싱"
+      detail: |
+        URP Volume (Global):
+          Bloom:
+            - Threshold: 0.9
+            - Intensity: 0.5
+            - Scatter: 0.7
+          Color Grading:
+            - Temperature: +10 (약간 따뜻하게)
+            - Saturation: +15
+            - Contrast: +10
+          Vignette:
+            - Intensity: 0.25
+            - Smoothness: 0.5
+          Ambient Occlusion (SSAO):
+            - Intensity: 0.5
+        던전 전용 Volume:
+          - Temperature: -20 (차갑게)
+          - Bloom Intensity: 0.8 (마법 빛 강조)
+      assignee: client
+      status: todo
+
+    - id: "VIS_03"
+      name: "셰이더 설정"
+      detail: |
+        캐릭터:
+          - URP/Lit (기본)
+          - Outline 셰이더 (ShaderGraph: Fresnel + 외곽선)
+        몬스터:
+          - 피격: _EmissionColor 빨강 플래시 (0.1초)
+          - 엘리트: 보라색 Emission 지속
+          - 보스: 검정 + 빨강 Emission
+        이펙트:
+          - URP/Particles/Unlit (가산 블렌딩)
+          - 스킬 궤적: Trail Renderer + Gradient
+        환경:
+          - 물: URP Water shader (Reflection + Refraction)
+          - 풀: GPU Instancing + Wind animation
+      assignee: client
+      status: todo
+
+# ============================================================
+# 사운드 시스템
+# ============================================================
+- id: "AUDIO"
+  name: "사운드 설계"
+  description: "BGM, SFX, 환경음 — freesound + AI 생성"
+
+  categories:
+    - name: "BGM"
+      tracks:
+        - id: "bgm_title"
+          desc: "타이틀 화면 (장엄한 오케스트라)"
+          source: "suno_ai"
+        - id: "bgm_tutorial"
+          desc: "튜토리얼 존 (평화로운 판타지)"
+          source: "suno_ai"
+        - id: "bgm_village"
+          desc: "마을 (중세 선술집 분위기)"
+          source: "suno_ai"
+        - id: "bgm_field"
+          desc: "필드 (모험, 경쾌한 판타지)"
+          source: "suno_ai"
+        - id: "bgm_dungeon"
+          desc: "던전 (긴장감, 어두운 분위기)"
+          source: "suno_ai"
+        - id: "bgm_boss"
+          desc: "보스전 (압도적, 빠른 템포)"
+          source: "suno_ai"
+
+    - name: "SFX"
+      tracks:
+        - id: "sfx_hit_sword"
+          desc: "검 타격"
+          source: "freesound"
+        - id: "sfx_hit_arrow"
+          desc: "화살 적중"
+          source: "freesound"
+        - id: "sfx_hit_magic"
+          desc: "마법 타격"
+          source: "freesound"
+        - id: "sfx_levelup"
+          desc: "레벨업 징글"
+          source: "freesound"
+        - id: "sfx_quest_complete"
+          desc: "퀘스트 완료"
+          source: "freesound"
+        - id: "sfx_item_pickup"
+          desc: "아이템 획득"
+          source: "freesound"
+        - id: "sfx_gold_clink"
+          desc: "골드 획득"
+          source: "freesound"
+        - id: "sfx_ui_click"
+          desc: "UI 버튼 클릭"
+          source: "freesound"
+        - id: "sfx_door_open"
+          desc: "던전 문 열림"
+          source: "freesound"
+        - id: "sfx_boss_roar"
+          desc: "보스 등장 포효"
+          source: "freesound"
