@@ -146,7 +146,7 @@ async def run_tests(port: int):
         msg_type, resp = await c.recv_packet()
         assert msg_type == MsgType.LOGIN_RESULT, f"Expected LOGIN_RESULT, got {msg_type}"
         result, account_id = struct.unpack('<BI', resp[:5])
-        assert result == 1, f"Login should succeed, got result={result}"
+        assert result == 0, f"Login should succeed (SUCCESS=0), got result={result}"
         assert account_id > 0, f"Account ID should be > 0, got {account_id}"
         c.close()
 
@@ -196,7 +196,7 @@ async def run_tests(port: int):
         assert MsgType.ENTER_GAME in msg_types, f"Missing ENTER_GAME in {msg_types}"
         enter_game = next(p[1] for p in packets if p[0] == MsgType.ENTER_GAME)
         result = enter_game[0]
-        assert result == 1, f"Enter game should succeed, got result={result}"
+        assert result == 0, f"Enter game should succeed (SUCCESS=0), got result={result}"
 
         entity_id = struct.unpack_from('<Q', enter_game, 1)[0]
         assert entity_id > 0, f"Entity ID should be > 0"

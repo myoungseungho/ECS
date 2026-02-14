@@ -627,12 +627,12 @@ class BridgeServer:
 
     async def _on_login(self, session: PlayerSession, payload: bytes):
         if len(payload) < 2:
-            self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 0, 0))
+            self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 1, 0))  # FAIL=1
             return
 
         name_len = payload[0]
         if len(payload) < 1 + name_len + 1:
-            self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 0, 0))
+            self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 1, 0))  # FAIL=1
             return
 
         username = payload[1:1+name_len].decode('utf-8', errors='replace')
@@ -646,7 +646,7 @@ class BridgeServer:
         session.logged_in = True
 
         self.log(f"Login: {username} (account={session.account_id})", "GAME")
-        self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 1, session.account_id))
+        self._send(session, MsgType.LOGIN_RESULT, struct.pack('<BI', 0, session.account_id))  # SUCCESS=0
 
     async def _on_char_list_req(self, session: PlayerSession, payload: bytes):
         if not session.logged_in:
@@ -664,13 +664,13 @@ class BridgeServer:
 
     async def _on_char_select(self, session: PlayerSession, payload: bytes):
         if len(payload) < 4 or not session.logged_in:
-            self._send(session, MsgType.ENTER_GAME, struct.pack('<B', 0) + b'\x00' * 24)
+            self._send(session, MsgType.ENTER_GAME, struct.pack('<B', 1) + b'\x00' * 24)  # FAIL=1
             return
 
         char_id = struct.unpack('<I', payload[:4])[0]
         tmpl = next((c for c in CHARACTER_TEMPLATES if c["id"] == char_id), None)
         if not tmpl:
-            self._send(session, MsgType.ENTER_GAME, struct.pack('<B', 0) + b'\x00' * 24)
+            self._send(session, MsgType.ENTER_GAME, struct.pack('<B', 1) + b'\x00' * 24)  # FAIL=1
             return
 
         session.entity_id = new_entity()
@@ -692,7 +692,7 @@ class BridgeServer:
         self.log(f"EnterGame: {session.char_name} (entity={session.entity_id}, zone={session.zone_id})", "GAME")
 
         resp = struct.pack('<BQIfff',
-            1, session.entity_id, session.zone_id,
+            0, session.entity_id, session.zone_id,  # SUCCESS=0
             session.pos.x, session.pos.y, session.pos.z)
         self._send(session, MsgType.ENTER_GAME, resp)
 
