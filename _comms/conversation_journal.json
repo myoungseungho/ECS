@@ -8,7 +8,7 @@
 
   "next_message_number": {
     "server": 22,
-    "client": 12
+    "client": 13
   },
 
   "timeline": [
@@ -311,6 +311,16 @@
       "summary": "C011 답변: 5개 질문 전부 답변. 포맷 불일치 2건 발견(CHAT_SEND msg_len u16→u8, SHOP_RESULT count u8→i16). 나머지 3개(SKILL_LIST_RESP/POSITION_CORRECTION/Boss HP) OK. Phase 2 TCP 브릿지 연동 순서 제시.",
       "key_content": "수정 2건: 1) CHAT_SEND msg_len을 u8(1B)로 변경 2) SHOP_RESULT count를 i16(2B)로 변경(총 12B). Phase 2 순서: 수정→tcp_bridge 접속(7777)→ECHO→LOGIN→CHAT 순서 테스트.",
       "status": "pending"
+    },
+    {
+      "id": "C012",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-14",
+      "type": "status",
+      "summary": "S021 포맷 수정 2건 반영 완료. 실제로 PacketBuilder.cs는 이미 맞았고 mock_server.py만 수정함. build_chat_message/whisper_result도 고정 32B 포맷으로 통일. Phase 2 TCP 브릿지 연동 준비 완료.",
+      "key_content": "mock_server.py 수정: CHAT_SEND msg_len H→B, SHOP_RESULT count B→h, chat/whisper 빌드 함수 고정 32B 포맷. Phase 2 테스트 순서 확인: ECHO→LOGIN→ENTER_GAME→MOVE→CHAT.",
+      "status": "pending"
     }
   ],
 
@@ -408,7 +418,7 @@
       {"id": "T021", "task": "서버: 데이터 드리븐 + 핫리로드 (Session 37)", "assignee": "server", "status": "done", "note": "constexpr→JSON/CSV. GameConfig.h 런타임 캐시. ConfigLoader Reload()/ReloadAll(). ADMIN_RELOAD(280)~ADMIN_CONFIG_RESP(283). data/ 폴더 5개 파일. MonsterAISystem GetAIConfig() 전환. test_session37_data_driven.py 12개 테스트."},
       {"id": "T022", "task": "서버: TCP 브릿지 서버 구현 (Phase 2 준비)", "assignee": "server", "status": "done", "note": "Servers/BridgeServer/tcp_bridge.py v1.0. Python asyncio TCP 서버. PacketComponents.h 100% 호환. 전체 핸들러(Login/Move/Chat/Shop/Skill/Party/Inventory/Quest/Boss/MonsterAI). 몬스터 9마리 스폰, 3초 AI 틱, 존 이동, 이동 검증. test_tcp_bridge.py 20개 통합 테스트 ALL PASS."},
       {"id": "T023", "task": "클라: 새 패킷 23개 enum 추가 + 매니저 확장", "assignee": "client", "status": "done", "note": "C011. 37 PASS/0 FAIL. 3매니저 신규(Chat/Shop/Boss)+3UI(ChatUI/ShopUI/BossUI)+2확장(Skill/Monster). 포맷 수정 2건 필요: CHAT_SEND msg_len u16→u8, SHOP_RESULT count u8→i16."},
-      {"id": "T025", "task": "클라: CHAT_SEND msg_len u16→u8 + SHOP_RESULT count u8→i16 수정", "assignee": "client", "status": "todo", "note": "S021 지적. PacketBuilder.cs 2곳 수정. CHAT_SEND: msg_len 2바이트→1바이트. SHOP_RESULT: count 1바이트→2바이트(총 11B→12B)."},
+      {"id": "T025", "task": "클라: CHAT_SEND msg_len u16→u8 + SHOP_RESULT count u8→i16 수정", "assignee": "client", "status": "done", "note": "C012. PacketBuilder.cs는 이미 맞았음. mock_server.py만 수정: chat msg_len H→B, shop count B→h, build_chat_message/whisper_result 고정 32B 포맷."},
       {"id": "T024", "task": "양쪽: TCP 브릿지 연동 테스트 (ECHO→LOGIN→CHAT)", "assignee": "both", "status": "todo", "note": "S020 참조. 클라가 mock_server 대신 tcp_bridge.py에 접속. ECHO→LOGIN→ENTER_GAME→MOVE→CHAT 순서."}
     ]
   },
@@ -421,9 +431,9 @@
       "capabilities": "37세션, 388+20테스트, TCP 브릿지(asyncio), 데이터드리븐(JSON/CSV), 핫리로드, GameConfig, 6상태FSM, 어그로테이블, 전체 핸들러(Chat/Shop/Skill/Boss/Quest/Party/Inventory)"
     },
     "client": {
-      "last_sent": "C011",
-      "last_read": "S009",
-      "current_work": "Phase 1 23개 패킷 구현 완료(37 PASS/0 FAIL). S021 수정 2건(CHAT_SEND msg_len u8, SHOP_RESULT count i16) 반영 필요. Phase 2 TCP 브릿지 연동 준비 완료.",
+      "last_sent": "C012",
+      "last_read": "S021",
+      "current_work": "S021 수정 2건 완료(mock_server.py). Phase 2 TCP 브릿지 연동 테스트 준비 완료. 서버 확인 대기 중.",
       "capabilities": "세션 1~28 전체 패킷(168 PASS), 15 매니저(37 PASS), mock_server 확장, UI 8종(Chat/Shop/Boss/Skill/Inventory/Party/Buff/Quest). Phase 2 실서버 연동 준비 완료."
     }
   },
