@@ -209,6 +209,10 @@ namespace Network
         public event Action<RepairResultData> OnRepairResult;
         public event Action<RerollResultData> OnRerollResult;
         public event Action<DurabilityNotifyData> OnDurabilityNotify;
+        // S053: 전장/길드전/PvP시즌
+        public event Action<BattlegroundStatusData> OnBattlegroundStatus;
+        public event Action<BattlegroundScoreUpdateData> OnBattlegroundScoreUpdate;
+        public event Action<GuildWarStatusData> OnGuildWarStatus;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1117,6 +1121,26 @@ namespace Network
         public void RequestDurabilityQuery()
         {
             _field?.Send(PacketBuilder.DurabilityQuery());
+        }
+
+        // ━━━ S053: 전장/길드전/PvP시즌 API ━━━
+
+        /// <summary>전장 큐 등록 (action: 0=enqueue, 1=cancel; mode: 0=거점점령, 1=수레호위)</summary>
+        public void BattlegroundQueue(byte action, byte mode)
+        {
+            _field?.Send(PacketBuilder.BattlegroundQueue(action, mode));
+        }
+
+        /// <summary>전장 점수 조회</summary>
+        public void BattlegroundScoreQuery(byte action, byte pointIndex)
+        {
+            _field?.Send(PacketBuilder.BattlegroundScore(action, pointIndex));
+        }
+
+        /// <summary>길드전 선언/수락/거절/조회</summary>
+        public void GuildWarAction(byte action, uint targetGuildId)
+        {
+            _field?.Send(PacketBuilder.GuildWarDeclare(action, targetGuildId));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2383,6 +2407,30 @@ namespace Network
                     var data = PacketBuilder.ParseDurabilityNotify(payload);
                     Debug.Log($"[Net] DurabilityNotify: slot={data.InvSlot}, dur={data.Durability:F1}, broken={data.IsBroken}");
                     OnDurabilityNotify?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S053: 전장/길드전/PvP시즌 (TASK 6) ━━━
+
+                case MsgType.BATTLEGROUND_STATUS:
+                {
+                    var data = PacketBuilder.ParseBattlegroundStatus(payload);
+                    Debug.Log($"[Net] BattlegroundStatus: status={data.Status}, match={data.MatchId}, mode={data.Mode}, team={data.Team}");
+                    OnBattlegroundStatus?.Invoke(data);
+                    break;
+                }
+                case MsgType.BATTLEGROUND_SCORE_UPDATE:
+                {
+                    var data = PacketBuilder.ParseBattlegroundScoreUpdate(payload);
+                    Debug.Log($"[Net] BattlegroundScore: mode={data.Mode}, red={data.RedScore}, blue={data.BlueScore}, time={data.TimeRemaining}");
+                    OnBattlegroundScoreUpdate?.Invoke(data);
+                    break;
+                }
+                case MsgType.GUILD_WAR_STATUS:
+                {
+                    var data = PacketBuilder.ParseGuildWarStatus(payload);
+                    Debug.Log($"[Net] GuildWarStatus: status={data.Status}, war={data.WarId}, hpA={data.CrystalHpA}, hpB={data.CrystalHpB}");
+                    OnGuildWarStatus?.Invoke(data);
                     break;
                 }
 

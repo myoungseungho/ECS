@@ -1461,6 +1461,107 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: BattlegroundManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "전장/PvP시즌 관리 — S053 TASK 6 (MsgType 430-433)"
+    reads: []
+    writes:
+      - _isQueued (bool)
+      - _queueMode (BattlegroundMode)
+      - _inMatch (bool)
+      - _matchId (uint)
+      - _myTeam (BattlegroundTeam)
+      - _redScore (uint)
+      - _blueScore (uint)
+      - _timeRemaining (uint)
+    fires_events:
+      - OnQueueStatusChanged(BattlegroundStatusData)
+      - OnScoreUpdated(BattlegroundScoreUpdateData)
+      - OnMatchStarted()
+      - OnMatchEnded()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnBattlegroundStatus → 전장 큐/매칭 상태
+      - NetworkManager.OnBattlegroundScoreUpdate → 실시간 점수
+    public_api:
+      - OpenPanel() / ClosePanel()
+      - EnqueueBattleground(mode)
+      - CancelQueue()
+      - RequestScoreUpdate()
+      - GetTierFromRating(rating)
+      - GetTierName(tier)
+    computed_properties:
+      - IsQueued, InMatch, MyTeam, RedScore, BlueScore, TimeRemaining
+
+  - name: GuildWarManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "길드전 관리 — S053 TASK 6 (MsgType 434-435)"
+    reads: []
+    writes:
+      - _inWar (bool)
+      - _warId (uint)
+      - _guildAId (uint)
+      - _guildBId (uint)
+      - _crystalHpA (uint)
+      - _crystalHpB (uint)
+      - _timeRemaining (uint)
+    fires_events:
+      - OnWarStatusChanged(GuildWarStatusData)
+      - OnWarStarted()
+      - OnWarEnded()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnGuildWarStatus → 길드전 상태
+    public_api:
+      - OpenPanel() / ClosePanel()
+      - DeclareWar(targetGuildId)
+      - AcceptWar()
+      - RejectWar()
+      - QueryWarStatus()
+    computed_properties:
+      - InWar, WarId, CrystalHpA, CrystalHpB, TimeRemaining
+
+  - name: BattlegroundUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "전장 큐/점수판 UI — S053 TASK 6 (F7키 토글)"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - BattlegroundManager.OnPanelOpened → 패널 표시
+      - BattlegroundManager.OnPanelClosed → 패널 숨김
+      - BattlegroundManager.OnQueueStatusChanged → 큐 상태 갱신
+      - BattlegroundManager.OnScoreUpdated → 점수 갱신
+      - BattlegroundManager.OnMatchStarted → 매치 시작
+      - BattlegroundManager.OnMatchEnded → 매치 종료
+    public_api: []
+    computed_properties: []
+
+  - name: GuildWarUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "길드전 UI — S053 TASK 6 (F8키 토글) 선언/수락/거절 + 수정HP"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - GuildWarManager.OnPanelOpened → 패널 표시
+      - GuildWarManager.OnPanelClosed → 패널 숨김
+      - GuildWarManager.OnWarStatusChanged → 길드전 상태 갱신
+      - GuildWarManager.OnWarStarted → 길드전 시작
+      - GuildWarManager.OnWarEnded → 길드전 종료
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -2007,6 +2108,27 @@ data_flows:
     to: RerollUI
     via: "C# events (OnRerollComplete, OnRerollPanelOpened, OnRerollPanelClosed)"
     description: "리롤 UI 갱신 (F11키 토글)"
+
+  # S053: 전장/길드전 (TASK 6)
+  - from: NetworkManager
+    to: BattlegroundManager
+    via: "C# events (OnBattlegroundStatus, OnBattlegroundScoreUpdate)"
+    description: "전장 큐/매칭/점수 수신 (430-433)"
+
+  - from: BattlegroundManager
+    to: BattlegroundUI
+    via: "C# events (OnQueueStatusChanged, OnScoreUpdated, OnMatchStarted, OnMatchEnded, OnPanelOpened, OnPanelClosed)"
+    description: "전장 UI 갱신 (F7키 토글)"
+
+  - from: NetworkManager
+    to: GuildWarManager
+    via: "C# events (OnGuildWarStatus)"
+    description: "길드전 상태 수신 (434-435)"
+
+  - from: GuildWarManager
+    to: GuildWarUI
+    via: "C# events (OnWarStatusChanged, OnWarStarted, OnWarEnded, OnPanelOpened, OnPanelClosed)"
+    description: "길드전 UI 갱신 (F8키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

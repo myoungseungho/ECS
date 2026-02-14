@@ -3161,5 +3161,65 @@ namespace Network
             d.IsBroken = payload[5] != 0;
             return d;
         }
+
+        // ━━━ S053: 전장/길드전/PvP시즌 (TASK 6, MsgType 430-435) ━━━
+
+        /// <summary>BATTLEGROUND_QUEUE 빌더: action(1) + mode(1)</summary>
+        public static byte[] BattlegroundQueue(byte action, byte mode)
+        {
+            return Build(MsgType.BATTLEGROUND_QUEUE, new byte[] { action, mode });
+        }
+
+        /// <summary>BATTLEGROUND_SCORE 빌더: action(1) + point_index(1)</summary>
+        public static byte[] BattlegroundScore(byte action, byte pointIndex)
+        {
+            return Build(MsgType.BATTLEGROUND_SCORE, new byte[] { action, pointIndex });
+        }
+
+        /// <summary>GUILD_WAR_DECLARE 빌더: action(1) + target_guild_id(4)</summary>
+        public static byte[] GuildWarDeclare(byte action, uint targetGuildId)
+        {
+            byte[] payload = new byte[5];
+            payload[0] = action;
+            BitConverter.GetBytes(targetGuildId).CopyTo(payload, 1);
+            return Build(MsgType.GUILD_WAR_DECLARE, payload);
+        }
+
+        /// <summary>BATTLEGROUND_STATUS 파싱: status(1)+match_id(4)+mode(1)+team(1)+queue_count(1)</summary>
+        public static BattlegroundStatusData ParseBattlegroundStatus(byte[] payload)
+        {
+            var d = new BattlegroundStatusData();
+            d.Status = (BattlegroundStatus)payload[0];
+            d.MatchId = BitConverter.ToUInt32(payload, 1);
+            d.Mode = (BattlegroundMode)payload[5];
+            d.Team = (BattlegroundTeam)payload[6];
+            d.QueueCount = payload[7];
+            return d;
+        }
+
+        /// <summary>BATTLEGROUND_SCORE_UPDATE 파싱: mode(1)+red_score(4)+blue_score(4)+time(4)</summary>
+        public static BattlegroundScoreUpdateData ParseBattlegroundScoreUpdate(byte[] payload)
+        {
+            var d = new BattlegroundScoreUpdateData();
+            d.Mode = (BattlegroundMode)payload[0];
+            d.RedScore = BitConverter.ToUInt32(payload, 1);
+            d.BlueScore = BitConverter.ToUInt32(payload, 5);
+            d.TimeRemaining = BitConverter.ToUInt32(payload, 9);
+            return d;
+        }
+
+        /// <summary>GUILD_WAR_STATUS 파싱: status(1)+war_id(4)+guild_a(4)+guild_b(4)+crystal_hp_a(4)+crystal_hp_b(4)+time(4)</summary>
+        public static GuildWarStatusData ParseGuildWarStatus(byte[] payload)
+        {
+            var d = new GuildWarStatusData();
+            d.Status = (GuildWarStatus)payload[0];
+            d.WarId = BitConverter.ToUInt32(payload, 1);
+            d.GuildAId = BitConverter.ToUInt32(payload, 5);
+            d.GuildBId = BitConverter.ToUInt32(payload, 9);
+            d.CrystalHpA = BitConverter.ToUInt32(payload, 13);
+            d.CrystalHpB = BitConverter.ToUInt32(payload, 17);
+            d.TimeRemaining = BitConverter.ToUInt32(payload, 21);
+            return d;
+        }
     }
 }

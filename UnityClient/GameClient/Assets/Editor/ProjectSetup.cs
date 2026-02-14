@@ -622,6 +622,10 @@ public static class ProjectSetup
         var durabilityManagerGo = CreateManagerObject("DurabilityManager", typeof(DurabilityManager));
         var repairUIGo = CreateManagerObject("RepairUI", typeof(RepairUI));
         var rerollUIGo = CreateManagerObject("RerollUI", typeof(RerollUI));
+        var battlegroundManagerGo = CreateManagerObject("BattlegroundManager", typeof(BattlegroundManager));
+        var guildWarManagerGo = CreateManagerObject("GuildWarManager", typeof(GuildWarManager));
+        var battlegroundUIGo = CreateManagerObject("BattlegroundUI", typeof(BattlegroundUI));
+        var guildWarUIGo = CreateManagerObject("GuildWarUI", typeof(GuildWarUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

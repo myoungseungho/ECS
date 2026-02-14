@@ -401,6 +401,14 @@ namespace Network
         PARTY_FINDER_LIST       = 421,  // S→C: count(1) {listing_id(4) owner_len(1) owner(N) title_len(1) title(N) category(1) min_level(1) role(1)}*N
         PARTY_FINDER_CREATE     = 422,  // C→S: title_len(1) title(N) category(1) min_level(1) role(1)
 
+        // ━━━ S053: 전장/길드전/PvP시즌 (TASK 6, MsgType 430-435) ━━━
+        BATTLEGROUND_QUEUE          = 430,  // C→S: action(u8)+mode(u8) — action: 0=enqueue, 1=cancel; mode: 0=capture_point, 1=payload
+        BATTLEGROUND_STATUS         = 431,  // S→C: status(u8)+match_id(u32)+mode(u8)+team(u8)+queue_count(u8)
+        BATTLEGROUND_SCORE          = 432,  // C→S: action(u8)+point_index(u8) — action: 0=query
+        BATTLEGROUND_SCORE_UPDATE   = 433,  // S→C: mode(u8)+red_score(u32)+blue_score(u32)+time(u32)+data(variable)
+        GUILD_WAR_DECLARE           = 434,  // C→S: action(u8)+target_guild_id(u32) — action: 0=declare, 1=accept, 2=reject, 3=query
+        GUILD_WAR_STATUS            = 435,  // S→C: status(u8)+war_id(u32)+guild_a(u32)+guild_b(u32)+crystal_hp_a(u32)+crystal_hp_b(u32)+time(u32)
+
         // ━━━ S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405) ━━━
         DAILY_QUEST_LIST_REQ    = 400,  // C→S: empty
         DAILY_QUEST_LIST        = 401,  // S→C: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
@@ -2408,5 +2416,98 @@ namespace Network
         public byte InvSlot;
         public float Durability;
         public bool IsBroken;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S053: 전장/길드전/PvP시즌 (TASK 6, MsgType 430-435)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>전장 상태 코드 (BATTLEGROUND_STATUS status)</summary>
+    public enum BattlegroundStatus : byte
+    {
+        QUEUED          = 0,
+        MATCH_FOUND     = 1,
+        CANCELLED       = 2,
+        ALREADY_IN_MATCH = 3,
+        INVALID_MODE    = 4,
+    }
+
+    /// <summary>전장 모드</summary>
+    public enum BattlegroundMode : byte
+    {
+        CAPTURE_POINT = 0,
+        PAYLOAD       = 1,
+    }
+
+    /// <summary>전장 팀</summary>
+    public enum BattlegroundTeam : byte
+    {
+        RED  = 0,
+        BLUE = 1,
+    }
+
+    /// <summary>길드전 상태 코드 (GUILD_WAR_STATUS status)</summary>
+    public enum GuildWarStatus : byte
+    {
+        WAR_DECLARED    = 0,
+        WAR_STARTED     = 1,
+        WAR_REJECTED    = 2,
+        NO_GUILD        = 3,
+        TOO_FEW_MEMBERS = 4,
+        ALREADY_AT_WAR  = 5,
+        PENDING_INFO    = 6,
+        NO_WAR          = 7,
+    }
+
+    /// <summary>길드전 액션</summary>
+    public enum GuildWarAction : byte
+    {
+        DECLARE = 0,
+        ACCEPT  = 1,
+        REJECT  = 2,
+        QUERY   = 3,
+    }
+
+    /// <summary>PvP 티어</summary>
+    public enum PvPTier : byte
+    {
+        BRONZE       = 0,
+        SILVER       = 1,
+        GOLD         = 2,
+        PLATINUM     = 3,
+        DIAMOND      = 4,
+        MASTER       = 5,
+        GRANDMASTER  = 6,
+    }
+
+    /// <summary>전장 상태 데이터 (BATTLEGROUND_STATUS 파싱용)</summary>
+    public class BattlegroundStatusData
+    {
+        public BattlegroundStatus Status;
+        public uint MatchId;
+        public BattlegroundMode Mode;
+        public BattlegroundTeam Team;
+        public byte QueueCount;
+    }
+
+    /// <summary>전장 점수 업데이트 데이터 (BATTLEGROUND_SCORE_UPDATE 파싱용)</summary>
+    public class BattlegroundScoreUpdateData
+    {
+        public BattlegroundMode Mode;
+        public uint RedScore;
+        public uint BlueScore;
+        public uint TimeRemaining;
+    }
+
+    /// <summary>길드전 상태 데이터 (GUILD_WAR_STATUS 파싱용)</summary>
+    public class GuildWarStatusData
+    {
+        public GuildWarStatus Status;
+        public uint WarId;
+        public uint GuildAId;
+        public uint GuildBId;
+        public uint CrystalHpA;
+        public uint CrystalHpB;
+        public uint TimeRemaining;
     }
 }

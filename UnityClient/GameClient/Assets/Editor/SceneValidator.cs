@@ -180,6 +180,10 @@ public static class SceneValidator
         Check("GameScene: DurabilityManager 존재", objectNames.Contains("DurabilityManager"));
         Check("GameScene: RepairUI 존재", objectNames.Contains("RepairUI"));
         Check("GameScene: RerollUI 존재", objectNames.Contains("RerollUI"));
+        Check("GameScene: BattlegroundManager 존재", objectNames.Contains("BattlegroundManager"));
+        Check("GameScene: GuildWarManager 존재", objectNames.Contains("GuildWarManager"));
+        Check("GameScene: BattlegroundUI 존재", objectNames.Contains("BattlegroundUI"));
+        Check("GameScene: GuildWarUI 존재", objectNames.Contains("GuildWarUI"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인
