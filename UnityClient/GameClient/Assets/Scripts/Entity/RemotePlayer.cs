@@ -7,6 +7,12 @@ public class RemotePlayer : MonoBehaviour
     public ulong EntityId { get; set; }
 
     private Vector3 _targetPos;
+    private Animator _animator;
+
+    private void Start()
+    {
+        _animator = GetComponentInChildren<Animator>();
+    }
 
     public void SetTargetPosition(Vector3 pos)
     {
@@ -15,6 +21,9 @@ public class RemotePlayer : MonoBehaviour
 
     private void Update()
     {
+        float distance = Vector3.Distance(transform.position, _targetPos);
+        _animator?.SetBool("IsMoving", distance > 0.1f);
+
         transform.position = Vector3.Lerp(
             transform.position, _targetPos, Time.deltaTime * lerpSpeed);
 

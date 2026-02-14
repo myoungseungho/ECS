@@ -5,10 +5,12 @@
 
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.IO;
+using System.Linq;
 
 public static class ProjectSetup
 {
@@ -17,14 +19,28 @@ public static class ProjectSetup
     private const string PrefabsDir     = "Assets/Prefabs";
     private const string ScenesDir      = "Assets/Scenes";
 
+    private const string AnimControllersDir = "Assets/Art/AnimatorControllers";
+
     private const string LocalMatPath    = MaterialsDir + "/LocalPlayer.mat";
     private const string RemoteMatPath   = MaterialsDir + "/RemotePlayer.mat";
     private const string MonsterMatPath  = MaterialsDir + "/Monster.mat";
+    private const string BossMatPath     = MaterialsDir + "/Boss.mat";
     private const string LocalPrefabPath   = PrefabsDir + "/LocalPlayer.prefab";
     private const string RemotePrefabPath  = PrefabsDir + "/RemotePlayer.prefab";
     private const string MonsterPrefabPath = PrefabsDir + "/Monster.prefab";
     private const string GameScenePath  = ScenesDir + "/GameScene.unity";
     private const string TestScenePath  = ScenesDir + "/TestScene.unity";
+
+    // FBX 경로
+    private const string PlayerFBXPath  = "Assets/Art/Characters/X Bot.fbx";
+    private const string MonsterFBXPath = "Assets/Art/Characters/Zombiegirl W Kurniawan.fbx";
+    private const string AnimControllerPath = AnimControllersDir + "/CharacterAnimator.controller";
+
+    // 애니메이션 FBX 경로
+    private const string IdleAnimPath    = "Assets/Art/Animations/Idle.fbx";
+    private const string WalkAnimPath    = "Assets/Art/Animations/Walking.fbx";
+    private const string AttackAnimPath  = "Assets/Art/Animations/Punching.fbx";
+    private const string DeathAnimPath   = "Assets/Art/Animations/Death.fbx";
 
     // URP Lit 셰이더 이름
     private const string URPLitShader = "Universal Render Pipeline/Lit";
@@ -35,7 +51,9 @@ public static class ProjectSetup
         Debug.Log("━━━ [ProjectSetup] 시작 ━━━");
 
         CreateDirectories();
+        ConfigureFBXImports();
         CreateMaterials();
+        CreateAnimatorControllers();
         CreatePrefabs();
         CreateGameScene();
         CreateTestScene();
@@ -62,6 +80,8 @@ public static class ProjectSetup
         EnsureDirectory(MaterialsDir);
         EnsureDirectory(PrefabsDir);
         EnsureDirectory(ScenesDir);
+        EnsureDirectory("Assets/Art");
+        EnsureDirectory(AnimControllersDir);
     }
 
     private static void EnsureDirectory(string path)
@@ -75,6 +95,119 @@ public static class ProjectSetup
         }
     }
 
+    // ━━━ 1b. FBX Import 설정 ━━━
+
+    private static void ConfigureFBXImports()
+    {
+        string[] fbxPaths = { PlayerFBXPath, MonsterFBXPath, IdleAnimPath, WalkAnimPath, AttackAnimPath, DeathAnimPath };
+
+        foreach (var path in fbxPaths)
+        {
+            var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (importer == null)
+            {
+                Debug.LogWarning($"  [FBX] {path} — 파일 없음, 스킵");
+                continue;
+            }
+
+            if (importer.animationType != ModelImporterAnimationType.Human)
+            {
+                importer.animationType = ModelImporterAnimationType.Human;
+                importer.SaveAndReimport();
+                Debug.Log($"  [FBX] {path} → Humanoid 리깅 설정");
+            }
+            else
+            {
+                Debug.Log($"  [FBX] {path} — 이미 Humanoid, 스킵");
+            }
+        }
+    }
+
+    // ━━━ 1c. Animator Controllers ━━━
+
+    private static void CreateAnimatorControllers()
+    {
+        if (AssetDatabase.LoadAssetAtPath<AnimatorController>(AnimControllerPath) != null)
+        {
+            Debug.Log("  [Animator] CharacterAnimator — 이미 존재, 스킵");
+            return;
+        }
+
+        var controller = AnimatorController.CreateAnimatorControllerAtPath(AnimControllerPath);
+
+        // 파라미터
+        controller.AddParameter("IsMoving", AnimatorControllerParameterType.Bool);
+        controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("IsDead", AnimatorControllerParameterType.Bool);
+
+        var rootStateMachine = controller.layers[0].stateMachine;
+
+        // 애니메이션 클립 로드
+        var idleClip = LoadAnimationClip(IdleAnimPath);
+        var walkClip = LoadAnimationClip(WalkAnimPath);
+        var attackClip = LoadAnimationClip(AttackAnimPath);
+        var deathClip = LoadAnimationClip(DeathAnimPath);
+
+        // 상태 생성
+        var idleState = rootStateMachine.AddState("Idle");
+        idleState.motion = idleClip;
+
+        var walkState = rootStateMachine.AddState("Walk");
+        walkState.motion = walkClip;
+
+        var attackState = rootStateMachine.AddState("Attack");
+        attackState.motion = attackClip;
+
+        var deathState = rootStateMachine.AddState("Death");
+        deathState.motion = deathClip;
+
+        // 기본 상태 = Idle
+        rootStateMachine.defaultState = idleState;
+
+        // Idle → Walk (IsMoving == true)
+        var idleToWalk = idleState.AddTransition(walkState);
+        idleToWalk.AddCondition(AnimatorConditionMode.If, 0, "IsMoving");
+        idleToWalk.hasExitTime = false;
+        idleToWalk.duration = 0.15f;
+
+        // Walk → Idle (IsMoving == false)
+        var walkToIdle = walkState.AddTransition(idleState);
+        walkToIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "IsMoving");
+        walkToIdle.hasExitTime = false;
+        walkToIdle.duration = 0.15f;
+
+        // AnyState → Attack (Attack trigger)
+        var anyToAttack = rootStateMachine.AddAnyStateTransition(attackState);
+        anyToAttack.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+        anyToAttack.hasExitTime = false;
+        anyToAttack.duration = 0.1f;
+
+        // Attack → Idle (exit time)
+        var attackToIdle = attackState.AddTransition(idleState);
+        attackToIdle.hasExitTime = true;
+        attackToIdle.exitTime = 0.9f;
+        attackToIdle.duration = 0.15f;
+
+        // AnyState → Death (IsDead == true)
+        var anyToDeath = rootStateMachine.AddAnyStateTransition(deathState);
+        anyToDeath.AddCondition(AnimatorConditionMode.If, 0, "IsDead");
+        anyToDeath.hasExitTime = false;
+        anyToDeath.duration = 0.15f;
+
+        EditorUtility.SetDirty(controller);
+        Debug.Log("  [Animator] CharacterAnimator.controller 생성 완료");
+    }
+
+    private static AnimationClip LoadAnimationClip(string fbxPath)
+    {
+        var assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+        if (assets == null) return null;
+
+        return assets
+            .OfType<AnimationClip>()
+            .FirstOrDefault(c => !c.name.StartsWith("__preview__"));
+    }
+
     // ━━━ 2. Materials ━━━
 
     private static void CreateMaterials()
@@ -82,6 +215,7 @@ public static class ProjectSetup
         CreateMaterial(LocalMatPath,  new Color(0.2f, 0.4f, 1.0f), "LocalPlayer (파랑)");
         CreateMaterial(RemoteMatPath, new Color(0.2f, 0.8f, 0.3f), "RemotePlayer (초록)");
         CreateMaterial(MonsterMatPath, new Color(0.9f, 0.2f, 0.2f), "Monster (빨강)");
+        CreateMaterial(BossMatPath, new Color(0.3f, 0.05f, 0.05f), "Boss (다크 레드)");
     }
 
     private static void CreateMaterial(string path, Color color, string label)
@@ -114,14 +248,16 @@ public static class ProjectSetup
             LocalPrefabPath,
             LocalMatPath,
             typeof(LocalPlayer),
-            "LocalPlayer"
+            "LocalPlayer",
+            PlayerFBXPath
         );
 
         CreatePlayerPrefab(
             RemotePrefabPath,
             RemoteMatPath,
             typeof(RemotePlayer),
-            "RemotePlayer"
+            "RemotePlayer",
+            PlayerFBXPath
         );
 
         CreateMonsterPrefab();
@@ -135,26 +271,57 @@ public static class ProjectSetup
             return;
         }
 
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = "Monster";
-        go.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
+        var fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(MonsterFBXPath);
 
-        var mat = AssetDatabase.LoadAssetAtPath<Material>(MonsterMatPath);
-        if (mat != null)
+        GameObject go;
+        if (fbxAsset != null)
         {
-            var renderer = go.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = mat;
+            go = (GameObject)PrefabUtility.InstantiatePrefab(fbxAsset);
+            go.name = "Monster";
+
+            // CapsuleCollider 수동 추가
+            var col = go.AddComponent<CapsuleCollider>();
+            col.center = new Vector3(0f, 0.9f, 0f);
+            col.height = 1.8f;
+            col.radius = 0.3f;
+
+            // Animator Controller 할당
+            var animator = go.GetComponent<Animator>();
+            if (animator == null) animator = go.AddComponent<Animator>();
+            var animController = AssetDatabase.LoadAssetAtPath<AnimatorController>(AnimControllerPath);
+            if (animController != null) animator.runtimeAnimatorController = animController;
+
+            // Material 적용
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(MonsterMatPath);
+            if (mat != null)
+            {
+                foreach (var renderer in go.GetComponentsInChildren<Renderer>())
+                    renderer.sharedMaterial = mat;
+            }
+
+            Debug.Log("  [Prefab] Monster (FBX: Zombiegirl) 생성 완료");
+        }
+        else
+        {
+            go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Monster";
+            go.transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
+
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(MonsterMatPath);
+            if (mat != null)
+                go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            Debug.Log("  [Prefab] Monster (프리미티브 폴백) 생성 완료");
         }
 
         go.AddComponent<MonsterEntity>();
 
         PrefabUtility.SaveAsPrefabAsset(go, MonsterPrefabPath);
         Object.DestroyImmediate(go);
-        Debug.Log("  [Prefab] Monster 생성 완료");
     }
 
     private static void CreatePlayerPrefab(
-        string prefabPath, string matPath, System.Type componentType, string label)
+        string prefabPath, string matPath, System.Type componentType, string label, string fbxPath)
     {
         if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null)
         {
@@ -162,16 +329,47 @@ public static class ProjectSetup
             return;
         }
 
-        // Capsule 프리미티브 생성
-        var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        go.name = label;
+        var fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
 
-        // Material 적용
-        var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
-        if (mat != null)
+        GameObject go;
+        if (fbxAsset != null)
         {
-            var renderer = go.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = mat;
+            go = (GameObject)PrefabUtility.InstantiatePrefab(fbxAsset);
+            go.name = label;
+
+            // CapsuleCollider 수동 추가
+            var col = go.AddComponent<CapsuleCollider>();
+            col.center = new Vector3(0f, 0.9f, 0f);
+            col.height = 1.8f;
+            col.radius = 0.3f;
+
+            // Animator Controller 할당
+            var animator = go.GetComponent<Animator>();
+            if (animator == null) animator = go.AddComponent<Animator>();
+            var animController = AssetDatabase.LoadAssetAtPath<AnimatorController>(AnimControllerPath);
+            if (animController != null) animator.runtimeAnimatorController = animController;
+
+            // Material 적용
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (mat != null)
+            {
+                foreach (var renderer in go.GetComponentsInChildren<Renderer>())
+                    renderer.sharedMaterial = mat;
+            }
+
+            Debug.Log($"  [Prefab] {label} (FBX) 생성 완료");
+        }
+        else
+        {
+            // FBX 없으면 기존 프리미티브 폴백
+            go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            go.name = label;
+
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (mat != null)
+                go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+            Debug.Log($"  [Prefab] {label} (프리미티브 폴백) 생성 완료");
         }
 
         // 컴포넌트 부착
@@ -180,7 +378,6 @@ public static class ProjectSetup
         // Prefab 저장
         PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
         Object.DestroyImmediate(go);
-        Debug.Log($"  [Prefab] {label} 생성 완료");
     }
 
     // ━━━ 4. GameScene ━━━
