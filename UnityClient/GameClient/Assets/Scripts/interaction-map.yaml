@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_s050_engraving_transcend
+version: session_s052_durability_repair_reroll
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -1388,6 +1388,79 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: DurabilityManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "내구도/수리/리롤 관리 — S052 TASK 9 (MsgType 462-467) 내구도 추적/경고/broken 상태/수리/리롤"
+    reads: []
+    writes:
+      - _slotDurability (Dictionary<byte, DurabilityNotifyData>)
+      - _isRepairPanelOpen (bool)
+      - _isRerollPanelOpen (bool)
+    fires_events:
+      - OnDurabilityChanged(DurabilityNotifyData)
+      - OnDurabilityWarning(byte)
+      - OnEquipmentBroken(byte)
+      - OnRepairComplete(RepairResultData)
+      - OnRerollComplete(RerollResultData)
+      - OnRepairPanelOpened()
+      - OnRepairPanelClosed()
+      - OnRerollPanelOpened()
+      - OnRerollPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnDurabilityNotify → 내구도 알림 수신
+      - NetworkManager.OnRepairResult → 수리 결과
+      - NetworkManager.OnRerollResult → 리롤 결과
+    public_api:
+      - OpenRepairPanel()
+      - CloseRepairPanel()
+      - OpenRerollPanel()
+      - CloseRerollPanel()
+      - RepairSingle(byte)
+      - RepairAll()
+      - Reroll(byte, byte[])
+      - QueryDurability()
+      - GetSlotDurability(byte) → DurabilityNotifyData
+      - HasBrokenEquipment() → bool
+      - HasLowDurability() → bool
+    computed_properties:
+      - IsRepairPanelOpen (bool)
+      - IsRerollPanelOpen (bool)
+
+  - name: RepairUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "NPC 수리 창 — S052 TASK 9 (F10키 토글) 단일/전체 수리 + 내구도 경고"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - DurabilityManager.OnDurabilityChanged → 내구도 갱신
+      - DurabilityManager.OnDurabilityWarning → 경고
+      - DurabilityManager.OnEquipmentBroken → 파손
+      - DurabilityManager.OnRepairComplete → 수리 결과
+      - DurabilityManager.OnRepairPanelOpened → 패널 표시
+      - DurabilityManager.OnRepairPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
+  - name: RerollUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "옵션 재감정 창 — S052 TASK 9 (F11키 토글) 잠금 토글 + 결과 표시"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - DurabilityManager.OnRerollComplete → 리롤 결과
+      - DurabilityManager.OnRerollPanelOpened → 패널 표시
+      - DurabilityManager.OnRerollPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1919,6 +1992,21 @@ data_flows:
     to: PartyFinderUI
     via: "C# events (OnListingsChanged, OnPanelOpened, OnPanelClosed)"
     description: "파티 찾기 UI 갱신 (Y키 토글)"
+
+  - from: NetworkManager
+    to: DurabilityManager
+    via: "C# events (OnDurabilityNotify, OnRepairResult, OnRerollResult)"
+    description: "내구도 알림/수리 결과/리롤 결과 수신 (462-467)"
+
+  - from: DurabilityManager
+    to: RepairUI
+    via: "C# events (OnDurabilityChanged, OnDurabilityWarning, OnEquipmentBroken, OnRepairComplete, OnRepairPanelOpened, OnRepairPanelClosed)"
+    description: "수리 UI 갱신 (F10키 토글)"
+
+  - from: DurabilityManager
+    to: RerollUI
+    via: "C# events (OnRerollComplete, OnRerollPanelOpened, OnRerollPanelClosed)"
+    description: "리롤 UI 갱신 (F11키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

@@ -205,6 +205,10 @@ namespace Network
         public event Action<BlockPlayerResult> OnBlockResult;
         public event Action<BlockListData> OnBlockList;
         public event Action<PartyFinderListData> OnPartyFinderList;
+        // S052: 내구도/수리/리롤
+        public event Action<RepairResultData> OnRepairResult;
+        public event Action<RerollResultData> OnRerollResult;
+        public event Action<DurabilityNotifyData> OnDurabilityNotify;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1093,6 +1097,26 @@ namespace Network
         public void CreatePartyFinderListing(string title, byte category, byte minLevel, byte role)
         {
             _field?.Send(PacketBuilder.PartyFinderCreate(title, category, minLevel, role));
+        }
+
+        // ━━━ S052: 내구도/수리/리롤 API ━━━
+
+        /// <summary>장비 수리 요청 (mode: 0=단일, 1=전체)</summary>
+        public void RequestRepair(byte mode, byte invSlot)
+        {
+            _field?.Send(PacketBuilder.RepairReq(mode, invSlot));
+        }
+
+        /// <summary>옵션 리롤 요청</summary>
+        public void RequestReroll(byte invSlot, byte[] lockIndices)
+        {
+            _field?.Send(PacketBuilder.RerollReq(invSlot, lockIndices));
+        }
+
+        /// <summary>장착 장비 내구도 조회</summary>
+        public void RequestDurabilityQuery()
+        {
+            _field?.Send(PacketBuilder.DurabilityQuery());
         }
 
         /// <summary>연결 끊기</summary>
@@ -2335,6 +2359,30 @@ namespace Network
                     var data = PacketBuilder.ParsePartyFinderList(payload);
                     Debug.Log($"[Net] PartyFinderList: count={data.Listings.Length}");
                     OnPartyFinderList?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S052: 내구도/수리/리롤 (TASK 9) ━━━
+
+                case MsgType.REPAIR_RESULT:
+                {
+                    var data = PacketBuilder.ParseRepairResult(payload);
+                    Debug.Log($"[Net] RepairResult: result={data.Result}, cost={data.TotalCost}, count={data.RepairedCount}");
+                    OnRepairResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.REROLL_RESULT:
+                {
+                    var data = PacketBuilder.ParseRerollResult(payload);
+                    Debug.Log($"[Net] RerollResult: result={data.Result}, opts={data.Options.Length}");
+                    OnRerollResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.DURABILITY_NOTIFY:
+                {
+                    var data = PacketBuilder.ParseDurabilityNotify(payload);
+                    Debug.Log($"[Net] DurabilityNotify: slot={data.InvSlot}, dur={data.Durability:F1}, broken={data.IsBroken}");
+                    OnDurabilityNotify?.Invoke(data);
                     break;
                 }
 

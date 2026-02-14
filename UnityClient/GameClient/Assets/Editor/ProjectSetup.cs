@@ -619,6 +619,9 @@ public static class ProjectSetup
         var friendUIGo = CreateManagerObject("FriendUI", typeof(FriendUI));
         var blockUIGo = CreateManagerObject("BlockUI", typeof(BlockUI));
         var partyFinderUIGo = CreateManagerObject("PartyFinderUI", typeof(PartyFinderUI));
+        var durabilityManagerGo = CreateManagerObject("DurabilityManager", typeof(DurabilityManager));
+        var repairUIGo = CreateManagerObject("RepairUI", typeof(RepairUI));
+        var rerollUIGo = CreateManagerObject("RerollUI", typeof(RerollUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

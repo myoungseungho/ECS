@@ -3094,5 +3094,72 @@ namespace Network
             }
             return d;
         }
+
+        // ━━━ S052: 내구도/수리/리롤 (TASK 9, MsgType 462-467) ━━━
+
+        /// <summary>REPAIR_REQ 빌더: mode(1) + inv_slot(1)</summary>
+        public static byte[] RepairReq(byte mode, byte invSlot)
+        {
+            return Build(MsgType.REPAIR_REQ, new byte[] { mode, invSlot });
+        }
+
+        /// <summary>REROLL_REQ 빌더: inv_slot(1) + lock_count(1) + [lock_idx(1)]*N</summary>
+        public static byte[] RerollReq(byte invSlot, byte[] lockIndices)
+        {
+            int lockCount = lockIndices?.Length ?? 0;
+            byte[] payload = new byte[2 + lockCount];
+            payload[0] = invSlot;
+            payload[1] = (byte)lockCount;
+            if (lockCount > 0)
+                Buffer.BlockCopy(lockIndices, 0, payload, 2, lockCount);
+            return Build(MsgType.REROLL_REQ, payload);
+        }
+
+        /// <summary>DURABILITY_QUERY 빌더: empty</summary>
+        public static byte[] DurabilityQuery()
+        {
+            return Build(MsgType.DURABILITY_QUERY);
+        }
+
+        /// <summary>REPAIR_RESULT 파싱: result(1) + total_cost(4u32) + repaired_count(1)</summary>
+        public static RepairResultData ParseRepairResult(byte[] payload)
+        {
+            var d = new RepairResultData();
+            d.Result = (RepairResult)payload[0];
+            d.TotalCost = BitConverter.ToUInt32(payload, 1);
+            d.RepairedCount = payload[5];
+            return d;
+        }
+
+        /// <summary>REROLL_RESULT 파싱: result(1) + opt_count(1) + [stat_len(1)+stat(str)+value(2i16)+locked(1)]*N</summary>
+        public static RerollResultData ParseRerollResult(byte[] payload)
+        {
+            var d = new RerollResultData();
+            int off = 0;
+            d.Result = (RerollResult)payload[off]; off += 1;
+            byte optCount = payload[off]; off += 1;
+            d.Options = new RandomOptionInfo[optCount];
+
+            for (int i = 0; i < optCount; i++)
+            {
+                var opt = new RandomOptionInfo();
+                byte statLen = payload[off]; off += 1;
+                opt.StatName = Encoding.UTF8.GetString(payload, off, statLen); off += statLen;
+                opt.Value = BitConverter.ToInt16(payload, off); off += 2;
+                opt.Locked = payload[off] != 0; off += 1;
+                d.Options[i] = opt;
+            }
+            return d;
+        }
+
+        /// <summary>DURABILITY_NOTIFY 파싱: inv_slot(1) + durability(4f32) + is_broken(1)</summary>
+        public static DurabilityNotifyData ParseDurabilityNotify(byte[] payload)
+        {
+            var d = new DurabilityNotifyData();
+            d.InvSlot = payload[0];
+            d.Durability = BitConverter.ToSingle(payload, 1);
+            d.IsBroken = payload[5] != 0;
+            return d;
+        }
     }
 }

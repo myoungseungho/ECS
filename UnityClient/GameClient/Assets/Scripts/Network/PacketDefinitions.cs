@@ -299,6 +299,14 @@ namespace Network
         TRANSCEND_REQ      = 458,  // C→S: slot_len(1) + slot(str)
         TRANSCEND_RESULT   = 459,  // S→C: result(1) + slot_len(1) + slot(str) + new_level(1) + gold_cost(4) + success(1)
 
+        // ━━━ S052: 내구도/수리/리롤 (TASK 9, MsgType 462-467) ━━━
+        REPAIR_REQ             = 462,  // C→S: mode(1) + inv_slot(1) — mode: 0=단일, 1=전체
+        REPAIR_RESULT          = 463,  // S→C: result(1) + total_cost(4u32) + repaired_count(1)
+        REROLL_REQ             = 464,  // C→S: inv_slot(1) + lock_count(1) + [lock_idx(1)]*N
+        REROLL_RESULT          = 465,  // S→C: result(1) + opt_count(1) + [stat_len(1)+stat(str)+value(2i16)+locked(1)]*N
+        DURABILITY_NOTIFY      = 466,  // S→C: inv_slot(1) + durability(4f32) + is_broken(1)
+        DURABILITY_QUERY       = 467,  // C→S: empty
+
         // ━━━ S042: Phase 5 — 캐시샵/배틀패스/이벤트 (TASK 11, MsgType 474-489) ━━━
         CASH_SHOP_LIST_REQ      = 474,  // C→S: category(1)
         CASH_SHOP_LIST          = 475,  // S→C: count(1) {item_id(4) name(32) category(1) price(4) currency(1)}*N = 42B/entry
@@ -2347,5 +2355,58 @@ namespace Network
     public class PartyFinderListData
     {
         public PartyFinderListingInfo[] Listings;
+    }
+
+    // ━━━ S052: 내구도/수리/리롤 (TASK 9, MsgType 462-467) ━━━
+
+    /// <summary>수리 결과 코드</summary>
+    public enum RepairResult : byte
+    {
+        SUCCESS         = 0,
+        NO_EQUIPMENT    = 1,
+        NOT_ENOUGH_GOLD = 2,
+        ALREADY_FULL    = 3,
+    }
+
+    /// <summary>리롤 결과 코드</summary>
+    public enum RerollResult : byte
+    {
+        SUCCESS         = 0,
+        NO_EQUIPMENT    = 1,
+        NOT_ENOUGH_GOLD = 2,
+        NO_SCROLL       = 3,
+        TOO_MANY_LOCKS  = 4,
+        INVALID_LOCK    = 5,
+    }
+
+    /// <summary>수리 결과 데이터 (REPAIR_RESULT 파싱용)</summary>
+    public class RepairResultData
+    {
+        public RepairResult Result;
+        public uint TotalCost;
+        public byte RepairedCount;
+    }
+
+    /// <summary>랜덤 옵션 정보 (REROLL_RESULT 파싱용)</summary>
+    public class RandomOptionInfo
+    {
+        public string StatName;
+        public short Value;
+        public bool Locked;
+    }
+
+    /// <summary>리롤 결과 데이터 (REROLL_RESULT 파싱용)</summary>
+    public class RerollResultData
+    {
+        public RerollResult Result;
+        public RandomOptionInfo[] Options;
+    }
+
+    /// <summary>내구도 알림 데이터 (DURABILITY_NOTIFY 파싱용)</summary>
+    public class DurabilityNotifyData
+    {
+        public byte InvSlot;
+        public float Durability;
+        public bool IsBroken;
     }
 }

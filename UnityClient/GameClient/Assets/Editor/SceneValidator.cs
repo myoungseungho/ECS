@@ -177,6 +177,9 @@ public static class SceneValidator
         Check("GameScene: FriendUI 존재", objectNames.Contains("FriendUI"));
         Check("GameScene: BlockUI 존재", objectNames.Contains("BlockUI"));
         Check("GameScene: PartyFinderUI 존재", objectNames.Contains("PartyFinderUI"));
+        Check("GameScene: DurabilityManager 존재", objectNames.Contains("DurabilityManager"));
+        Check("GameScene: RepairUI 존재", objectNames.Contains("RepairUI"));
+        Check("GameScene: RerollUI 존재", objectNames.Contains("RerollUI"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인
