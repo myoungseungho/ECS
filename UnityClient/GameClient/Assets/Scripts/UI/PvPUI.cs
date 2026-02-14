@@ -16,7 +16,6 @@ public class PvPUI : MonoBehaviour
     [SerializeField] private Text _recordText;
     [SerializeField] private Button _arena1v1Btn;
     [SerializeField] private Button _arena3v3Btn;
-    [SerializeField] private Button _battlegroundBtn;
     [SerializeField] private Button _dequeueBtn;
     [SerializeField] private Button _leaveBtn;
     [SerializeField] private Button _closeBtn;
@@ -41,12 +40,13 @@ public class PvPUI : MonoBehaviour
         {
             pm.OnStateChanged += HandleStateChanged;
             pm.OnMatchFound += HandleMatchFound;
+            pm.OnMatchEnded += HandleMatchEnded;
+            pm.OnRatingUpdated += HandleRatingUpdated;
         }
 
         // 버튼 연결
         if (_arena1v1Btn != null) _arena1v1Btn.onClick.AddListener(() => OnQueueClick(PvPManager.PvPMode.ARENA_1V1));
         if (_arena3v3Btn != null) _arena3v3Btn.onClick.AddListener(() => OnQueueClick(PvPManager.PvPMode.ARENA_3V3));
-        if (_battlegroundBtn != null) _battlegroundBtn.onClick.AddListener(() => OnQueueClick(PvPManager.PvPMode.BATTLEGROUND));
         if (_dequeueBtn != null) _dequeueBtn.onClick.AddListener(OnDequeueClick);
         if (_leaveBtn != null) _leaveBtn.onClick.AddListener(OnLeaveClick);
         if (_closeBtn != null) _closeBtn.onClick.AddListener(OnCloseClick);
@@ -63,6 +63,8 @@ public class PvPUI : MonoBehaviour
 
         pm.OnStateChanged -= HandleStateChanged;
         pm.OnMatchFound -= HandleMatchFound;
+        pm.OnMatchEnded -= HandleMatchEnded;
+        pm.OnRatingUpdated -= HandleRatingUpdated;
     }
 
     private void Update()
@@ -89,7 +91,7 @@ public class PvPUI : MonoBehaviour
 
     private void OnDequeueClick()
     {
-        PvPManager.Instance?.DequeueMatch();
+        PvPManager.Instance?.CancelQueue();
     }
 
     private void OnLeaveClick()
@@ -111,7 +113,7 @@ public class PvPUI : MonoBehaviour
 
     private void OnMatchDeclineClick()
     {
-        PvPManager.Instance?.DequeueMatch();
+        PvPManager.Instance?.CancelQueue();
         if (_matchPopup != null) _matchPopup.SetActive(false);
     }
 
@@ -122,21 +124,30 @@ public class PvPUI : MonoBehaviour
         RefreshUI();
     }
 
-    private void HandleMatchFound(MatchFoundData data)
+    private void HandleMatchFound(PvPMatchFoundData data)
     {
         if (_matchPopup != null)
         {
             _matchPopup.SetActive(true);
-            string modeStr = data.DungeonType switch
+            string modeStr = data.ModeId switch
             {
-                101 => "Arena 1v1",
-                102 => "Arena 3v3",
-                103 => "Battleground",
-                _ => $"Mode {data.DungeonType}"
+                1 => "Arena 1v1",
+                2 => "Arena 3v3",
+                _ => $"Mode {data.ModeId}"
             };
             if (_matchPopupText != null)
-                _matchPopupText.text = $"PvP Match Found!\n{modeStr}\nPlayers: {data.PlayerCount}";
+                _matchPopupText.text = $"PvP Match Found!\n{modeStr}\nTeam: {data.TeamId}";
         }
+    }
+
+    private void HandleMatchEnded(PvPMatchEndData data)
+    {
+        RefreshUI();
+    }
+
+    private void HandleRatingUpdated(PvPRatingInfoData data)
+    {
+        RefreshUI();
     }
 
     // ━━━ UI 갱신 ━━━
@@ -152,9 +163,9 @@ public class PvPUI : MonoBehaviour
             _statusText.text = pm.CurrentState switch
             {
                 PvPManager.PvPState.IDLE => "Ready for PvP",
-                PvPManager.PvPState.QUEUED => $"Queued... Position: {pm.QueuePosition}",
+                PvPManager.PvPState.QUEUED => $"Queued... ({pm.QueueCount} in queue)",
                 PvPManager.PvPState.MATCH_FOUND => "Match Found! Accept?",
-                PvPManager.PvPState.IN_MATCH => "In Match",
+                PvPManager.PvPState.IN_MATCH => $"In Match (Time: {pm.TimeLimit}s)",
                 _ => ""
             };
         }
@@ -162,7 +173,7 @@ public class PvPUI : MonoBehaviour
         // 전적 텍스트
         if (_recordText != null)
         {
-            _recordText.text = $"Rating: {pm.Rating} | W: {pm.Wins} / L: {pm.Losses}";
+            _recordText.text = $"[{pm.Tier}] Rating: {pm.Rating} | W: {pm.Wins} / L: {pm.Losses}";
         }
 
         // 버튼 활성화
@@ -172,7 +183,6 @@ public class PvPUI : MonoBehaviour
 
         if (_arena1v1Btn != null) _arena1v1Btn.gameObject.SetActive(canQueue);
         if (_arena3v3Btn != null) _arena3v3Btn.gameObject.SetActive(canQueue);
-        if (_battlegroundBtn != null) _battlegroundBtn.gameObject.SetActive(canQueue);
         if (_dequeueBtn != null) _dequeueBtn.gameObject.SetActive(isQueued);
         if (_leaveBtn != null) _leaveBtn.gameObject.SetActive(inMatch);
     }

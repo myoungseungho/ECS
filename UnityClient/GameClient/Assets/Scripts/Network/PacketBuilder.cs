@@ -1735,5 +1735,206 @@ namespace Network
             d.MailId = BitConverter.ToUInt32(payload, 1);
             return d;
         }
+
+        // ━━━ S036: PvP 아레나 ━━━
+
+        /// <summary>PVP_QUEUE_REQ 빌드: mode(1)</summary>
+        public static byte[] PvPQueueReq(byte mode)
+        {
+            return Build(MsgType.PVP_QUEUE_REQ, new byte[] { mode });
+        }
+
+        /// <summary>PVP_QUEUE_CANCEL 빌드: empty</summary>
+        public static byte[] PvPQueueCancel()
+        {
+            return Build(MsgType.PVP_QUEUE_CANCEL);
+        }
+
+        /// <summary>PVP_MATCH_ACCEPT 빌드: match_id(4)</summary>
+        public static byte[] PvPMatchAccept(uint matchId)
+        {
+            return Build(MsgType.PVP_MATCH_ACCEPT, BitConverter.GetBytes(matchId));
+        }
+
+        /// <summary>PVP_ATTACK 빌드: match_id(4) target_team(1) target_idx(1) skill_id(2) damage(2) = 10B</summary>
+        public static byte[] PvPAttack(uint matchId, byte targetTeam, byte targetIdx, ushort skillId, ushort damage)
+        {
+            byte[] payload = new byte[10];
+            BitConverter.GetBytes(matchId).CopyTo(payload, 0);
+            payload[4] = targetTeam;
+            payload[5] = targetIdx;
+            BitConverter.GetBytes(skillId).CopyTo(payload, 6);
+            BitConverter.GetBytes(damage).CopyTo(payload, 8);
+            return Build(MsgType.PVP_ATTACK, payload);
+        }
+
+        /// <summary>PVP_QUEUE_STATUS 파싱: mode_id(1) status(1) queue_count(2) = 4B</summary>
+        public static PvPQueueStatusData ParsePvPQueueStatus(byte[] payload)
+        {
+            var d = new PvPQueueStatusData();
+            d.ModeId = payload[0];
+            d.Status = (PvPQueueStatus)payload[1];
+            d.QueueCount = BitConverter.ToUInt16(payload, 2);
+            return d;
+        }
+
+        /// <summary>PVP_MATCH_FOUND 파싱: match_id(4) mode_id(1) team_id(1) = 6B</summary>
+        public static PvPMatchFoundData ParsePvPMatchFound(byte[] payload)
+        {
+            var d = new PvPMatchFoundData();
+            d.MatchId = BitConverter.ToUInt32(payload, 0);
+            d.ModeId = payload[4];
+            d.TeamId = payload[5];
+            return d;
+        }
+
+        /// <summary>PVP_MATCH_START 파싱: match_id(4) team_id(1) time_limit(2) = 7B</summary>
+        public static PvPMatchStartData ParsePvPMatchStart(byte[] payload)
+        {
+            var d = new PvPMatchStartData();
+            d.MatchId = BitConverter.ToUInt32(payload, 0);
+            d.TeamId = payload[4];
+            d.TimeLimit = BitConverter.ToUInt16(payload, 5);
+            return d;
+        }
+
+        /// <summary>PVP_ATTACK_RESULT 파싱: match_id(4) attacker_team(1) target_team(1) target_idx(1) damage(2) remaining_hp(4) = 13B</summary>
+        public static PvPAttackResultData ParsePvPAttackResult(byte[] payload)
+        {
+            var d = new PvPAttackResultData();
+            d.MatchId = BitConverter.ToUInt32(payload, 0);
+            d.AttackerTeam = payload[4];
+            d.TargetTeam = payload[5];
+            d.TargetIdx = payload[6];
+            d.Damage = BitConverter.ToUInt16(payload, 7);
+            d.RemainingHP = BitConverter.ToUInt32(payload, 9);
+            return d;
+        }
+
+        /// <summary>PVP_MATCH_END 파싱: match_id(4) winner_team(1) won(1) new_rating(2) tier(16B) = 24B</summary>
+        public static PvPMatchEndData ParsePvPMatchEnd(byte[] payload)
+        {
+            var d = new PvPMatchEndData();
+            d.MatchId = BitConverter.ToUInt32(payload, 0);
+            d.WinnerTeam = payload[4];
+            d.Won = payload[5];
+            d.NewRating = BitConverter.ToUInt16(payload, 6);
+            int tierEnd = 8;
+            while (tierEnd < 8 + 16 && tierEnd < payload.Length && payload[tierEnd] != 0) tierEnd++;
+            d.Tier = Encoding.UTF8.GetString(payload, 8, tierEnd - 8);
+            return d;
+        }
+
+        /// <summary>PVP_RATING_INFO 파싱: rating(2) tier(16B) wins(2) losses(2) = 22B</summary>
+        public static PvPRatingInfoData ParsePvPRatingInfo(byte[] payload)
+        {
+            var d = new PvPRatingInfoData();
+            d.Rating = BitConverter.ToUInt16(payload, 0);
+            int tierEnd = 2;
+            while (tierEnd < 2 + 16 && tierEnd < payload.Length && payload[tierEnd] != 0) tierEnd++;
+            d.Tier = Encoding.UTF8.GetString(payload, 2, tierEnd - 2);
+            d.Wins = BitConverter.ToUInt16(payload, 18);
+            d.Losses = BitConverter.ToUInt16(payload, 20);
+            return d;
+        }
+
+        // ━━━ S036: 레이드 보스 ━━━
+
+        /// <summary>RAID_ATTACK 빌드: instance_id(4) skill_id(2) damage(4) = 10B</summary>
+        public static byte[] RaidAttack(uint instanceId, ushort skillId, uint damage)
+        {
+            byte[] payload = new byte[10];
+            BitConverter.GetBytes(instanceId).CopyTo(payload, 0);
+            BitConverter.GetBytes(skillId).CopyTo(payload, 4);
+            BitConverter.GetBytes(damage).CopyTo(payload, 6);
+            return Build(MsgType.RAID_ATTACK, payload);
+        }
+
+        /// <summary>RAID_BOSS_SPAWN 파싱: instance_id(4) boss_name(32) max_hp(4) current_hp(4) phase(1) max_phases(1) enrage_timer(2) = 48B</summary>
+        public static RaidBossSpawnData ParseRaidBossSpawn(byte[] payload)
+        {
+            var d = new RaidBossSpawnData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            int nameEnd = 4;
+            while (nameEnd < 4 + 32 && nameEnd < payload.Length && payload[nameEnd] != 0) nameEnd++;
+            d.BossName = Encoding.UTF8.GetString(payload, 4, nameEnd - 4);
+            d.MaxHP = BitConverter.ToUInt32(payload, 36);
+            d.CurrentHP = BitConverter.ToUInt32(payload, 40);
+            d.Phase = payload[44];
+            d.MaxPhases = payload[45];
+            d.EnrageTimer = BitConverter.ToUInt16(payload, 46);
+            return d;
+        }
+
+        /// <summary>RAID_PHASE_CHANGE 파싱: instance_id(4) phase(1) max_phases(1) = 6B</summary>
+        public static RaidPhaseChangeData ParseRaidPhaseChange(byte[] payload)
+        {
+            var d = new RaidPhaseChangeData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.Phase = payload[4];
+            d.MaxPhases = payload[5];
+            return d;
+        }
+
+        /// <summary>RAID_MECHANIC 파싱: instance_id(4) mechanic_id(1) phase(1) = 6B</summary>
+        public static RaidMechanicData ParseRaidMechanic(byte[] payload)
+        {
+            var d = new RaidMechanicData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.MechanicId = (RaidMechanicId)payload[4];
+            d.Phase = payload[5];
+            return d;
+        }
+
+        /// <summary>RAID_MECHANIC_RESULT 파싱: instance_id(4) mechanic_id(1) success(1) = 6B</summary>
+        public static RaidMechanicResultData ParseRaidMechanicResult(byte[] payload)
+        {
+            var d = new RaidMechanicResultData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.MechanicId = (RaidMechanicId)payload[4];
+            d.Success = payload[5] == 1;
+            return d;
+        }
+
+        /// <summary>RAID_STAGGER 파싱: instance_id(4) stagger_gauge(1) = 5B</summary>
+        public static RaidStaggerData ParseRaidStagger(byte[] payload)
+        {
+            var d = new RaidStaggerData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.StaggerGauge = payload[4];
+            return d;
+        }
+
+        /// <summary>RAID_ATTACK_RESULT 파싱: instance_id(4) skill_id(2) damage(4) current_hp(4) max_hp(4) = 18B</summary>
+        public static RaidAttackResultData ParseRaidAttackResult(byte[] payload)
+        {
+            var d = new RaidAttackResultData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.SkillId = BitConverter.ToUInt16(payload, 4);
+            d.Damage = BitConverter.ToUInt32(payload, 6);
+            d.CurrentHP = BitConverter.ToUInt32(payload, 10);
+            d.MaxHP = BitConverter.ToUInt32(payload, 14);
+            return d;
+        }
+
+        /// <summary>RAID_CLEAR 파싱: instance_id(4) gold(4) exp(4) tokens(2) = 14B</summary>
+        public static RaidClearData ParseRaidClear(byte[] payload)
+        {
+            var d = new RaidClearData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.Gold = BitConverter.ToUInt32(payload, 4);
+            d.Exp = BitConverter.ToUInt32(payload, 8);
+            d.Tokens = BitConverter.ToUInt16(payload, 12);
+            return d;
+        }
+
+        /// <summary>RAID_WIPE 파싱: instance_id(4) phase(1) = 5B</summary>
+        public static RaidWipeData ParseRaidWipe(byte[] payload)
+        {
+            var d = new RaidWipeData();
+            d.InstanceId = BitConverter.ToUInt32(payload, 0);
+            d.Phase = payload[4];
+            return d;
+        }
     }
 }

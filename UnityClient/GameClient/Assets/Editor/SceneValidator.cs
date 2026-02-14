@@ -150,6 +150,7 @@ public static class SceneValidator
         Check("GameScene: MailManager 존재", objectNames.Contains("MailManager"));
         Check("GameScene: DungeonManager 존재", objectNames.Contains("DungeonManager"));
         Check("GameScene: PvPManager 존재", objectNames.Contains("PvPManager"));
+        Check("GameScene: RaidManager 존재", objectNames.Contains("RaidManager"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인

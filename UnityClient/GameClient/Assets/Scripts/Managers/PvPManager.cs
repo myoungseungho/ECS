@@ -1,6 +1,5 @@
 // ━━━ PvPManager.cs ━━━
-// PvP 아레나/전장 시스템 관리
-// 던전 매칭 시스템을 활용하여 PvP 매칭 수행
+// PvP 아레나 시스템 관리 (S036 전용 패킷 350-359)
 // NetworkManager 이벤트 구독 → PvPUI에 이벤트 발행
 
 using System;
@@ -10,11 +9,10 @@ using Network;
 public class PvPManager : MonoBehaviour
 {
     // ━━━ PvP 모드 ━━━
-    public enum PvPMode : uint
+    public enum PvPMode : byte
     {
-        ARENA_1V1 = 101,
-        ARENA_3V3 = 102,
-        BATTLEGROUND = 103,
+        ARENA_1V1 = 1,
+        ARENA_3V3 = 2,
     }
 
     // ━━━ PvP 상태 ━━━
@@ -29,20 +27,24 @@ public class PvPManager : MonoBehaviour
     // ━━━ 런타임 데이터 ━━━
     public PvPState CurrentState { get; private set; }
     public PvPMode CurrentMode { get; private set; }
-    public uint QueuePosition { get; private set; }
+    public ushort QueueCount { get; private set; }
     public uint PendingMatchId { get; private set; }
-    public uint CurrentInstanceId { get; private set; }
+    public byte MyTeamId { get; private set; }
+    public ushort TimeLimit { get; private set; }
 
-    // ━━━ 전적 (로컬 캐시) ━━━
-    public int Wins { get; private set; }
-    public int Losses { get; private set; }
-    public int Rating { get; private set; } = 1000;
+    // 전적/레이팅
+    public ushort Rating { get; private set; } = 1000;
+    public string Tier { get; private set; } = "Silver";
+    public ushort Wins { get; private set; }
+    public ushort Losses { get; private set; }
 
     // ━━━ 이벤트 ━━━
     public event Action<PvPState> OnStateChanged;
-    public event Action<MatchFoundData> OnMatchFound;
-    public event Action OnMatchEntered;
-    public event Action OnMatchLeft;
+    public event Action<PvPMatchFoundData> OnMatchFound;
+    public event Action<PvPMatchStartData> OnMatchStarted;
+    public event Action<PvPAttackResultData> OnAttackResult;
+    public event Action<PvPMatchEndData> OnMatchEnded;
+    public event Action<PvPRatingInfoData> OnRatingUpdated;
 
     // ━━━ 싱글톤 (Scene-bound) ━━━
     public static PvPManager Instance { get; private set; }
@@ -60,11 +62,12 @@ public class PvPManager : MonoBehaviour
     private void Start()
     {
         var net = NetworkManager.Instance;
-        // PvP 매칭은 Instance/Match 패킷 재활용 (DungeonType 100+ = PvP)
-        net.OnMatchFound += HandleMatchFound;
-        net.OnMatchStatus += HandleMatchStatus;
-        net.OnInstanceEnter += HandleInstanceEnter;
-        net.OnInstanceLeaveResult += HandleInstanceLeaveResult;
+        net.OnPvPQueueStatus += HandleQueueStatus;
+        net.OnPvPMatchFound += HandleMatchFound;
+        net.OnPvPMatchStart += HandleMatchStart;
+        net.OnPvPAttackResult += HandleAttackResult;
+        net.OnPvPMatchEnd += HandleMatchEnd;
+        net.OnPvPRatingInfo += HandleRatingInfo;
     }
 
     private void OnDestroy()
@@ -72,10 +75,12 @@ public class PvPManager : MonoBehaviour
         var net = NetworkManager.Instance;
         if (net == null) return;
 
-        net.OnMatchFound -= HandleMatchFound;
-        net.OnMatchStatus -= HandleMatchStatus;
-        net.OnInstanceEnter -= HandleInstanceEnter;
-        net.OnInstanceLeaveResult -= HandleInstanceLeaveResult;
+        net.OnPvPQueueStatus -= HandleQueueStatus;
+        net.OnPvPMatchFound -= HandleMatchFound;
+        net.OnPvPMatchStart -= HandleMatchStart;
+        net.OnPvPAttackResult -= HandleAttackResult;
+        net.OnPvPMatchEnd -= HandleMatchEnd;
+        net.OnPvPRatingInfo -= HandleRatingInfo;
 
         if (Instance == this) Instance = null;
     }
@@ -87,16 +92,16 @@ public class PvPManager : MonoBehaviour
     {
         CurrentMode = mode;
         CurrentState = PvPState.QUEUED;
-        NetworkManager.Instance.EnqueueMatch((uint)mode);
+        NetworkManager.Instance.PvPQueueReq((byte)mode);
         OnStateChanged?.Invoke(CurrentState);
     }
 
     /// <summary>매칭 큐 해제</summary>
-    public void DequeueMatch()
+    public void CancelQueue()
     {
         CurrentState = PvPState.IDLE;
-        QueuePosition = 0;
-        NetworkManager.Instance.DequeueMatch();
+        QueueCount = 0;
+        NetworkManager.Instance.PvPQueueCancel();
         OnStateChanged?.Invoke(CurrentState);
     }
 
@@ -104,65 +109,87 @@ public class PvPManager : MonoBehaviour
     public void AcceptMatch()
     {
         if (PendingMatchId == 0) return;
-        NetworkManager.Instance.AcceptMatch(PendingMatchId);
+        NetworkManager.Instance.PvPMatchAccept(PendingMatchId);
     }
 
-    /// <summary>PvP 경기장 퇴장</summary>
+    /// <summary>PvP 공격</summary>
+    public void Attack(byte targetTeam, byte targetIdx, ushort skillId, ushort damage)
+    {
+        if (PendingMatchId == 0) return;
+        NetworkManager.Instance.PvPAttack(PendingMatchId, targetTeam, targetIdx, skillId, damage);
+    }
+
+    /// <summary>PvP 경기장 퇴장 (기존 Instance Leave 사용)</summary>
     public void LeaveMatch()
     {
         NetworkManager.Instance.LeaveInstance();
-    }
-
-    /// <summary>PvP 모드인지 판별 (dungeonType 100+)</summary>
-    public static bool IsPvPType(uint dungeonType)
-    {
-        return dungeonType >= 100 && dungeonType < 200;
+        CurrentState = PvPState.IDLE;
+        PendingMatchId = 0;
+        OnStateChanged?.Invoke(CurrentState);
     }
 
     // ━━━ 핸들러 ━━━
 
-    private void HandleMatchFound(MatchFoundData data)
+    private void HandleQueueStatus(PvPQueueStatusData data)
     {
-        // PvP 타입 매칭만 처리
-        if (!IsPvPType(data.DungeonType)) return;
+        QueueCount = data.QueueCount;
+        if (data.Status == PvPQueueStatus.QUEUED)
+        {
+            CurrentState = PvPState.QUEUED;
+        }
+        else if (data.Status == PvPQueueStatus.CANCELLED)
+        {
+            CurrentState = PvPState.IDLE;
+        }
+        OnStateChanged?.Invoke(CurrentState);
+    }
 
+    private void HandleMatchFound(PvPMatchFoundData data)
+    {
         PendingMatchId = data.MatchId;
+        MyTeamId = data.TeamId;
         CurrentState = PvPState.MATCH_FOUND;
-        Debug.Log($"[PvPManager] Match found! matchId={data.MatchId}, mode={data.DungeonType}, players={data.PlayerCount}");
+        Debug.Log($"[PvPManager] Match found! matchId={data.MatchId}, mode={data.ModeId}, team={data.TeamId}");
         OnMatchFound?.Invoke(data);
         OnStateChanged?.Invoke(CurrentState);
     }
 
-    private void HandleMatchStatus(MatchStatusData data)
+    private void HandleMatchStart(PvPMatchStartData data)
     {
-        // 매칭 중일 때만 처리
-        if (CurrentState != PvPState.QUEUED) return;
-        QueuePosition = data.QueuePosition;
-    }
-
-    private void HandleInstanceEnter(InstanceEnterData data)
-    {
-        // PvP 인스턴스만 처리
-        if (!IsPvPType(data.DungeonType)) return;
-        if (data.Result != 0) return;
-
-        CurrentInstanceId = data.InstanceId;
         CurrentState = PvPState.IN_MATCH;
-        PendingMatchId = 0;
-        Debug.Log($"[PvPManager] Entered PvP match: instance={data.InstanceId}, mode={data.DungeonType}");
-        OnMatchEntered?.Invoke();
+        TimeLimit = data.TimeLimit;
+        Debug.Log($"[PvPManager] Match started! matchId={data.MatchId}, timeLimit={data.TimeLimit}s");
+        OnMatchStarted?.Invoke(data);
         OnStateChanged?.Invoke(CurrentState);
     }
 
-    private void HandleInstanceLeaveResult(InstanceLeaveResultData data)
+    private void HandleAttackResult(PvPAttackResultData data)
     {
-        if (CurrentState != PvPState.IN_MATCH) return;
-        if (data.Result != 0) return;
+        OnAttackResult?.Invoke(data);
+    }
 
-        CurrentInstanceId = 0;
+    private void HandleMatchEnd(PvPMatchEndData data)
+    {
+        bool won = data.Won == 1;
+        Rating = data.NewRating;
+        Tier = data.Tier;
+        if (won) Wins++;
+        else Losses++;
+
         CurrentState = PvPState.IDLE;
-        Debug.Log("[PvPManager] Left PvP match");
-        OnMatchLeft?.Invoke();
+        PendingMatchId = 0;
+        Debug.Log($"[PvPManager] Match ended! won={won}, rating={data.NewRating}, tier={data.Tier}");
+        OnMatchEnded?.Invoke(data);
         OnStateChanged?.Invoke(CurrentState);
+    }
+
+    private void HandleRatingInfo(PvPRatingInfoData data)
+    {
+        Rating = data.Rating;
+        Tier = data.Tier;
+        Wins = data.Wins;
+        Losses = data.Losses;
+        Debug.Log($"[PvPManager] Rating={data.Rating}, Tier={data.Tier}, W={data.Wins}/L={data.Losses}");
+        OnRatingUpdated?.Invoke(data);
     }
 }
