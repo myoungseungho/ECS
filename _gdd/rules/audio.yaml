@@ -1,0 +1,486 @@
+# ============================================================
+# AUDIO SYSTEM — 사운드/음악 완전 정의
+# Reference: Lost Ark / Final Fantasy XIV / Genshin Impact
+# ============================================================
+# Unity Audio System 기반
+# 모든 사운드는 AudioManager 싱글톤으로 관리
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 오디오 엔진 설정
+# ──────────────────────────────────────────────────────────
+engine:
+  max_channels: 32
+  listener: "main_camera"
+  global_volume: 0.8
+
+  mixer_groups:
+    master:    { default_volume: 1.0 }
+    bgm:       { default_volume: 0.6, parent: "master" }
+    sfx:       { default_volume: 0.8, parent: "master" }
+    ambient:   { default_volume: 0.5, parent: "master" }
+    ui:        { default_volume: 0.7, parent: "master" }
+    voice:     { default_volume: 0.8, parent: "master" }
+
+  # 3D 사운드 기본값
+  spatial_defaults:
+    min_distance: 1.0
+    max_distance: 30.0
+    rolloff: "logarithmic"
+    doppler: 0.0                       # 게임에서 도플러 OFF
+
+  # 오디오 풀
+  pool:
+    sfx_sources: 16
+    ambient_sources: 4
+    voice_sources: 2
+
+# ──────────────────────────────────────────────────────────
+# 1. BGM — 배경 음악
+# ──────────────────────────────────────────────────────────
+bgm:
+  crossfade_duration: 2.0              # BGM 전환 시 2초 크로스페이드
+  loop: true
+
+  # 존별 BGM 매핑
+  zone_music:
+    # 마을
+    tutorial_zone:
+      track: "bgm_tutorial_peaceful"
+      mood: "calm"
+      bpm: 80
+      instruments: "string_quartet + soft_piano"
+
+    wind_village:
+      track: "bgm_village_warm"
+      mood: "warm"
+      bpm: 90
+      instruments: "acoustic_guitar + flute + light_percussion"
+      time_variants:
+        day: "bgm_village_warm_day"
+        night: "bgm_village_warm_night"    # 더 잔잔한 버전
+
+    aqua_port:
+      track: "bgm_port_lively"
+      mood: "adventurous"
+      bpm: 110
+      instruments: "accordion + fiddle + sea_shanty_drums"
+
+    # 필드
+    grass_plain:
+      track: "bgm_field_adventure"
+      mood: "adventurous"
+      bpm: 100
+      instruments: "orchestral_light + woodwinds"
+      combat_transition: true           # 전투 시 자동 전환
+
+    sapphire_coast:
+      track: "bgm_coast_breeze"
+      mood: "refreshing"
+      bpm: 95
+      instruments: "harp + ocean_waves_ambient + strings"
+
+    frozen_peak:
+      track: "bgm_frozen_solemn"
+      mood: "solemn"
+      bpm: 70
+      instruments: "choir + cellos + wind_sfx"
+
+    fire_desert:
+      track: "bgm_desert_tension"
+      mood: "tense"
+      bpm: 85
+      instruments: "middle_eastern_strings + deep_drums + duduk"
+
+    volcanic_zone:
+      track: "bgm_volcanic_danger"
+      mood: "dangerous"
+      bpm: 120
+      instruments: "brass + war_drums + distorted_strings"
+
+    demon_territory:
+      track: "bgm_demon_dark"
+      mood: "dark"
+      bpm: 75
+      instruments: "dark_choir + pipe_organ + deep_brass"
+
+    ancient_ruins:
+      track: "bgm_ancient_mystery"
+      mood: "mysterious"
+      bpm: 65
+      instruments: "ethereal_pads + ancient_flute + reverb_piano"
+
+    void_rift:
+      track: "bgm_void_chaos"
+      mood: "chaotic"
+      bpm: 140
+      instruments: "industrial + distorted_synth + reverse_reverb"
+
+  # 전투 BGM
+  combat_music:
+    field_combat:
+      track: "bgm_combat_normal"
+      trigger: "player_in_combat"
+      exit_delay: 5.0                  # 전투 종료 후 5초 뒤 필드 BGM 복귀
+      bpm: 130
+      instruments: "strings_aggressive + brass + percussion"
+
+    elite_combat:
+      track: "bgm_combat_elite"
+      trigger: "elite_monster_engaged"
+      bpm: 140
+      instruments: "full_orchestra_aggressive"
+
+    boss_phase_1:
+      track: "bgm_boss_phase1"
+      trigger: "boss_fight_start"
+      bpm: 150
+      instruments: "full_orchestra + choir"
+
+    boss_phase_2:
+      track: "bgm_boss_phase2"
+      trigger: "boss_hp_below_50"
+      bpm: 160
+      instruments: "full_orchestra_intense + choir_dramatic"
+      seamless_transition: true        # 박자 맞춰서 전환
+
+    boss_final:
+      track: "bgm_boss_final"
+      trigger: "boss_hp_below_10"
+      bpm: 170
+      instruments: "everything_ff + chorus_fortissimo"
+
+    pvp_arena:
+      track: "bgm_pvp_battle"
+      bpm: 145
+      instruments: "electronic_rock + orchestra"
+
+  # 특수 BGM
+  special_music:
+    login_screen:     "bgm_title_epic"
+    character_select: "bgm_character_calm"
+    loading:          "bgm_loading_ambient"
+    victory:          "bgm_victory_fanfare"
+    defeat:           "bgm_defeat_somber"
+    cutscene:         "dynamic"          # 컷씬별 개별 지정
+
+# ──────────────────────────────────────────────────────────
+# 2. SFX — 효과음
+# ──────────────────────────────────────────────────────────
+sfx:
+  # ── 전투 ──
+  combat:
+    # 무기별 기본 공격
+    sword_swing:      { clip: "sfx_sword_swing", volume: 0.7, pitch_range: [0.95, 1.05], spatial: true }
+    sword_hit:        { clip: "sfx_sword_hit_flesh", volume: 0.8, pitch_range: [0.9, 1.1], spatial: true }
+    bow_draw:         { clip: "sfx_bow_draw", volume: 0.5, spatial: true }
+    bow_release:      { clip: "sfx_bow_release", volume: 0.7, spatial: true }
+    arrow_hit:        { clip: "sfx_arrow_impact", volume: 0.6, pitch_range: [0.9, 1.1], spatial: true }
+    staff_cast:       { clip: "sfx_staff_whoosh", volume: 0.6, spatial: true }
+
+    # 스킬 (원소별)
+    fire_cast:        { clip: "sfx_fire_ignite", volume: 0.8, spatial: true }
+    fire_impact:      { clip: "sfx_fire_explosion", volume: 0.9, spatial: true }
+    fire_loop:        { clip: "sfx_fire_burn_loop", volume: 0.4, loop: true, spatial: true }
+    ice_cast:         { clip: "sfx_ice_crystal_form", volume: 0.7, spatial: true }
+    ice_impact:       { clip: "sfx_ice_shatter", volume: 0.8, spatial: true }
+    ice_freeze:       { clip: "sfx_ice_freeze", volume: 0.6, spatial: true }
+    lightning_strike:  { clip: "sfx_thunder_crack", volume: 1.0, spatial: true }
+    lightning_chain:   { clip: "sfx_electric_zap", volume: 0.7, pitch_range: [0.8, 1.2], spatial: true }
+    dark_cast:        { clip: "sfx_dark_whoosh", volume: 0.7, spatial: true }
+    holy_cast:        { clip: "sfx_holy_chime", volume: 0.7, spatial: true }
+    nature_cast:      { clip: "sfx_nature_wind", volume: 0.6, spatial: true }
+
+    # 피격
+    hit_normal:       { clip: "sfx_hit_impact", volume: 0.7, pitch_range: [0.9, 1.1], spatial: true }
+    hit_critical:     { clip: "sfx_hit_critical", volume: 0.9, spatial: true }
+    hit_armor:        { clip: "sfx_hit_metal", volume: 0.6, pitch_range: [0.95, 1.05], spatial: true }
+    dodge:            { clip: "sfx_dodge_whoosh", volume: 0.5, spatial: true }
+    block:            { clip: "sfx_shield_block", volume: 0.8, spatial: true }
+    miss:             { clip: "sfx_whoosh_miss", volume: 0.3, spatial: true }
+
+    # 죽음
+    monster_death:    { clip: "sfx_monster_death", volume: 0.7, spatial: true }
+    player_death:     { clip: "sfx_player_death", volume: 0.9 }
+
+    # 보스
+    boss_roar:        { clip: "sfx_boss_roar", volume: 1.0, spatial: true }
+    boss_stagger:     { clip: "sfx_boss_stagger_break", volume: 1.0, spatial: true }
+    boss_mechanic:    { clip: "sfx_boss_mechanic_alert", volume: 0.9, priority: "high" }
+
+  # ── 이동 ──
+  movement:
+    footstep_grass:   { clip: "sfx_step_grass", volume: 0.3, pitch_range: [0.9, 1.1], spatial: true }
+    footstep_stone:   { clip: "sfx_step_stone", volume: 0.4, pitch_range: [0.9, 1.1], spatial: true }
+    footstep_wood:    { clip: "sfx_step_wood", volume: 0.35, pitch_range: [0.9, 1.1], spatial: true }
+    footstep_sand:    { clip: "sfx_step_sand", volume: 0.3, pitch_range: [0.9, 1.1], spatial: true }
+    footstep_snow:    { clip: "sfx_step_snow", volume: 0.3, pitch_range: [0.9, 1.1], spatial: true }
+    footstep_water:   { clip: "sfx_step_water_splash", volume: 0.4, spatial: true }
+    dash:             { clip: "sfx_dash_whoosh", volume: 0.6 }
+    jump:             { clip: "sfx_jump", volume: 0.4 }
+    land:             { clip: "sfx_land_impact", volume: 0.5 }
+    mount_summon:     { clip: "sfx_mount_summon", volume: 0.7 }
+    mount_gallop:     { clip: "sfx_horse_gallop", volume: 0.5, loop: true, spatial: true }
+
+    # 지면 타입 감지
+    ground_detection:
+      method: "texture_tag"            # 텍스처에 태그 부여
+      tags: ["grass", "stone", "wood", "sand", "snow", "water"]
+      footstep_interval: 0.35          # 걷기
+      footstep_interval_run: 0.25      # 달리기
+
+  # ── 시스템 ──
+  system:
+    level_up:         { clip: "sfx_level_up_fanfare", volume: 0.9, priority: "high" }
+    quest_accept:     { clip: "sfx_quest_accept", volume: 0.6 }
+    quest_complete:   { clip: "sfx_quest_complete", volume: 0.8 }
+    item_pickup:      { clip: "sfx_item_pickup", volume: 0.5, pitch_range: [0.95, 1.05] }
+    item_equip:       { clip: "sfx_item_equip", volume: 0.6 }
+    gold_pickup:      { clip: "sfx_gold_coins", volume: 0.5, pitch_range: [0.9, 1.1] }
+    enhance_success:  { clip: "sfx_enhance_success", volume: 0.9 }
+    enhance_fail:     { clip: "sfx_enhance_fail", volume: 0.7 }
+    craft_start:      { clip: "sfx_craft_hammering", volume: 0.6 }
+    craft_complete:   { clip: "sfx_craft_complete", volume: 0.7 }
+    teleport:         { clip: "sfx_teleport_warp", volume: 0.7 }
+    revive:           { clip: "sfx_revive_holy", volume: 0.8 }
+    legendary_drop:   { clip: "sfx_legendary_drop_choir", volume: 1.0, priority: "high" }
+    achievement:      { clip: "sfx_achievement_unlock", volume: 0.8 }
+
+  # ── 포션/소비 ──
+  consumable:
+    potion_drink:     { clip: "sfx_potion_gulp", volume: 0.5 }
+    potion_heal:      { clip: "sfx_heal_sparkle", volume: 0.4 }
+    buff_activate:    { clip: "sfx_buff_activate", volume: 0.5 }
+    food_eat:         { clip: "sfx_food_eat", volume: 0.4 }
+    scroll_use:       { clip: "sfx_scroll_open", volume: 0.4 }
+
+  # ── NPC ──
+  npc:
+    dialog_open:      { clip: "sfx_dialog_open", volume: 0.4 }
+    dialog_next:      { clip: "sfx_dialog_next", volume: 0.3 }
+    dialog_choice:    { clip: "sfx_dialog_select", volume: 0.4 }
+    shop_open:        { clip: "sfx_shop_bell", volume: 0.5 }
+    shop_buy:         { clip: "sfx_shop_purchase", volume: 0.6 }
+    shop_sell:        { clip: "sfx_coins_drop", volume: 0.5 }
+
+# ──────────────────────────────────────────────────────────
+# 3. UI 사운드
+# ──────────────────────────────────────────────────────────
+ui_sounds:
+  button_hover:       { clip: "sfx_ui_hover", volume: 0.2 }
+  button_click:       { clip: "sfx_ui_click", volume: 0.4 }
+  panel_open:         { clip: "sfx_ui_panel_open", volume: 0.3 }
+  panel_close:        { clip: "sfx_ui_panel_close", volume: 0.25 }
+  tab_switch:         { clip: "sfx_ui_tab", volume: 0.25 }
+  inventory_open:     { clip: "sfx_ui_bag_open", volume: 0.4 }
+  item_drag:          { clip: "sfx_ui_item_drag", volume: 0.2 }
+  item_drop:          { clip: "sfx_ui_item_drop", volume: 0.3 }
+  slot_equip:         { clip: "sfx_ui_equip_slot", volume: 0.5 }
+  error_buzz:         { clip: "sfx_ui_error", volume: 0.5 }
+  notification:       { clip: "sfx_ui_notification", volume: 0.4 }
+  chat_message:       { clip: "sfx_ui_chat_msg", volume: 0.2 }
+  whisper_receive:    { clip: "sfx_ui_whisper", volume: 0.5 }
+  countdown:          { clip: "sfx_ui_countdown_tick", volume: 0.6 }
+  countdown_go:       { clip: "sfx_ui_countdown_go", volume: 0.8 }
+  map_open:           { clip: "sfx_ui_map_unfold", volume: 0.4 }
+  screenshot:         { clip: "sfx_ui_camera_shutter", volume: 0.5 }
+
+# ──────────────────────────────────────────────────────────
+# 4. 환경음 (Ambient)
+# ──────────────────────────────────────────────────────────
+ambient:
+  # 존별 환경음
+  zone_ambient:
+    tutorial_zone:
+      layers:
+        - { clip: "amb_birds_chirping", volume: 0.3, loop: true }
+        - { clip: "amb_wind_gentle", volume: 0.2, loop: true }
+
+    wind_village:
+      layers:
+        - { clip: "amb_village_crowd", volume: 0.2, loop: true }
+        - { clip: "amb_birds_chirping", volume: 0.2, loop: true }
+        - { clip: "amb_fountain", volume: 0.15, spatial: true, source: "fountain_object" }
+        - { clip: "amb_blacksmith_hammer", volume: 0.1, spatial: true, source: "blacksmith_npc", interval: [3, 8] }
+
+    grass_plain:
+      layers:
+        - { clip: "amb_wind_grass", volume: 0.25, loop: true }
+        - { clip: "amb_insects", volume: 0.1, loop: true }
+        - { clip: "amb_birds_distant", volume: 0.15, loop: true }
+
+    sapphire_coast:
+      layers:
+        - { clip: "amb_ocean_waves", volume: 0.4, loop: true }
+        - { clip: "amb_seagulls", volume: 0.15, loop: true }
+        - { clip: "amb_wind_coastal", volume: 0.2, loop: true }
+
+    frozen_peak:
+      layers:
+        - { clip: "amb_wind_howling", volume: 0.35, loop: true }
+        - { clip: "amb_ice_cracking", volume: 0.1, interval: [10, 30] }
+        - { clip: "amb_snow_crunch_distant", volume: 0.05, interval: [5, 15] }
+
+    fire_desert:
+      layers:
+        - { clip: "amb_wind_desert", volume: 0.25, loop: true }
+        - { clip: "amb_sand_shifting", volume: 0.1, loop: true }
+        - { clip: "amb_desert_silence", volume: 0.05, loop: true }   # 심리적 정적
+
+    volcanic_zone:
+      layers:
+        - { clip: "amb_lava_bubbling", volume: 0.3, loop: true }
+        - { clip: "amb_earth_rumble", volume: 0.2, loop: true }
+        - { clip: "amb_steam_vent", volume: 0.15, spatial: true, interval: [5, 15] }
+
+    demon_territory:
+      layers:
+        - { clip: "amb_dark_drone", volume: 0.3, loop: true }
+        - { clip: "amb_distant_screams", volume: 0.08, interval: [15, 45] }
+        - { clip: "amb_chains_rattling", volume: 0.1, interval: [10, 25] }
+
+    void_rift:
+      layers:
+        - { clip: "amb_void_hum", volume: 0.35, loop: true }
+        - { clip: "amb_reality_tear", volume: 0.15, interval: [8, 20] }
+        - { clip: "amb_whispers", volume: 0.1, loop: true }
+
+  # 시간대별 변화
+  time_variants:
+    night_overlay:
+      clip: "amb_night_crickets"
+      volume: 0.15
+      condition: "time_of_day == night"
+      fade_in: 5.0
+
+  # 날씨 사운드
+  weather_sounds:
+    rain:
+      clip: "amb_rain_medium"
+      volume: 0.4
+      loop: true
+      intensity_varies: true           # 비 강도에 따라 볼륨
+    rain_heavy:
+      clip: "amb_rain_heavy"
+      volume: 0.6
+      loop: true
+    thunder:
+      clip: "sfx_thunder_rumble"
+      volume: 0.8
+      interval: [10, 30]
+      pitch_range: [0.8, 1.2]
+    storm_wind:
+      clip: "amb_storm_wind"
+      volume: 0.5
+      loop: true
+    snow_wind:
+      clip: "amb_wind_soft"
+      volume: 0.25
+      loop: true
+    sandstorm_wind:
+      clip: "amb_sandstorm_roar"
+      volume: 0.5
+      loop: true
+
+# ──────────────────────────────────────────────────────────
+# 5. 보이스 / 대사
+# ──────────────────────────────────────────────────────────
+voice:
+  # 캐릭터 보이스 (전투)
+  player_voice:
+    warrior:
+      attack_grunt:   { clips: ["vo_warrior_attack_1", "vo_warrior_attack_2", "vo_warrior_attack_3"], volume: 0.6 }
+      skill_shout:    { clips: ["vo_warrior_skill_1", "vo_warrior_skill_2"], volume: 0.8 }
+      hit_pain:       { clips: ["vo_warrior_pain_1", "vo_warrior_pain_2"], volume: 0.7 }
+      death:          { clip: "vo_warrior_death", volume: 0.9 }
+      revive:         { clip: "vo_warrior_revive", volume: 0.6 }
+    archer:
+      attack_grunt:   { clips: ["vo_archer_attack_1", "vo_archer_attack_2"], volume: 0.5 }
+      skill_shout:    { clips: ["vo_archer_skill_1", "vo_archer_skill_2"], volume: 0.7 }
+      hit_pain:       { clips: ["vo_archer_pain_1", "vo_archer_pain_2"], volume: 0.7 }
+      death:          { clip: "vo_archer_death", volume: 0.9 }
+    mage:
+      cast_chant:     { clips: ["vo_mage_cast_1", "vo_mage_cast_2", "vo_mage_cast_3"], volume: 0.6 }
+      skill_shout:    { clips: ["vo_mage_skill_1", "vo_mage_skill_2"], volume: 0.7 }
+      hit_pain:       { clips: ["vo_mage_pain_1", "vo_mage_pain_2"], volume: 0.7 }
+      death:          { clip: "vo_mage_death", volume: 0.9 }
+
+  # 보이스 쿨다운 (같은 보이스 연속 재생 방지)
+  voice_cooldown: 0.5                  # 최소 0.5초 간격
+  random_no_repeat: true               # 같은 클립 연속 X
+
+  # 몬스터 사운드
+  monster_voice:
+    slime:
+      idle: { clip: "sfx_slime_wobble", interval: [3, 8] }
+      aggro: { clip: "sfx_slime_splat" }
+      attack: { clip: "sfx_slime_splash" }
+      death: { clip: "sfx_slime_pop" }
+    goblin:
+      idle: { clip: "sfx_goblin_chatter", interval: [5, 12] }
+      aggro: { clip: "sfx_goblin_yell" }
+      attack: { clips: ["sfx_goblin_attack_1", "sfx_goblin_attack_2"] }
+      death: { clip: "sfx_goblin_death" }
+    wolf:
+      idle: { clip: "sfx_wolf_breathing", interval: [4, 10] }
+      aggro: { clip: "sfx_wolf_howl" }
+      attack: { clip: "sfx_wolf_bite" }
+      death: { clip: "sfx_wolf_whimper" }
+    boss_generic:
+      intro_roar:   { clip: "sfx_boss_roar", volume: 1.0 }
+      phase_change: { clip: "sfx_boss_enrage", volume: 1.0 }
+
+# ──────────────────────────────────────────────────────────
+# 6. 뮤직 트리거 시스템
+# ──────────────────────────────────────────────────────────
+music_triggers:
+  # 자동 전환 규칙
+  rules:
+    - trigger: "enter_zone"
+      action: "play_zone_bgm"
+      crossfade: 2.0
+
+    - trigger: "enter_combat"
+      action: "play_combat_bgm"
+      crossfade: 0.5                   # 전투는 빠르게 전환
+
+    - trigger: "exit_combat"
+      delay: 5.0                       # 5초 후 원래 BGM
+      crossfade: 3.0
+
+    - trigger: "boss_encounter"
+      action: "play_boss_bgm_phase1"
+      crossfade: 1.0
+
+    - trigger: "boss_hp_50"
+      action: "play_boss_bgm_phase2"
+      crossfade: 0.0                   # 즉시 전환 (한 박자에)
+      sync_beat: true                  # 비트 동기화
+
+    - trigger: "boss_defeated"
+      action: "play_victory_bgm"
+      crossfade: 0.5
+      stop_after: 15.0                 # 15초 후 존 BGM
+
+    - trigger: "player_death"
+      action: "play_defeat_bgm"
+      crossfade: 1.0
+
+    - trigger: "cutscene_start"
+      action: "play_cutscene_bgm"
+      crossfade: 1.5
+
+    - trigger: "pvp_match_start"
+      action: "play_pvp_bgm"
+      delay: 3.0                       # 카운트다운 후
+
+  # 다이나믹 레이어링 (로아 스타일)
+  dynamic_layers:
+    desc: "전투 강도에 따라 BGM 레이어 추가/제거"
+    layers:
+      base:        { always: true, desc: "기본 멜로디" }
+      percussion:  { condition: "combat_intensity > 0.3", desc: "드럼 추가" }
+      brass:       { condition: "combat_intensity > 0.6", desc: "금관 추가" }
+      choir:       { condition: "combat_intensity > 0.8", desc: "합창 추가" }
+      full:        { condition: "boss_fight", desc: "풀 오케스트라" }
+    transition_time: 1.0

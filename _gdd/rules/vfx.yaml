@@ -1,0 +1,864 @@
+# ============================================================
+# VFX SYSTEM — 비주얼 이펙트/파티클 완전 정의
+# Reference: Lost Ark / Diablo 4 / Path of Exile
+# ============================================================
+# Unity Particle System + Shader 기반
+# 모든 이펙트는 Object Pool로 관리 (생성/파괴 X)
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 글로벌 VFX 설정
+# ──────────────────────────────────────────────────────────
+global:
+  quality_levels:
+    low:
+      particle_multiplier: 0.3
+      max_particles_per_system: 50
+      trail_enabled: false
+      distortion_enabled: false
+    medium:
+      particle_multiplier: 0.6
+      max_particles_per_system: 200
+      trail_enabled: true
+      distortion_enabled: false
+    high:
+      particle_multiplier: 1.0
+      max_particles_per_system: 500
+      trail_enabled: true
+      distortion_enabled: true
+
+  pool_config:
+    initial_pool_size: 20
+    max_pool_size: 100
+    recycle_delay: 0.5
+
+  layer: "VFX"                         # Unity Layer
+  sorting_layer: "Effects"
+  render_queue: 3100                   # 반투명 위
+
+# ──────────────────────────────────────────────────────────
+# 1. 전투 이펙트 — 근접 공격
+# ──────────────────────────────────────────────────────────
+melee_effects:
+  # 기본 공격 (베기)
+  basic_slash:
+    type: "mesh_particle"
+    mesh: "vfx_slash_arc"              # 반원 궤적 메시
+    texture: "vfx_slash_trail"
+    color_over_lifetime:
+      start: "#FFFFFFCC"
+      end: "#FFFFFF00"
+    size: [1.5, 0.3]                   # 폭, 두께
+    duration: 0.25
+    emission: 1                        # 단발
+    rotation: "match_attack_direction"
+    additive_blend: true
+
+  # 강공격
+  heavy_slash:
+    type: "mesh_particle"
+    mesh: "vfx_slash_heavy"
+    texture: "vfx_slash_trail_wide"
+    color_start: "#FFD700CC"
+    color_end: "#FF880000"
+    size: [2.5, 0.5]
+    duration: 0.35
+    emission: 1
+    screen_shake: { intensity: 0.05, duration: 0.15 }
+    ground_crack:
+      enabled: true
+      decal: "vfx_ground_crack"
+      size: [1.0, 1.0]
+      fade_time: 3.0
+
+  # 찌르기
+  thrust:
+    type: "cone_particle"
+    texture: "vfx_spark"
+    color: "#FFFFFFCC"
+    emission_count: 15
+    cone_angle: 15
+    speed: [5, 8]
+    size: [0.05, 0.1]
+    lifetime: [0.1, 0.2]
+    duration: 0.15
+
+  # 회전 베기 (범위 공격)
+  spin_slash:
+    type: "mesh_particle"
+    mesh: "vfx_slash_360"              # 360도 원형
+    texture: "vfx_slash_trail"
+    color_start: "#3498DBCC"
+    color_end: "#3498DB00"
+    size: [3.0, 0.4]
+    duration: 0.4
+    rotation_speed: 720                # 초당 720도
+    wind_trail:
+      enabled: true
+      particle_count: 30
+      spread: 360
+
+# ──────────────────────────────────────────────────────────
+# 2. 전투 이펙트 — 원거리/마법
+# ──────────────────────────────────────────────────────────
+ranged_effects:
+  # 화살
+  arrow_trail:
+    type: "trail_renderer"
+    width: [0.05, 0.0]                # 시작→끝 폭
+    color_start: "#FFFFFFCC"
+    color_end: "#FFFFFF00"
+    time: 0.2                          # 트레일 지속
+    material: "vfx_trail_additive"
+
+  # 파이어볼
+  fireball:
+    core:
+      type: "sphere_particle"
+      texture: "vfx_fire_core"
+      color: "#FF4400"
+      emission_rate: 50
+      size: [0.3, 0.5]
+      glow: true
+      glow_intensity: 2.0
+      light:
+        color: "#FF6600"
+        intensity: 3.0
+        range: 5.0
+    trail:
+      type: "trail_particle"
+      texture: "vfx_fire_smoke"
+      color_start: "#FF440088"
+      color_end: "#33000000"
+      emission_rate: 30
+      size: [0.2, 0.6]
+      lifetime: [0.3, 0.5]
+    spark:
+      type: "burst_particle"
+      texture: "vfx_spark"
+      color: "#FFD700"
+      emission_rate: 10
+      speed: [1, 3]
+      size: [0.02, 0.05]
+    impact:
+      type: "burst_particle"
+      texture: "vfx_fire_burst"
+      color: "#FF4400"
+      emission_count: 40
+      speed: [3, 8]
+      size: [0.1, 0.4]
+      lifetime: [0.2, 0.6]
+      smoke:
+        texture: "vfx_smoke"
+        color: "#333333"
+        count: 10
+        size: [0.5, 2.0]
+        rise_speed: 1.0
+      ground_scorch:
+        decal: "vfx_scorch_mark"
+        size: [2.0, 2.0]
+        fade_time: 5.0
+      screen_shake: { intensity: 0.08, duration: 0.2 }
+      light_flash:
+        color: "#FF6600"
+        intensity: 5.0
+        duration: 0.15
+
+  # 아이스볼트
+  ice_bolt:
+    core:
+      texture: "vfx_ice_crystal"
+      color: "#88DDFF"
+      rotation_speed: 360
+      glow_color: "#00CCFF"
+    trail:
+      texture: "vfx_ice_mist"
+      color: "#88DDFF44"
+    impact:
+      type: "burst_particle"
+      texture: "vfx_ice_shard"
+      color: "#CCFFFF"
+      count: 20
+      speed: [2, 5]
+      frost_decal:
+        texture: "vfx_frost_ground"
+        size: [1.5, 1.5]
+        fade_time: 4.0
+
+  # 번개
+  lightning:
+    type: "line_renderer"
+    material: "vfx_lightning"
+    color: "#FFFFFF"
+    glow_color: "#9B59B6"
+    width: [0.1, 0.3]
+    segments: 8                        # 지그재그 세그먼트
+    jitter: 0.3                        # 지그재그 정도
+    branch_chance: 0.3                 # 30% 확률 분기
+    duration: 0.15
+    flash_count: 3                     # 3번 깜빡
+    flash_interval: 0.05
+    impact_spark:
+      count: 30
+      color: "#DDAAFF"
+      speed: [3, 10]
+
+# ──────────────────────────────────────────────────────────
+# 3. 피격 이펙트
+# ──────────────────────────────────────────────────────────
+hit_effects:
+  # 일반 피격
+  normal_hit:
+    spark:
+      count: 8
+      texture: "vfx_hit_spark"
+      color: "#FFFFFF"
+      size: [0.05, 0.1]
+      speed: [2, 5]
+      lifetime: [0.1, 0.2]
+    flash:
+      type: "sprite"
+      texture: "vfx_hit_flash"
+      size: [0.8, 0.8]
+      duration: 0.08
+      color: "#FFFFFF"
+      additive: true
+    hit_stop:
+      duration: 0.03                   # 3프레임 히트스톱
+    character_flash:
+      color: "#FF0000"
+      duration: 0.1
+      material_property: "_EmissionColor"
+
+  # 크리티컬 피격
+  critical_hit:
+    spark:
+      count: 20
+      texture: "vfx_crit_spark"
+      color: "#FFD700"
+      size: [0.08, 0.15]
+      speed: [3, 8]
+    flash:
+      texture: "vfx_crit_flash"
+      size: [1.5, 1.5]
+      duration: 0.12
+      color: "#FFD700"
+    screen_effect:
+      type: "radial_blur"
+      intensity: 0.02
+      duration: 0.1
+    hit_stop:
+      duration: 0.06
+    camera_shake: { intensity: 0.03, duration: 0.1 }
+
+  # 원소별 피격
+  elemental_hit:
+    fire:
+      color: "#FF4400"
+      burn_particle:
+        texture: "vfx_fire_small"
+        duration: 2.0                  # DoT 지속시간 동안
+        emission_rate: 5
+    ice:
+      color: "#88DDFF"
+      freeze_overlay:
+        material: "vfx_ice_overlay"
+        opacity: 0.3
+        duration: 1.5
+    lightning:
+      color: "#9B59B6"
+      spark_chain:
+        count: 5
+        jitter: 0.5
+        duration: 0.2
+    dark:
+      color: "#4A0080"
+      shadow_wisps:
+        texture: "vfx_shadow_wisp"
+        count: 5
+        orbit_speed: 2.0
+    holy:
+      color: "#FFD700"
+      light_pillar:
+        texture: "vfx_holy_pillar"
+        height: 5.0
+        duration: 0.5
+    nature:
+      color: "#27AE60"
+      leaf_burst:
+        texture: "vfx_leaf"
+        count: 8
+        float_speed: 1.0
+
+# ──────────────────────────────────────────────────────────
+# 4. 스킬 이펙트 (직업별)
+# ──────────────────────────────────────────────────────────
+skill_effects:
+  warrior:
+    # 전사 - 질풍참
+    whirlwind:
+      type: "continuous"
+      duration: "channel_time"
+      wind_ring:
+        texture: "vfx_wind_ring"
+        size: [4.0, 4.0]
+        rotation_speed: 540
+        opacity: 0.6
+      dust_ring:
+        texture: "vfx_dust"
+        emission_rate: 40
+        size: [0.1, 0.3]
+        lifetime: [0.3, 0.6]
+        spread_radius: 3.0
+      slash_trails:
+        count: 3
+        rotation_offset: 120           # 120도 간격
+        texture: "vfx_slash_trail"
+        color: "#FFFFFF88"
+
+    # 전사 - 돌진
+    charge:
+      ground_trail:
+        type: "decal_trail"
+        texture: "vfx_ground_crack_line"
+        width: 1.0
+        fade_time: 2.0
+      dust:
+        emission_rate: 50
+        texture: "vfx_dust_heavy"
+        size: [0.3, 0.8]
+      impact:
+        shockwave:
+          type: "expanding_ring"
+          texture: "vfx_shockwave"
+          max_size: 5.0
+          duration: 0.3
+          distortion: 0.05
+        debris:
+          count: 15
+          meshes: ["vfx_rock_small", "vfx_rock_medium"]
+          gravity: true
+
+    # 전사 - 검기
+    sword_beam:
+      projectile:
+        mesh: "vfx_sword_beam"
+        size: [3.0, 1.0, 0.1]
+        color: "#3498DB"
+        glow_intensity: 3.0
+        speed: 15.0
+      trail:
+        texture: "vfx_energy_trail"
+        color: "#3498DB66"
+        width: [1.0, 0.0]
+
+  archer:
+    # 궁수 - 다중 사격
+    multi_shot:
+      arrows:
+        count: 5
+        spread_angle: 30               # 30도 부채꼴
+        trail: "arrow_trail"
+        impact: "normal_hit"
+
+    # 궁수 - 폭발 화살
+    explosive_arrow:
+      flight: "arrow_trail"
+      explosion:
+        type: "sphere_burst"
+        texture: "vfx_fire_burst"
+        size: 3.0
+        color: "#FF6600"
+        emission_count: 60
+        shockwave_ring: true
+        screen_shake: { intensity: 0.1, duration: 0.25 }
+        light_flash:
+          intensity: 8.0
+          range: 10.0
+          duration: 0.2
+
+    # 궁수 - 독화살
+    poison_arrow:
+      flight:
+        trail_color: "#27AE60"
+      impact:
+        poison_pool:
+          type: "ground_area"
+          texture: "vfx_poison_pool"
+          size: [3.0, 3.0]
+          color: "#27AE6088"
+          bubble_particles:
+            count: 10
+            texture: "vfx_bubble"
+            size: [0.1, 0.2]
+          duration: 5.0
+
+  mage:
+    # 마법사 - 메테오
+    meteor:
+      warning:
+        type: "ground_indicator"
+        texture: "vfx_circle_warning"
+        color: "#FF000066"
+        size: [6.0, 6.0]
+        pulse: true
+        duration: 2.0
+      projectile:
+        mesh: "vfx_meteor_rock"
+        size: [2.0, 2.0, 2.0]
+        fire_trail:
+          emission_rate: 80
+          color: "#FF4400"
+          size: [0.3, 1.0]
+        speed: 25.0
+        arc: true
+      impact:
+        explosion:
+          size: 8.0
+          color: "#FF4400"
+          emission_count: 200
+          duration: 1.0
+        shockwave:
+          size: 10.0
+          distortion: 0.1
+          duration: 0.4
+        screen_shake: { intensity: 0.2, duration: 0.5 }
+        camera_zoom: { amount: 0.95, duration: 0.3 }
+        crater:
+          decal: "vfx_crater"
+          size: [6.0, 6.0]
+          fade_time: 10.0
+        fire_patches:
+          count: 5
+          texture: "vfx_fire_ground"
+          size: [1.5, 1.5]
+          duration: 3.0
+
+    # 마법사 - 블리자드
+    blizzard:
+      area:
+        type: "cylinder_zone"
+        radius: 5.0
+        height: 15.0
+        duration: 5.0
+      snow:
+        emission_rate: 100
+        texture: "vfx_snowflake"
+        color: "#CCFFFF"
+        size: [0.05, 0.15]
+        fall_speed: [3, 6]
+      ice_shards:
+        emission_rate: 20
+        texture: "vfx_ice_shard"
+        size: [0.1, 0.3]
+        impact_on_ground: true
+      frost_ground:
+        texture: "vfx_frost_ground"
+        opacity_buildup: 0.2           # 초당 20% 증가
+        max_opacity: 0.8
+      wind:
+        distortion: 0.03
+        sound: "sfx_blizzard_wind"
+
+    # 마법사 - 텔레포트
+    teleport:
+      departure:
+        type: "implosion"
+        texture: "vfx_magic_particle"
+        color: "#9B59B6"
+        count: 30
+        implode_speed: 8.0
+        duration: 0.2
+      arrival:
+        type: "explosion"
+        texture: "vfx_magic_particle"
+        color: "#9B59B6"
+        count: 30
+        speed: [3, 6]
+        duration: 0.3
+        flash:
+          color: "#9B59B644"
+          duration: 0.1
+
+# ──────────────────────────────────────────────────────────
+# 5. 환경 이펙트
+# ──────────────────────────────────────────────────────────
+environment_effects:
+  # 비
+  rain:
+    particles:
+      texture: "vfx_raindrop"
+      emission_rate: 300
+      area: [50, 50]                   # 카메라 주변 50x50
+      fall_speed: [10, 15]
+      size: [0.01, 0.03]
+      color: "#AACCFF44"
+    splash:
+      texture: "vfx_rain_splash"
+      emission_rate: 50
+      size: [0.1, 0.2]
+      lifetime: 0.15
+      spawn_on: "ground"
+    puddle_reflections:
+      shader: "vfx_puddle_reflect"
+      intensity: 0.3
+    sound: "sfx_rain_loop"
+
+  # 눈
+  snow:
+    particles:
+      texture: "vfx_snowflake"
+      emission_rate: 100
+      area: [50, 50]
+      fall_speed: [1, 3]
+      size: [0.03, 0.08]
+      color: "#FFFFFF88"
+      wobble: true
+      wobble_amplitude: 0.5
+    ground_accumulation:
+      shader: "vfx_snow_accumulate"
+      rate: 0.01                       # 초당 1%
+      max: 0.3                         # 최대 30cm
+    sound: "sfx_wind_soft"
+
+  # 안개
+  fog:
+    type: "volumetric_fog"
+    density: 0.02
+    color: "#AABBCC"
+    height: 3.0
+    noise:
+      texture: "vfx_fog_noise"
+      scale: 0.5
+      speed: 0.3
+
+  # 모래폭풍
+  sandstorm:
+    particles:
+      texture: "vfx_sand_particle"
+      emission_rate: 200
+      wind_direction: [1, 0, 0.2]
+      wind_speed: 8.0
+      size: [0.02, 0.05]
+      color: "#D4A56A88"
+    visibility:
+      fog_density: 0.05
+      fog_color: "#C4955A"
+    screen_overlay:
+      texture: "vfx_sand_overlay"
+      opacity: 0.15
+    sound: "sfx_sandstorm_loop"
+
+  # 화산 지대
+  volcanic:
+    ember:
+      texture: "vfx_ember"
+      emission_rate: 30
+      rise_speed: [1, 3]
+      size: [0.02, 0.05]
+      color: "#FF6600"
+      glow: true
+    heat_haze:
+      shader: "vfx_heat_distortion"
+      intensity: 0.02
+      height: 5.0
+    lava_bubble:
+      texture: "vfx_lava_bubble"
+      interval: [2, 5]
+      size: [0.3, 0.8]
+      pop_particles:
+        count: 5
+        color: "#FF4400"
+
+  # 던전 — 어둠 기운
+  dark_dungeon:
+    ambient_particles:
+      texture: "vfx_dark_wisp"
+      emission_rate: 10
+      float_speed: 0.5
+      size: [0.1, 0.3]
+      color: "#4A008044"
+      glow: true
+    torch_fire:
+      texture: "vfx_torch_fire"
+      emission_rate: 20
+      size: [0.1, 0.3]
+      color_start: "#FF8800"
+      color_end: "#FF440000"
+      light:
+        color: "#FF8800"
+        intensity: 2.0
+        range: 5.0
+        flicker: true
+        flicker_speed: 8.0
+        flicker_amount: 0.3
+
+# ──────────────────────────────────────────────────────────
+# 6. UI/시스템 이펙트
+# ──────────────────────────────────────────────────────────
+system_effects:
+  # 강화 성공
+  enhance_success:
+    flash:
+      type: "screen_flash"
+      color: "#FFD70044"
+      duration: 0.3
+    pillar:
+      type: "light_pillar"
+      color: "#FFD700"
+      height: 10.0
+      width: 0.5
+      duration: 1.5
+    particles:
+      texture: "vfx_star_particle"
+      color: "#FFD700"
+      count: 50
+      speed: [2, 5]
+      gravity: -1.0                    # 위로 올라감
+    sound: "sfx_enhance_success"
+
+  # 강화 실패
+  enhance_failure:
+    flash:
+      type: "screen_flash"
+      color: "#FF000033"
+      duration: 0.2
+    crack:
+      texture: "vfx_crack_overlay"
+      duration: 0.5
+    smoke:
+      texture: "vfx_dark_smoke"
+      count: 10
+      color: "#333333"
+    sound: "sfx_enhance_fail"
+
+  # 레벨업
+  level_up:
+    pillar:
+      type: "light_pillar"
+      color: "#FFD700"
+      height: 15.0
+      width: 1.0
+      duration: 2.0
+      expand_ring: true
+    aura:
+      texture: "vfx_levelup_aura"
+      color: "#FFD70066"
+      size: [3.0, 3.0]
+      duration: 3.0
+    text_effect:
+      text: "LEVEL UP!"
+      font_size: 48
+      color: "#FFD700"
+      animation: "pop_scale_fade"
+    sound: "sfx_level_up"
+
+  # 아이템 드롭 (바닥 빛기둥)
+  item_drop:
+    common:
+      light_beam: false
+    uncommon:
+      light_beam:
+        color: "#1EFF0066"
+        height: 3.0
+        width: 0.2
+    rare:
+      light_beam:
+        color: "#0070DD88"
+        height: 5.0
+        width: 0.3
+    epic:
+      light_beam:
+        color: "#A335EEAA"
+        height: 7.0
+        width: 0.4
+        particles: true
+    legendary:
+      light_beam:
+        color: "#FF8000CC"
+        height: 10.0
+        width: 0.5
+        particles: true
+        screen_flash: true
+        sound: "sfx_legendary_drop"
+
+  # 포탈
+  portal:
+    ring:
+      mesh: "vfx_portal_ring"
+      size: [2.0, 2.0]
+      rotation_speed: 60
+      color: "#3498DB"
+      glow_intensity: 2.0
+    center:
+      shader: "vfx_portal_distortion"
+      distortion: 0.1
+      texture: "vfx_portal_swirl"
+      swirl_speed: 2.0
+    particles:
+      texture: "vfx_magic_particle"
+      emission_rate: 20
+      orbit_radius: 1.0
+      color: "#3498DB88"
+    light:
+      color: "#3498DB"
+      intensity: 3.0
+      range: 5.0
+
+  # 텔레포트 워프 포인트
+  waypoint:
+    idle:
+      particles:
+        texture: "vfx_crystal_shard"
+        emission_rate: 5
+        float_speed: 0.3
+        color: "#00FFFF44"
+      glow:
+        color: "#00FFFF"
+        intensity: 1.0
+        pulse: true
+        pulse_speed: 2.0
+    activated:
+      flash:
+        color: "#00FFFF88"
+        duration: 0.5
+      particles:
+        emission_rate: 50
+        speed: [2, 5]
+        duration: 1.0
+
+# ──────────────────────────────────────────────────────────
+# 7. 캐릭터 상태 이펙트
+# ──────────────────────────────────────────────────────────
+status_effects:
+  # 독
+  poisoned:
+    body_tint:
+      color: "#27AE6033"
+      material_property: "_TintColor"
+    particles:
+      texture: "vfx_poison_bubble"
+      emission_rate: 3
+      size: [0.05, 0.1]
+      color: "#27AE60"
+      rise_speed: 0.5
+
+  # 화상
+  burning:
+    body_tint:
+      color: "#FF440033"
+    particles:
+      texture: "vfx_fire_small"
+      emission_rate: 8
+      size: [0.1, 0.2]
+      color: "#FF6600"
+
+  # 빙결
+  frozen:
+    ice_overlay:
+      material: "vfx_ice_shell"
+      opacity: 0.5
+      refraction: 0.1
+    frost_particles:
+      texture: "vfx_frost_particle"
+      emission_rate: 5
+      color: "#88DDFF"
+
+  # 기절
+  stunned:
+    stars:
+      texture: "vfx_star"
+      count: 3
+      orbit_radius: 0.5
+      orbit_speed: 2.0
+      height: 2.0                      # 머리 위
+      color: "#FFD700"
+
+  # 버프 오라
+  buff_aura:
+    atk_buff:
+      color: "#FF4444"
+      texture: "vfx_aura_up"
+      opacity: 0.2
+      pulse: true
+    def_buff:
+      color: "#3498DB"
+      texture: "vfx_aura_shield"
+      opacity: 0.3
+    speed_buff:
+      color: "#2ECC71"
+      foot_trail:
+        texture: "vfx_speed_trail"
+        width: 0.3
+        duration: 0.3
+    heal_over_time:
+      color: "#2ECC71"
+      particles:
+        texture: "vfx_heal_sparkle"
+        emission_rate: 5
+        rise_speed: 1.0
+
+  # 죽음
+  death:
+    dissolve:
+      shader: "vfx_dissolve"
+      duration: 2.0
+      edge_color: "#FF4400"
+      edge_width: 0.05
+      direction: "bottom_to_top"
+    soul:
+      texture: "vfx_soul_orb"
+      color: "#FFFFFF44"
+      rise_speed: 1.0
+      size: 0.5
+      fade_time: 3.0
+
+# ──────────────────────────────────────────────────────────
+# 8. 보스 전용 이펙트
+# ──────────────────────────────────────────────────────────
+boss_effects:
+  # 안전지대 기믹
+  safe_zone_warning:
+    danger_area:
+      type: "full_screen_overlay"
+      color: "#FF000022"
+      pulse: true
+      pulse_speed: 3.0
+    safe_circle:
+      type: "ground_indicator"
+      color: "#00FF0044"
+      size: [5.0, 5.0]
+      border: { color: "#00FF00", width: 0.1 }
+      pulse: true
+
+  # 무력화 게이지
+  stagger_break:
+    shockwave:
+      type: "expanding_sphere"
+      size: 8.0
+      color: "#FFD700"
+      distortion: 0.15
+      duration: 0.5
+    debris:
+      count: 30
+      meshes: ["vfx_rock_small", "vfx_rock_medium", "vfx_rock_large"]
+      speed: [5, 15]
+      gravity: true
+    screen_shake: { intensity: 0.3, duration: 0.5 }
+    slow_motion:
+      time_scale: 0.3
+      duration: 0.5
+
+  # 보스 등장 연출
+  boss_intro:
+    camera_zoom:
+      target: "boss"
+      zoom: 0.7
+      duration: 2.0
+    nameplate:
+      animation: "slide_in"
+      duration: 3.0
+    dark_overlay:
+      color: "#00000066"
+      vignette: 0.5
+    sound: "sfx_boss_intro"

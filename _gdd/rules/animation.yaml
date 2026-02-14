@@ -1,0 +1,450 @@
+# ============================================================
+# ANIMATION SYSTEM — 캐릭터/몬스터 애니메이션 완전 정의
+# Reference: Lost Ark / Dark Souls / Monster Hunter
+# ============================================================
+# Unity Animator Controller + Blend Tree 기반
+# Mixamo 리깅 호환 (65 bone humanoid)
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 글로벌 애니메이션 설정
+# ──────────────────────────────────────────────────────────
+global:
+  rig_type: "humanoid"
+  avatar: "mixamo_standard"
+  root_motion: false                   # 코드로 이동 제어
+  update_mode: "normal"
+  culling_mode: "cull_completely"      # 화면 밖이면 중지
+
+  # 블렌드 설정
+  default_transition_duration: 0.15    # 기본 전환 0.15초
+  combat_transition_duration: 0.08    # 전투 전환은 더 빠르게
+
+  # IK 설정
+  ik:
+    foot_ik: true                      # 바닥 경사에 발 맞춤
+    hand_ik: false                     # 필요 시만 활성화
+    look_at_ik: true                   # 타겟 쳐다보기
+    look_at_weight: 0.6
+
+# ──────────────────────────────────────────────────────────
+# 1. 캐릭터 애니메이터 (Animator Controller)
+# ──────────────────────────────────────────────────────────
+character_animator:
+  name: "AC_Character"
+
+  # 파라미터 정의
+  parameters:
+    - { name: "Speed", type: "float", desc: "이동 속도 (0=정지, 1=걷기, 2=달리기)" }
+    - { name: "MoveX", type: "float", desc: "좌우 이동 블렌드 (-1~1)" }
+    - { name: "MoveY", type: "float", desc: "전후 이동 블렌드 (-1~1)" }
+    - { name: "InCombat", type: "bool", desc: "전투 상태" }
+    - { name: "IsGrounded", type: "bool", desc: "지면 접촉" }
+    - { name: "IsDead", type: "bool", desc: "사망" }
+    - { name: "AttackIndex", type: "int", desc: "공격 콤보 인덱스 (0~3)" }
+    - { name: "SkillIndex", type: "int", desc: "스킬 번호" }
+    - { name: "HitDirection", type: "float", desc: "피격 방향 (0=정면, 1=후면)" }
+    - { name: "IsMounted", type: "bool", desc: "탈것 탑승" }
+    - { name: "InteractType", type: "int", desc: "상호작용 타입" }
+    - { name: "EmoteIndex", type: "int", desc: "감정표현 번호" }
+
+  # ── 레이어 정의 ──
+  layers:
+    # Base Layer — 이동/전투
+    - name: "Base"
+      weight: 1.0
+      mask: "full_body"
+      states:
+        # 대기
+        idle:
+          clip: "anim_idle_breathe"
+          loop: true
+          transitions:
+            - to: "locomotion"
+              condition: "Speed > 0.1"
+            - to: "combat_idle"
+              condition: "InCombat == true"
+            - to: "death"
+              condition: "IsDead == true"
+
+        # 이동 블렌드 트리
+        locomotion:
+          type: "blend_tree_2d"
+          blend_type: "freeform_directional"
+          parameters: ["MoveX", "MoveY"]
+          children:
+            - { clip: "anim_walk_forward",    position: [0, 1] }
+            - { clip: "anim_walk_backward",   position: [0, -1] }
+            - { clip: "anim_walk_left",       position: [-1, 0] }
+            - { clip: "anim_walk_right",      position: [1, 0] }
+            - { clip: "anim_walk_forward_left",  position: [-0.7, 0.7] }
+            - { clip: "anim_walk_forward_right", position: [0.7, 0.7] }
+            - { clip: "anim_idle_breathe",    position: [0, 0] }
+          speed_multiplier: "Speed"
+          transitions:
+            - to: "idle"
+              condition: "Speed < 0.1"
+            - to: "combat_locomotion"
+              condition: "InCombat == true"
+
+        # 달리기 (Speed > 1.5)
+        run:
+          type: "blend_tree_1d"
+          parameter: "Speed"
+          children:
+            - { clip: "anim_walk_forward", threshold: 0.5 }
+            - { clip: "anim_run_forward", threshold: 1.5 }
+            - { clip: "anim_sprint_forward", threshold: 2.5 }
+
+        # 전투 대기
+        combat_idle:
+          clip: "anim_combat_idle"
+          loop: true
+          desc: "무기를 든 전투 자세"
+          transitions:
+            - to: "combat_locomotion"
+              condition: "Speed > 0.1"
+            - to: "attack_combo"
+              trigger: "Attack"
+            - to: "skill_cast"
+              trigger: "Skill"
+            - to: "idle"
+              condition: "InCombat == false"
+
+        # 전투 이동
+        combat_locomotion:
+          type: "blend_tree_2d"
+          blend_type: "freeform_directional"
+          parameters: ["MoveX", "MoveY"]
+          children:
+            - { clip: "anim_combat_walk_forward",    position: [0, 1] }
+            - { clip: "anim_combat_walk_backward",   position: [0, -1] }
+            - { clip: "anim_combat_walk_left",       position: [-1, 0] }
+            - { clip: "anim_combat_walk_right",      position: [1, 0] }
+            - { clip: "anim_combat_idle",            position: [0, 0] }
+
+        # 대시/회피
+        dash:
+          clip: "anim_dash_roll"
+          duration: 0.5
+          exit_time: 0.9                # 90% 재생 후 전환 가능
+          has_exit_time: true
+          root_motion_override: true    # 이 때만 루트모션 사용
+          invincible_frames: [0.05, 0.35]  # 무적 프레임 구간
+
+        # 공격 콤보
+        attack_combo:
+          type: "state_machine"
+          states:
+            attack_1:
+              clip: "anim_attack_slash_1"
+              duration: 0.5
+              damage_frame: 0.2         # 20% 시점에 데미지 판정
+              cancel_window: [0.4, 0.5] # 40~50% 구간에서 다음 콤보 입력
+              next: "attack_2"
+            attack_2:
+              clip: "anim_attack_slash_2"
+              duration: 0.55
+              damage_frame: 0.25
+              cancel_window: [0.45, 0.55]
+              next: "attack_3"
+            attack_3:
+              clip: "anim_attack_slash_3"
+              duration: 0.7
+              damage_frame: 0.3
+              cancel_window: [0.5, 0.7]
+              next: "attack_4"
+            attack_4:
+              clip: "anim_attack_heavy_finish"
+              duration: 0.9
+              damage_frame: 0.35
+              screen_shake: true
+              recovery: 0.3             # 마지막은 후딜 0.3초
+
+        # 스킬 시전
+        skill_cast:
+          desc: "SkillIndex로 분기"
+          sub_states:
+            skill_1: { clip: "anim_skill_slash_wide", duration: 0.8 }
+            skill_2: { clip: "anim_skill_upper_cut", duration: 0.7 }
+            skill_3: { clip: "anim_skill_spin_attack", duration: 1.0 }
+            skill_4: { clip: "anim_skill_charge_thrust", duration: 1.2 }
+            skill_5: { clip: "anim_skill_leap_slam", duration: 1.5 }
+            skill_6: { clip: "anim_skill_counter_stance", duration: 0.6 }
+            skill_7: { clip: "anim_skill_buff_pose", duration: 0.8 }
+            skill_8: { clip: "anim_skill_aoe_ground", duration: 1.0 }
+            ultimate: { clip: "anim_ultimate_cinematic", duration: 3.0, camera_cut: true }
+
+        # 피격
+        hit_react:
+          type: "blend_tree_1d"
+          parameter: "HitDirection"
+          children:
+            - { clip: "anim_hit_front", threshold: 0 }
+            - { clip: "anim_hit_back", threshold: 1 }
+          duration: 0.3
+          can_be_interrupted: true      # 연속 피격 가능
+
+        # 넉다운
+        knockdown:
+          clip: "anim_knockdown_fall"
+          duration: 0.8
+          recovery:
+            clip: "anim_knockdown_getup"
+            duration: 0.7
+            invincible: true            # 일어나는 동안 무적
+
+        # 사망
+        death:
+          clip: "anim_death_collapse"
+          duration: 1.2
+          has_exit_time: false          # 부활 전까지 유지
+          ragdoll_on_complete: false    # 래그돌 대신 애니메이션 사용
+
+        # 탈것 탑승
+        mounted:
+          idle: "anim_mount_idle"
+          run: "anim_mount_run"
+          mount: "anim_mount_get_on"       # 올라타기 0.8초
+          dismount: "anim_mount_get_off"   # 내리기 0.6초
+
+    # Upper Body Layer — 상체 오버라이드
+    - name: "UpperBody"
+      weight: 0.0                       # 필요 시만 활성화
+      mask: "upper_body"
+      additive: false
+      states:
+        wave:
+          clip: "anim_emote_wave"
+          desc: "걸으면서 손 흔들기"
+        carry:
+          clip: "anim_carry_object"
+          desc: "물건 들고 이동"
+
+    # Additive Layer — 호흡/피로
+    - name: "Additive"
+      weight: 1.0
+      mask: "full_body"
+      additive: true
+      states:
+        breathing:
+          clip: "anim_additive_breathing"
+          loop: true
+          weight: 0.3
+        exhausted:
+          clip: "anim_additive_exhausted"
+          condition: "stamina < 20"
+          weight: 0.5
+
+# ──────────────────────────────────────────────────────────
+# 2. 직업별 전투 애니메이션 차이
+# ──────────────────────────────────────────────────────────
+class_overrides:
+  warrior:
+    combat_idle: "anim_warrior_combat_idle"    # 검을 든 자세
+    attack_combo:
+      attack_1: { clip: "anim_warrior_slash_1", damage_frame: 0.2, duration: 0.5 }
+      attack_2: { clip: "anim_warrior_slash_2", damage_frame: 0.25, duration: 0.5 }
+      attack_3: { clip: "anim_warrior_slash_3", damage_frame: 0.2, duration: 0.6 }
+      attack_4: { clip: "anim_warrior_slam", damage_frame: 0.35, duration: 0.8 }
+    weapon_trail: true
+
+  archer:
+    combat_idle: "anim_archer_combat_idle"     # 활을 든 자세
+    attack_combo:
+      attack_1: { clip: "anim_archer_shoot_1", damage_frame: 0.4, duration: 0.6, projectile: true }
+      attack_2: { clip: "anim_archer_shoot_2", damage_frame: 0.35, duration: 0.55, projectile: true }
+      attack_3: { clip: "anim_archer_shoot_3", damage_frame: 0.45, duration: 0.7, projectile: true }
+    draw_bow_blend: true                # 차징 시스템
+
+  mage:
+    combat_idle: "anim_mage_combat_idle"       # 지팡이를 든 자세
+    attack_combo:
+      attack_1: { clip: "anim_mage_cast_1", damage_frame: 0.5, duration: 0.7, projectile: true }
+      attack_2: { clip: "anim_mage_cast_2", damage_frame: 0.45, duration: 0.65, projectile: true }
+      attack_3: { clip: "anim_mage_cast_3", damage_frame: 0.55, duration: 0.8, projectile: true }
+    cast_circle: true                   # 시전 시 발 밑 마법진
+
+# ──────────────────────────────────────────────────────────
+# 3. 몬스터 애니메이션
+# ──────────────────────────────────────────────────────────
+monster_animator:
+  # 공통 파라미터
+  parameters:
+    - { name: "Speed", type: "float" }
+    - { name: "IsAggro", type: "bool" }
+    - { name: "AttackType", type: "int" }
+    - { name: "IsDead", type: "bool" }
+    - { name: "IsStaggered", type: "bool" }
+
+  # 몬스터 타입별 템플릿
+  templates:
+    # 소형 (슬라임, 고블린)
+    small:
+      idle: { clip: "anim_small_idle", loop: true }
+      walk: { clip: "anim_small_walk", speed_mult: "Speed" }
+      run: { clip: "anim_small_run", speed_mult: "Speed" }
+      aggro: { clip: "anim_small_aggro_notice", duration: 0.5 }
+      attack_1: { clip: "anim_small_attack", duration: 0.6, damage_frame: 0.3 }
+      hit: { clip: "anim_small_hit", duration: 0.2 }
+      death: { clip: "anim_small_death", duration: 0.8 }
+      spawn: { clip: "anim_small_spawn", duration: 0.5 }
+
+    # 중형 (늑대, 해적, 골렘)
+    medium:
+      idle: { clip: "anim_medium_idle", loop: true }
+      walk: { clip: "anim_medium_walk" }
+      run: { clip: "anim_medium_run" }
+      aggro: { clip: "anim_medium_aggro_roar", duration: 0.8 }
+      attack_1: { clip: "anim_medium_attack_1", duration: 0.8, damage_frame: 0.35 }
+      attack_2: { clip: "anim_medium_attack_2", duration: 1.0, damage_frame: 0.4 }
+      hit: { clip: "anim_medium_hit", duration: 0.3 }
+      stagger: { clip: "anim_medium_stagger", duration: 1.0 }
+      death: { clip: "anim_medium_death", duration: 1.2 }
+
+    # 대형 보스
+    boss:
+      idle: { clip: "anim_boss_idle", loop: true }
+      walk: { clip: "anim_boss_walk_heavy" }
+      intro: { clip: "anim_boss_intro_roar", duration: 2.0, camera_shake: true }
+      attack_1: { clip: "anim_boss_attack_1", duration: 1.2, damage_frame: 0.5 }
+      attack_2: { clip: "anim_boss_attack_2", duration: 1.5, damage_frame: 0.6 }
+      attack_3: { clip: "anim_boss_attack_3", duration: 2.0, damage_frame: 0.7 }
+      aoe_attack: { clip: "anim_boss_aoe_slam", duration: 2.5, warning: 1.0, damage_frame: 1.5 }
+      phase_transition: { clip: "anim_boss_enrage", duration: 3.0, invincible: true }
+      stagger: { clip: "anim_boss_stagger_fall", duration: 3.0, desc: "무력화 상태" }
+      death: { clip: "anim_boss_death_dramatic", duration: 4.0, slow_motion: true }
+
+# ──────────────────────────────────────────────────────────
+# 4. NPC 애니메이션
+# ──────────────────────────────────────────────────────────
+npc_animator:
+  # NPC 타입별
+  shopkeeper:
+    idle: "anim_npc_stand_friendly"
+    greeting: "anim_npc_wave"
+    talk: "anim_npc_talk_gesture"
+    idle_variants:                     # 랜덤 아이들 (생동감)
+      - { clip: "anim_npc_look_around", weight: 0.3, interval: [8, 15] }
+      - { clip: "anim_npc_stretch", weight: 0.2, interval: [15, 30] }
+      - { clip: "anim_npc_yawn", weight: 0.1, interval: [30, 60] }
+
+  blacksmith:
+    idle: "anim_npc_blacksmith_hammer"
+    talk: "anim_npc_wipe_sweat"
+    work_loop: { clip: "anim_npc_hammering", loop: true }
+
+  guard:
+    idle: "anim_npc_guard_stand"
+    patrol: "anim_npc_guard_walk"
+    salute: "anim_npc_salute"
+
+  quest_giver:
+    idle: "anim_npc_scholar_read"
+    exclamation: "anim_npc_hand_wave"  # 느낌표 NPC
+    talk: "anim_npc_explain"
+
+# ──────────────────────────────────────────────────────────
+# 5. 감정 표현 (Emotes)
+# ──────────────────────────────────────────────────────────
+emotes:
+  greet:      { clip: "anim_emote_wave", duration: 2.0, loop: false }
+  bow:        { clip: "anim_emote_bow", duration: 1.5, loop: false }
+  cheer:      { clip: "anim_emote_cheer", duration: 2.5, loop: false }
+  dance_1:    { clip: "anim_emote_dance_casual", duration: 0, loop: true }   # 취소까지
+  dance_2:    { clip: "anim_emote_dance_funny", duration: 0, loop: true }
+  sit:        { clip: "anim_emote_sit_down", duration: 0, loop: true }
+  laugh:      { clip: "anim_emote_laugh", duration: 2.0, loop: false }
+  angry:      { clip: "anim_emote_angry_stomp", duration: 1.5, loop: false }
+  point:      { clip: "anim_emote_point_forward", duration: 2.0, loop: false }
+  clap:       { clip: "anim_emote_clap", duration: 3.0, loop: false }
+
+  # 에모트 중 이동 입력 시 즉시 취소
+  cancel_on_move: true
+  cancel_on_damage: true
+
+# ──────────────────────────────────────────────────────────
+# 6. 환경 애니메이션 (오브젝트)
+# ──────────────────────────────────────────────────────────
+environment_animations:
+  # 풀/나무 흔들림
+  foliage:
+    wind_sway:
+      shader: "vfx_wind_sway"
+      frequency: 1.5
+      amplitude: 0.1
+      direction: "wind_direction"
+    player_push:
+      radius: 0.5
+      push_strength: 0.3
+      recovery_speed: 2.0
+
+  # 물
+  water:
+    surface:
+      shader: "vfx_water_surface"
+      wave_speed: 0.5
+      wave_height: 0.05
+      reflection: true
+    ripple_on_enter:
+      particle: "vfx_water_splash"
+      ring: "vfx_water_ripple"
+
+  # 문/게이트
+  door:
+    open:
+      clip: "anim_door_open"
+      duration: 0.8
+      trigger_distance: 2.0
+      sound: "sfx_door_open"
+    close:
+      clip: "anim_door_close"
+      delay: 3.0                       # 3초 후 자동 닫힘
+
+  # 보물상자
+  treasure_chest:
+    idle: "anim_chest_glow_pulse"
+    open: { clip: "anim_chest_open", duration: 1.0, particles: "vfx_chest_sparkle" }
+
+  # 횃불
+  torch:
+    flame: "anim_torch_flicker"
+    light_flicker:
+      min_intensity: 1.5
+      max_intensity: 2.5
+      speed: 5.0
+
+# ──────────────────────────────────────────────────────────
+# 7. 카메라 애니메이션 이벤트
+# ──────────────────────────────────────────────────────────
+animation_events:
+  desc: "애니메이션 특정 프레임에 이벤트 발사"
+  types:
+    damage_trigger:
+      desc: "데미지 판정 시작"
+      method: "OnDamageFrame"
+    vfx_spawn:
+      desc: "VFX 생성"
+      method: "OnSpawnVFX"
+      params: ["vfx_name", "bone_name"]
+    sfx_play:
+      desc: "효과음 재생"
+      method: "OnPlaySFX"
+      params: ["sfx_name"]
+    footstep:
+      desc: "발소리"
+      method: "OnFootstep"
+      params: ["foot_index"]            # 0=왼발, 1=오른발
+    camera_shake:
+      desc: "카메라 흔들림"
+      method: "OnCameraShake"
+      params: ["intensity", "duration"]
+    projectile_spawn:
+      desc: "투사체 발사"
+      method: "OnSpawnProjectile"
+    weapon_trail_start:
+      desc: "무기 잔상 시작"
+      method: "OnWeaponTrailStart"
+    weapon_trail_end:
+      desc: "무기 잔상 종료"
+      method: "OnWeaponTrailEnd"

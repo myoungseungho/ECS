@@ -1,0 +1,525 @@
+# ============================================================
+# AI BEHAVIOR — 몬스터/NPC AI 행동 트리 완전 정의
+# Reference: Lost Ark / Dark Souls / Monster Hunter
+# ============================================================
+# Behavior Tree 기반 (Selector → Sequence → Action)
+# 모든 AI는 서버에서 연산, 클라이언트는 결과만 수신
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. AI 글로벌 설정
+# ──────────────────────────────────────────────────────────
+global:
+  tick_rate: 10                        # AI 판단 초당 10회
+  pathfinding: "navmesh"               # Unity NavMesh
+  max_active_ai: 200                   # 동시 활성 AI 상한
+  deactivation_distance: 50.0          # 플레이어로부터 50m 이상 → 비활성화
+
+  # 어그로 기본 규칙
+  aggro:
+    detection_radius: 10.0             # 기본 감지 반경
+    detection_fov: 120                 # 시야각 (도)
+    chase_radius: 20.0                 # 추격 포기 거리
+    leash_radius: 30.0                 # 리셋 거리 (스폰지점 기준)
+    aggro_table: true                  # 어그로 테이블 사용
+    aggro_decay: 2.0                   # 초당 어그로 감소
+    first_hit_bonus: 100               # 선공 보너스 어그로
+
+  # 그룹 AI
+  group:
+    max_attackers: 3                   # 동시 공격자 수 제한
+    surround: true                     # 플레이어 둘러싸기
+    call_for_help_radius: 8.0          # 도움 요청 범위
+    formation: "loose_circle"          # 기본 대형
+
+# ──────────────────────────────────────────────────────────
+# 1. 몬스터 AI 등급별 행동 트리
+# ──────────────────────────────────────────────────────────
+monster_ai:
+  # ── 일반 몬스터 (슬라임, 고블린 등) ──
+  normal:
+    behavior_tree:
+      type: "selector"
+      children:
+        # 1순위: 죽었으면 → 사망 처리
+        - type: "sequence"
+          name: "death_check"
+          children:
+            - { type: "condition", check: "hp <= 0" }
+            - { type: "action", do: "play_death_animation" }
+            - { type: "action", do: "drop_loot" }
+            - { type: "action", do: "despawn", delay: 3.0 }
+
+        # 2순위: 타겟 있으면 → 전투
+        - type: "sequence"
+          name: "combat"
+          children:
+            - { type: "condition", check: "has_target" }
+            - type: "selector"
+              children:
+                # 사거리 밖 → 접근
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "distance_to_target > attack_range" }
+                    - { type: "action", do: "move_to_target" }
+
+                # 사거리 안 → 공격
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "distance_to_target <= attack_range" }
+                    - { type: "condition", check: "attack_cooldown_ready" }
+                    - { type: "action", do: "face_target" }
+                    - { type: "action", do: "attack", attack_id: "basic_attack" }
+                    - { type: "action", do: "wait", duration: [1.0, 2.0] }
+
+        # 3순위: 타겟 감지 → 어그로
+        - type: "sequence"
+          name: "detect"
+          children:
+            - { type: "condition", check: "no_target" }
+            - { type: "condition", check: "player_in_detection_range" }
+            - { type: "action", do: "play_aggro_animation" }
+            - { type: "action", do: "set_target", target: "nearest_player" }
+
+        # 4순위: 리셋 체크
+        - type: "sequence"
+          name: "leash_check"
+          children:
+            - { type: "condition", check: "distance_from_spawn > leash_radius" }
+            - { type: "action", do: "reset_to_spawn" }
+            - { type: "action", do: "heal_to_full" }
+            - { type: "action", do: "clear_target" }
+
+        # 5순위: 아무것도 없으면 → 배회
+        - type: "sequence"
+          name: "idle_wander"
+          children:
+            - { type: "action", do: "wander", radius: 5.0 }
+            - { type: "action", do: "wait", duration: [3.0, 8.0] }
+
+    stats_override:
+      attack_range: 2.0
+      attack_cooldown: 2.0
+      detection_radius: 8.0
+      move_speed: 3.0
+
+  # ── 정예 몬스터 ──
+  elite:
+    behavior_tree:
+      type: "selector"
+      children:
+        - type: "sequence"
+          name: "death_check"
+          children:
+            - { type: "condition", check: "hp <= 0" }
+            - { type: "action", do: "play_death_animation" }
+            - { type: "action", do: "drop_loot_elite" }
+            - { type: "action", do: "despawn", delay: 5.0 }
+
+        # 정예: 체력 구간별 행동 변화
+        - type: "sequence"
+          name: "enrage_check"
+          children:
+            - { type: "condition", check: "hp_percent < 30" }
+            - { type: "condition", check: "not enraged" }
+            - { type: "action", do: "play_enrage_animation" }
+            - { type: "action", do: "set_flag", flag: "enraged" }
+            - { type: "action", do: "buff_self", buff: "atk_up_30" }
+            - { type: "action", do: "buff_self", buff: "speed_up_20" }
+
+        - type: "sequence"
+          name: "combat_elite"
+          children:
+            - { type: "condition", check: "has_target" }
+            - type: "selector"
+              children:
+                # 특수 공격 (쿨다운 기반)
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "special_attack_ready" }
+                    - { type: "condition", check: "distance_to_target <= 5.0" }
+                    - type: "random_selector"
+                      children:
+                        - { type: "action", do: "attack", attack_id: "aoe_slam", weight: 0.4 }
+                        - { type: "action", do: "attack", attack_id: "charge_rush", weight: 0.3 }
+                        - { type: "action", do: "attack", attack_id: "roar_debuff", weight: 0.3 }
+                    - { type: "action", do: "set_cooldown", ability: "special", duration: 8.0 }
+
+                # 일반 공격 패턴
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "distance_to_target <= attack_range" }
+                    - type: "random_selector"
+                      children:
+                        - { type: "action", do: "attack", attack_id: "attack_1", weight: 0.5 }
+                        - { type: "action", do: "attack", attack_id: "attack_2", weight: 0.3 }
+                        - { type: "action", do: "attack", attack_id: "attack_3", weight: 0.2 }
+                    - { type: "action", do: "wait", duration: [0.5, 1.5] }
+
+                # 접근
+                - type: "sequence"
+                  children:
+                    - { type: "action", do: "move_to_target" }
+
+        # 감지 + 리셋 + 배회 (일반 몬스터와 동일)
+        - type: "sequence"
+          name: "detect"
+          children:
+            - { type: "condition", check: "player_in_detection_range" }
+            - { type: "action", do: "play_aggro_animation" }
+            - { type: "action", do: "set_target", target: "nearest_player" }
+            - { type: "action", do: "call_for_help", radius: 10.0 }
+
+        - type: "sequence"
+          name: "idle_patrol"
+          children:
+            - { type: "action", do: "patrol", path: "spawn_area_waypoints" }
+
+    stats_override:
+      attack_range: 3.0
+      attack_cooldown: 1.5
+      detection_radius: 12.0
+      move_speed: 4.0
+      special_attack_cooldown: 8.0
+
+  # ── 보스 몬스터 ──
+  boss:
+    behavior_tree:
+      type: "selector"
+      children:
+        # 사망
+        - type: "sequence"
+          name: "death"
+          children:
+            - { type: "condition", check: "hp <= 0" }
+            - { type: "action", do: "stop_all_attacks" }
+            - { type: "action", do: "play_death_cinematic" }
+            - { type: "action", do: "drop_loot_boss" }
+
+        # 페이즈 전환
+        - type: "sequence"
+          name: "phase_transitions"
+          children:
+            - { type: "condition", check: "hp_percent crosses threshold" }
+            - { type: "action", do: "become_invincible" }
+            - { type: "action", do: "play_phase_transition" }
+            - { type: "action", do: "change_attack_pattern" }
+            - { type: "action", do: "become_vulnerable" }
+          thresholds: [70, 40, 15]     # 3단계 페이즈
+
+        # 기믹 패턴 (정해진 주기)
+        - type: "sequence"
+          name: "mechanic_pattern"
+          children:
+            - { type: "condition", check: "mechanic_timer_ready" }
+            - type: "selector"
+              desc: "현재 페이즈에 따라 다른 기믹"
+              children:
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "phase == 1" }
+                    - { type: "action", do: "mechanic", type: "safe_zone" }
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "phase == 2" }
+                    - type: "random_selector"
+                      children:
+                        - { type: "action", do: "mechanic", type: "safe_zone", weight: 0.4 }
+                        - { type: "action", do: "mechanic", type: "stagger_check", weight: 0.3 }
+                        - { type: "action", do: "mechanic", type: "counter", weight: 0.3 }
+                - type: "sequence"
+                  children:
+                    - { type: "condition", check: "phase == 3" }
+                    - type: "random_selector"
+                      children:
+                        - { type: "action", do: "mechanic", type: "typing_qte", weight: 0.25 }
+                        - { type: "action", do: "mechanic", type: "position_swap", weight: 0.25 }
+                        - { type: "action", do: "mechanic", type: "cooperation", weight: 0.25 }
+                        - { type: "action", do: "mechanic", type: "dps_check", weight: 0.25 }
+            - { type: "action", do: "reset_mechanic_timer", duration: [20, 30] }
+
+        # 전투 패턴
+        - type: "sequence"
+          name: "combat_boss"
+          children:
+            - { type: "condition", check: "has_target" }
+            - type: "sequence"
+              name: "attack_rotation"
+              desc: "어그로 1위 타겟 공격"
+              children:
+                - { type: "action", do: "face_target" }
+                - type: "random_selector"
+                  children:
+                    - { type: "action", do: "attack", attack_id: "boss_attack_1", weight: 0.3 }
+                    - { type: "action", do: "attack", attack_id: "boss_attack_2", weight: 0.25 }
+                    - { type: "action", do: "attack", attack_id: "boss_attack_3", weight: 0.2 }
+                    - { type: "action", do: "attack", attack_id: "boss_aoe", weight: 0.15 }
+                    - { type: "action", do: "attack", attack_id: "boss_grab", weight: 0.1 }
+                - { type: "action", do: "wait", duration: [0.5, 2.0] }
+                - type: "selector"
+                  desc: "가끔 타겟 변경"
+                  children:
+                    - type: "sequence"
+                      children:
+                        - { type: "condition", check: "random < 0.2" }
+                        - { type: "action", do: "switch_target", to: "second_aggro" }
+                    - { type: "action", do: "noop" }
+
+    # 보스 기믹 정의
+    mechanics:
+      safe_zone:
+        warning_time: 2.0
+        warning_vfx: "vfx_danger_zone_full"
+        safe_count: 2                  # 안전 지대 2개
+        safe_radius: 3.0
+        damage_outside: "90% max_hp"
+        sound: "sfx_boss_mechanic_alert"
+
+      stagger_check:
+        duration: 10.0
+        stagger_gauge: 1000
+        success: "boss_stagger_3sec"
+        failure: "boss_ultimate_attack"
+        ui: "stagger_bar_display"
+
+      counter:
+        warning_time: 1.0
+        window: 1.5                    # 카운터 가능 구간
+        counter_trigger: "specific_skill"
+        success: "boss_stagger_2sec"
+        failure: "boss_double_damage_attack"
+
+      typing_qte:
+        key_count: 6
+        time_limit: 5.0
+        success: "damage_reduction_50"
+        failure: "unavoidable_damage"
+
+      position_swap:
+        desc: "파티원 위치 교환 → 맞는 자리로 이동"
+        swap_time: 5.0
+        correct_position_indicator: true
+        damage_on_wrong: "50% max_hp"
+
+      cooperation:
+        desc: "2명이 동시에 버튼 상호작용"
+        required_players: 2
+        range: 3.0
+        time_limit: 8.0
+        failure: "wipe_mechanic"
+
+      dps_check:
+        desc: "제한시간 내 일정 데미지 → 실패 시 전멸"
+        hp_threshold: "10%"
+        time_limit: 15.0
+        failure: "instant_wipe"
+
+# ──────────────────────────────────────────────────────────
+# 2. NPC AI
+# ──────────────────────────────────────────────────────────
+npc_ai:
+  # ── 상점 NPC ──
+  shopkeeper:
+    behavior: "stationary"
+    position: "fixed"
+    facing: "toward_player_on_interact"
+    idle_behavior:
+      type: "sequence"
+      children:
+        - { type: "action", do: "play_idle_animation" }
+        - { type: "action", do: "wait", duration: [5, 12] }
+        - type: "random_selector"
+          children:
+            - { type: "action", do: "play_variant_animation", anim: "look_around", weight: 0.4 }
+            - { type: "action", do: "play_variant_animation", anim: "stretch", weight: 0.3 }
+            - { type: "action", do: "play_variant_animation", anim: "yawn", weight: 0.15 }
+            - { type: "action", do: "noop", weight: 0.15 }
+    interaction:
+      trigger: "player_interact"
+      actions:
+        - { type: "action", do: "face_player" }
+        - { type: "action", do: "play_greeting_animation" }
+        - { type: "action", do: "open_shop_ui" }
+
+  # ── 순찰 NPC (경비병) ──
+  patrol_guard:
+    behavior: "patrol"
+    patrol_path:
+      type: "waypoint_loop"
+      waypoints: "defined_per_instance"
+      speed: 2.0
+      wait_at_waypoint: [3.0, 8.0]
+      look_around_at_waypoint: true
+    idle_at_waypoint:
+      type: "random_selector"
+      children:
+        - { type: "action", do: "look_left_right", weight: 0.5 }
+        - { type: "action", do: "idle_stance", weight: 0.3 }
+        - { type: "action", do: "salute_nearby_player", weight: 0.2 }
+    interaction:
+      trigger: "player_interact"
+      actions:
+        - { type: "action", do: "stop_patrol" }
+        - { type: "action", do: "face_player" }
+        - { type: "action", do: "open_dialog" }
+      resume_after: 5.0               # 대화 후 5초 뒤 순찰 재개
+
+  # ── 퀘스트 NPC ──
+  quest_giver:
+    behavior: "stationary"
+    quest_indicator:
+      has_quest: "exclamation_mark_gold"
+      quest_in_progress: "question_mark_grey"
+      quest_complete: "question_mark_gold"
+      indicator_height: 2.5            # 머리 위 2.5m
+      indicator_animation: "bounce_y"
+      visible_distance: 30.0
+
+  # ── 대장장이 NPC ──
+  blacksmith:
+    behavior: "working"
+    work_cycle:
+      type: "sequence"
+      loop: true
+      children:
+        - { type: "action", do: "hammer_anvil", duration: 3.0 }
+        - { type: "action", do: "check_blade", duration: 1.5 }
+        - { type: "action", do: "wipe_sweat", duration: 1.0 }
+        - { type: "action", do: "heat_metal", duration: 2.0 }
+    interrupt_on_interact: true
+    interaction:
+      actions:
+        - { type: "action", do: "open_enhance_ui" }
+
+# ──────────────────────────────────────────────────────────
+# 3. 몬스터 공격 패턴 정의
+# ──────────────────────────────────────────────────────────
+attack_patterns:
+  # 공격 패턴 템플릿
+  basic_attack:
+    animation: "attack_1"
+    damage: "atk * 1.0"
+    range: 2.0
+    aoe: false
+    cast_time: 0.0
+    cooldown: 1.5
+
+  aoe_slam:
+    animation: "aoe_attack"
+    damage: "atk * 1.5"
+    range: 0.0
+    aoe: { shape: "circle", radius: 4.0 }
+    cast_time: 1.0                     # 1초 선딜 (회피 가능)
+    warning_indicator: true
+    warning_color: "#FF000044"
+    cooldown: 8.0
+
+  charge_rush:
+    animation: "charge"
+    damage: "atk * 2.0"
+    range: 12.0                        # 12m 돌진
+    aoe: { shape: "line", width: 2.0, length: 12.0 }
+    cast_time: 0.5
+    warning_indicator: true
+    knockback: 5.0
+    cooldown: 10.0
+
+  roar_debuff:
+    animation: "roar"
+    damage: 0
+    range: 0.0
+    aoe: { shape: "circle", radius: 8.0 }
+    effect: { debuff: "atk_down_20", duration: 5.0 }
+    cast_time: 0.8
+    cooldown: 15.0
+
+  boss_grab:
+    animation: "grab"
+    damage: "atk * 3.0"
+    range: 3.0
+    aoe: false
+    cast_time: 0.8
+    dodge_window: [0.3, 0.8]          # 이 구간에 회피 가능
+    grab_duration: 2.0                 # 잡힌 동안 행동 불가
+    cooldown: 20.0
+
+# ──────────────────────────────────────────────────────────
+# 4. 스폰 시스템
+# ──────────────────────────────────────────────────────────
+spawn_system:
+  # 스폰 규칙
+  rules:
+    respawn_time:
+      normal: [30, 60]                 # 30~60초
+      elite: [300, 600]                # 5~10분
+      boss: [3600, 7200]               # 1~2시간
+      field_boss: 7200                 # 2시간 고정
+
+    max_per_area: 20                   # 구역당 최대 20마리
+    min_distance_from_player: 15.0     # 플레이어 15m 내 스폰 X
+    spawn_animation: true
+    spawn_invincible: 1.0              # 스폰 후 1초 무적
+
+  # 야간 스폰 보너스
+  night_bonus:
+    spawn_rate_mult: 1.2               # 20% 더 스폰
+    special_monsters: true
+    night_only_list: ["shadow_wolf", "night_wraith", "phantom"]
+
+  # 존별 스폰 테이블
+  spawn_tables:
+    grass_plain:
+      - { monster: "slime", weight: 0.4, count: [2, 4] }
+      - { monster: "goblin", weight: 0.3, count: [1, 3] }
+      - { monster: "wolf", weight: 0.2, count: [1, 2] }
+      - { monster: "bear", weight: 0.1, count: [1, 1] }
+
+    frozen_peak:
+      - { monster: "ice_golem", weight: 0.35, count: [1, 2] }
+      - { monster: "frost_wolf", weight: 0.35, count: [2, 3] }
+      - { monster: "yeti", weight: 0.2, count: [1, 1] }
+      - { monster: "ice_queen_elite", weight: 0.1, count: [1, 1], type: "elite" }
+
+# ──────────────────────────────────────────────────────────
+# 5. 패스파인딩 설정
+# ──────────────────────────────────────────────────────────
+pathfinding:
+  system: "unity_navmesh"
+  agent_types:
+    small:
+      radius: 0.3
+      height: 1.0
+      step_height: 0.3
+      max_slope: 45
+      speed: 3.0
+    medium:
+      radius: 0.5
+      height: 2.0
+      step_height: 0.4
+      max_slope: 40
+      speed: 4.0
+    large:
+      radius: 1.5
+      height: 4.0
+      step_height: 0.5
+      max_slope: 30
+      speed: 3.5
+    boss:
+      radius: 3.0
+      height: 6.0
+      step_height: 1.0
+      max_slope: 20
+      speed: 3.0
+
+  avoidance:
+    enabled: true
+    priority_by_type:
+      player: 50
+      normal_monster: 30
+      elite_monster: 40
+      boss: 99                         # 보스는 회피 안 함
+      npc: 60
+
+  path_recalculation:
+    interval: 0.5                      # 0.5초마다 경로 재계산
+    distance_threshold: 2.0            # 타겟이 2m 이상 이동 시 즉시 재계산

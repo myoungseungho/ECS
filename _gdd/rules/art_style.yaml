@@ -1,0 +1,489 @@
+# ============================================================
+# ART STYLE GUIDE — 비주얼 아이덴티티/셰이더/라이팅 완전 정의
+# Reference: Lost Ark / Genshin Impact / Diablo 4
+# ============================================================
+# Unity URP (Universal Render Pipeline) 기반
+# 스타일리시 리얼리즘 (Stylized Realism)
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 아트 디렉션 총론
+# ──────────────────────────────────────────────────────────
+art_direction:
+  style: "stylized_realism"
+  desc: |
+    사실적인 비율과 질감을 기반으로 하되,
+    색감과 라이팅에서 약간의 과장과 판타지적 분위기를 더한다.
+    로아/디아블로4의 중간 톤. 만화적이지 않고 사실적이되,
+    다크소울처럼 지나치게 어둡지도 않다.
+
+  color_philosophy:
+    primary: "따뜻한 자연 톤 (초원, 마을) ↔ 차가운 어둠 톤 (던전, 마왕)"
+    contrast: "안전 지역은 밝고 따뜻하게, 위험 지역은 어둡고 차갑게"
+    saturation: "약간 높은 채도 (현실보다 10~20% 높게)"
+    readability: "적은 빨강, 아이템 등급은 고채도, 환경은 중채도"
+
+  proportions:
+    character_height: "7.5등신 (리얼리즘)"
+    weapon_scale: "실제보다 15% 과장"
+    monster_scale: "소형 0.5~1m, 중형 2~3m, 보스 5~15m"
+    environment_scale: "현실 기준, 건물은 10% 과장"
+
+# ──────────────────────────────────────────────────────────
+# 1. 색상 팔레트
+# ──────────────────────────────────────────────────────────
+color_palettes:
+  # 존별 메인 팔레트
+  zones:
+    tutorial:
+      primary: "#7CB342"               # 밝은 녹색
+      secondary: "#FFE082"             # 따뜻한 노랑
+      accent: "#81D4FA"                # 하늘 파랑
+      sky: "#87CEEB"
+      ground: "#8D6E63"
+      mood: "희망적이고 평화로운"
+
+    wind_village:
+      primary: "#8D6E63"               # 나무/흙 갈색
+      secondary: "#A5D6A7"             # 부드러운 녹색
+      accent: "#FFD54F"                # 따뜻한 금색
+      sky: "#87CEEB"
+      ground: "#795548"
+      mood: "따뜻하고 활기찬"
+
+    grass_plain:
+      primary: "#66BB6A"               # 풀색
+      secondary: "#FFF176"             # 햇빛 노랑
+      accent: "#42A5F5"                # 맑은 파랑
+      sky: "#64B5F6"
+      ground: "#6D4C41"
+      mood: "넓고 모험적인"
+
+    sapphire_coast:
+      primary: "#29B6F6"               # 바다 파랑
+      secondary: "#FFE0B2"             # 모래 베이지
+      accent: "#FF7043"                # 산호 주황
+      sky: "#4FC3F7"
+      ground: "#D7CCC8"
+      mood: "시원하고 상쾌한"
+
+    frozen_peak:
+      primary: "#E3F2FD"               # 빙하 흰파랑
+      secondary: "#90CAF9"             # 차가운 파랑
+      accent: "#7E57C2"                # 신비로운 보라
+      sky: "#B0BEC5"
+      ground: "#ECEFF1"
+      mood: "고요하고 장엄한"
+
+    fire_desert:
+      primary: "#FF8A65"               # 사막 주황
+      secondary: "#FFD54F"             # 모래 노랑
+      accent: "#D32F2F"                # 위험 빨강
+      sky: "#FFAB91"
+      ground: "#BF360C"
+      mood: "뜨겁고 위협적인"
+
+    volcanic_zone:
+      primary: "#D32F2F"               # 용암 빨강
+      secondary: "#FF6D00"             # 불꽃 주황
+      accent: "#212121"                # 화산암 검정
+      sky: "#424242"
+      ground: "#37474F"
+      mood: "파괴적이고 위험한"
+
+    demon_territory:
+      primary: "#311B92"               # 짙은 보라
+      secondary: "#880E4F"             # 어둠 자주
+      accent: "#76FF03"                # 독 녹색 (위험 신호)
+      sky: "#1A237E"
+      ground: "#263238"
+      mood: "암울하고 사악한"
+
+    ancient_ruins:
+      primary: "#546E7A"               # 낡은 돌
+      secondary: "#FFD600"             # 고대 금색
+      accent: "#00E5FF"                # 신비로운 시안
+      sky: "#37474F"
+      ground: "#455A64"
+      mood: "신비롭고 경이로운"
+
+    void_rift:
+      primary: "#4A148C"               # 깊은 보라
+      secondary: "#00BFA5"             # 시공간 시안
+      accent: "#FF1744"                # 카오스 빨강
+      sky: "#000000"
+      ground: "#1A237E"
+      mood: "카오스적이고 불안한"
+
+  # 시간대별 색온도
+  time_of_day:
+    dawn:
+      temperature_shift: 0             # 따뜻한 톤
+      saturation_mult: 0.9
+      sky_gradient: ["#FF8A65", "#FFE082", "#87CEEB"]
+    day:
+      temperature_shift: 0
+      saturation_mult: 1.0
+      sky_gradient: ["#64B5F6", "#87CEEB", "#E3F2FD"]
+    sunset:
+      temperature_shift: 20            # 매우 따뜻한 톤
+      saturation_mult: 1.1
+      sky_gradient: ["#D32F2F", "#FF6D00", "#311B92"]
+    night:
+      temperature_shift: -20           # 차가운 톤
+      saturation_mult: 0.7
+      sky_gradient: ["#0D47A1", "#1A237E", "#000051"]
+
+# ──────────────────────────────────────────────────────────
+# 2. 셰이더 정의
+# ──────────────────────────────────────────────────────────
+shaders:
+  # 캐릭터 셰이더
+  character:
+    name: "Shader_Character"
+    base: "URP/Lit"
+    properties:
+      _MainTex: "알베도 텍스처"
+      _NormalMap: "노멀맵"
+      _MetallicGlossMap: "메탈릭/스무스니스"
+      _EmissionMap: "발광 맵 (눈, 마법 효과)"
+      _RimColor: { desc: "림 라이트", default: "#FFFFFF33" }
+      _RimPower: { desc: "림 강도", default: 3.0 }
+      _OutlineWidth: { desc: "외곽선 두께", default: 0.002 }
+      _OutlineColor: { desc: "외곽선 색", default: "#00000088" }
+      _TintColor: { desc: "오버레이 색 (피격, 버프)", default: "#FFFFFF00" }
+    features:
+      rim_light: true                  # 캐릭터 외곽 하이라이트
+      thin_outline: true               # 얇은 외곽선 (가독성)
+      emission_pulse: true             # 발광 맵 펄스 (마법 효과)
+      hit_flash: true                  # 피격 시 하얀 플래시
+
+  # 장비 셰이더
+  equipment:
+    name: "Shader_Equipment"
+    base: "URP/Lit"
+    properties:
+      _MainTex: "알베도"
+      _NormalMap: "노멀맵"
+      _MetallicGlossMap: "메탈릭"
+      _EmissionMap: "발광 (강화 이펙트)"
+      _EnhanceLevel: { desc: "강화 레벨 (0~20)", type: "int" }
+      _EnhanceGlow: { desc: "강화 발광 강도", default: 0 }
+    enhance_visual:
+      0_4: { glow: 0, color: "none" }
+      5_9: { glow: 0.3, color: "#FFFFFF22" }
+      10_14: { glow: 0.6, color: "#3498DB33" }
+      15_19: { glow: 1.0, color: "#A335EE44" }
+      20: { glow: 1.5, color: "#FF800055", particle: true }
+
+  # 환경 셰이더
+  environment:
+    terrain:
+      name: "Shader_Terrain"
+      base: "URP/Terrain/Lit"
+      features:
+        texture_splatting: 4           # 4개 텍스처 블렌딩
+        triplanar: true                # 절벽 텍스처 깨짐 방지
+        detail_texture: true
+        snow_coverage: "height_based"  # 높은 곳에 눈
+
+    water:
+      name: "Shader_Water"
+      properties:
+        _ShallowColor: "#29B6F680"
+        _DeepColor: "#0D47A1B0"
+        _WaveSpeed: 0.5
+        _WaveHeight: 0.05
+        _Refraction: 0.05
+        _ReflectionIntensity: 0.3
+        _FoamTexture: "foam_noise"
+        _FoamThreshold: 0.8
+      features:
+        depth_color: true              # 깊을수록 짙은 색
+        caustics: true                 # 수면 코스틱
+        reflection: "planar"           # 평면 반사
+        foam: true                     # 가장자리 거품
+
+    foliage:
+      name: "Shader_Foliage"
+      features:
+        subsurface_scattering: true    # 잎사귀 빛 투과
+        wind_animation: true           # 바람에 흔들림
+        alpha_cutout: true
+
+  # 특수 이펙트 셰이더
+  effects:
+    dissolve:
+      name: "Shader_Dissolve"
+      desc: "몬스터 사망 시 녹아내림"
+      properties:
+        _DissolveAmount: { range: [0, 1], desc: "녹아내림 정도" }
+        _EdgeColor: "#FF4400"
+        _EdgeWidth: 0.05
+        _NoiseTexture: "dissolve_noise"
+
+    portal:
+      name: "Shader_Portal"
+      desc: "포탈/워프 이펙트"
+      properties:
+        _DistortionStrength: 0.1
+        _SwirlSpeed: 2.0
+        _SwirlTexture: "portal_swirl"
+        _EdgeGlow: "#3498DB"
+
+    force_field:
+      name: "Shader_ForceField"
+      desc: "보호막/결계"
+      properties:
+        _FresnelPower: 3.0
+        _Color: "#3498DB44"
+        _PatternTexture: "hex_pattern"
+        _AnimSpeed: 1.0
+
+# ──────────────────────────────────────────────────────────
+# 3. 라이팅 설정
+# ──────────────────────────────────────────────────────────
+lighting:
+  # 글로벌 라이팅
+  global:
+    render_pipeline: "URP"
+    hdr: true
+    color_space: "linear"
+
+  # 방향광 (태양)
+  directional_light:
+    rotation: [50, -30, 0]             # 쿼터뷰 최적 각도
+    intensity: 1.2
+    color: "dynamic"                   # 시간대별 변경
+    shadow:
+      type: "soft"
+      resolution: 2048
+      distance: 50
+      cascade_count: 4
+      cascade_splits: [0.05, 0.15, 0.3, 1.0]
+
+  # 시간대별 라이팅
+  time_lighting:
+    dawn:
+      sun_color: "#FFE4B5"
+      sun_intensity: 0.6
+      ambient_color: "#FFE4B5"
+      ambient_intensity: 0.4
+      fog_color: "#FFE4B5"
+      fog_density: 0.01
+
+    day:
+      sun_color: "#FFFACD"
+      sun_intensity: 1.2
+      ambient_color: "#E8EAF6"
+      ambient_intensity: 0.6
+      fog_color: "#B0BEC5"
+      fog_density: 0.005
+
+    sunset:
+      sun_color: "#FF8C00"
+      sun_intensity: 0.8
+      ambient_color: "#FF6F00"
+      ambient_intensity: 0.3
+      fog_color: "#BF360C"
+      fog_density: 0.015
+
+    night:
+      sun_color: "#4A6FA5"             # 달빛
+      sun_intensity: 0.15
+      ambient_color: "#1A237E"
+      ambient_intensity: 0.1
+      fog_color: "#0D1B2A"
+      fog_density: 0.02
+      moon:
+        color: "#E8EAF6"
+        intensity: 0.3
+
+  # 존별 라이팅 오버라이드
+  zone_lighting:
+    dungeon:
+      sun_intensity: 0.0               # 태양 없음
+      ambient_intensity: 0.15
+      ambient_color: "#263238"
+      point_lights: "torch_based"      # 횃불만 광원
+      fog: { color: "#1A1A2E", density: 0.03 }
+
+    volcanic:
+      ambient_color: "#BF360C"
+      fog: { color: "#4E342E", density: 0.02 }
+      lava_light:
+        color: "#FF6D00"
+        intensity: 2.0
+        range: 15.0
+        flicker: true
+
+    void_rift:
+      sun_intensity: 0.0
+      ambient_color: "#4A148C"
+      ambient_intensity: 0.1
+      fog: { color: "#1A0033", density: 0.04 }
+      pulsing_light:
+        color: "#00BFA5"
+        intensity: [0.5, 2.0]
+        speed: 0.5
+
+  # 포인트 라이트 프리셋
+  point_light_presets:
+    torch:
+      color: "#FF8800"
+      intensity: 2.0
+      range: 8.0
+      flicker: true
+      flicker_speed: 5.0
+      flicker_amount: 0.3
+      shadow: true
+
+    campfire:
+      color: "#FF6D00"
+      intensity: 3.0
+      range: 12.0
+      flicker: true
+
+    crystal:
+      color: "#00E5FF"
+      intensity: 1.5
+      range: 6.0
+      pulse: true
+      pulse_speed: 2.0
+
+    magic:
+      color: "#7C4DFF"
+      intensity: 2.0
+      range: 5.0
+
+# ──────────────────────────────────────────────────────────
+# 4. 포스트 프로세싱
+# ──────────────────────────────────────────────────────────
+post_processing:
+  # 글로벌 볼륨 (항상 적용)
+  global_volume:
+    bloom:
+      intensity: 0.3
+      threshold: 0.9
+      scatter: 0.7
+    tone_mapping:
+      mode: "ACES"
+    color_adjustments:
+      post_exposure: 0.0
+      contrast: 10
+      saturation: 10
+    vignette:
+      intensity: 0.2
+      smoothness: 0.5
+    ambient_occlusion:
+      intensity: 0.5
+      radius: 0.3
+
+  # 존별 오버라이드
+  zone_overrides:
+    frozen_peak:
+      color_adjustments:
+        temperature: -15
+        saturation: -10
+      bloom:
+        intensity: 0.5                 # 눈 반사 강화
+
+    fire_desert:
+      color_adjustments:
+        temperature: 15
+        saturation: 5
+      lens_distortion:
+        intensity: -0.1               # 열기 왜곡
+
+    demon_territory:
+      color_adjustments:
+        contrast: 20
+        saturation: -20
+      film_grain:
+        intensity: 0.1
+      vignette:
+        intensity: 0.4
+
+# ──────────────────────────────────────────────────────────
+# 5. 텍스처 & 모델 스펙
+# ──────────────────────────────────────────────────────────
+asset_specs:
+  textures:
+    character:
+      albedo: { size: 2048, format: "BC7" }
+      normal: { size: 2048, format: "BC5" }
+      metallic_smoothness: { size: 1024, format: "BC7" }
+      emission: { size: 512, format: "BC7" }
+
+    environment:
+      terrain: { size: 2048, format: "BC7", tiling: true }
+      props: { size: 1024, format: "BC7" }
+      detail: { size: 512, format: "BC7", tiling: true }
+
+    ui:
+      sprites: { format: "RGBA32", atlas: true, max_atlas: 4096 }
+      icons: { size: 128, format: "RGBA32" }
+
+  models:
+    player_character:
+      triangles: [15000, 25000]        # 1.5~2.5만 폴리곤
+      bones: 65                        # Mixamo 표준
+      lod_levels: 3
+      lod_distances: [15, 30, 50]
+
+    npc:
+      triangles: [8000, 15000]
+      bones: 65
+      lod_levels: 2
+
+    monster_normal:
+      triangles: [5000, 10000]
+      lod_levels: 2
+
+    monster_boss:
+      triangles: [30000, 50000]
+      bones: 80
+      lod_levels: 2
+
+    environment_prop:
+      triangles: [500, 5000]
+      lod_levels: 2
+
+  # LOD 설정
+  lod:
+    bias: 1.0
+    cross_fade: true
+    cross_fade_duration: 0.5
+
+# ──────────────────────────────────────────────────────────
+# 6. UI 아트 스타일
+# ──────────────────────────────────────────────────────────
+ui_art:
+  style: "dark_fantasy_flat"
+  desc: "어두운 톤의 플랫 디자인 + 금색 장식 라인"
+
+  panel:
+    background: "#16213ECC"            # 반투명 남색
+    border: "#3A3A5C"                  # 은회색
+    border_width: 1
+    corner_radius: 4
+    header_accent: "#FFD70033"         # 금색 액센트 라인
+
+  button:
+    normal: "#2980B9"
+    hover: "#3498DB"
+    pressed: "#1A5276"
+    disabled: "#4A4A5A"
+    corner_radius: 4
+    border: "#FFFFFF22"
+
+  icon_style:
+    background: "rounded_square"
+    rarity_glow: true
+    shadow: { offset: [2, -2], color: "#00000066" }
+
+  scroll_bar:
+    width: 6
+    thumb_color: "#5A5A8C"
+    track_color: "#1A1A2E"
+    corner_radius: 3

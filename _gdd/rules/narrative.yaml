@@ -1,0 +1,407 @@
+# ============================================================
+# NARRATIVE SYSTEM — 스토리/대사/컷씬 완전 정의
+# Reference: Lost Ark / Final Fantasy XIV / Genshin Impact
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 세계관 설정
+# ──────────────────────────────────────────────────────────
+lore:
+  world_name: "아르카디아"
+  premise: |
+    태초에 여섯 원소(불, 얼음, 번개, 어둠, 신성, 자연)의 신들이
+    아르카디아 대륙을 창조했다. 수천 년간 평화가 이어졌으나,
+    어둠의 신 '니힐'이 다른 신들을 배신하고 마계의 문을 열었다.
+    다섯 신이 목숨을 바쳐 니힐을 봉인했지만, 봉인이 약해지고 있다.
+    플레이어는 평범한 마을 출신의 모험가로, 봉인이 깨지기 전에
+    고대의 유물을 모아 다시 봉인해야 한다.
+
+  factions:
+    guardians:
+      name: "수호자 기사단"
+      desc: "봉인을 지키는 신성 기사단"
+      alignment: "lawful_good"
+    merchant_league:
+      name: "상인 연합"
+      desc: "대륙 무역을 독점하는 상인 집단"
+      alignment: "neutral"
+    shadow_cult:
+      name: "그림자 결사"
+      desc: "니힐의 부활을 꿈꾸는 비밀 조직"
+      alignment: "chaotic_evil"
+    free_explorers:
+      name: "자유 탐험가"
+      desc: "고대 유적을 연구하는 학자 집단"
+      alignment: "neutral_good"
+
+# ──────────────────────────────────────────────────────────
+# 1. 주요 NPC 프로필
+# ──────────────────────────────────────────────────────────
+characters:
+  player:
+    name: "(유저 입력)"
+    role: "봉인의 계승자"
+    desc: "바람의 마을 출신 평범한 모험가. 고대 유물에 반응하는 특별한 힘을 가짐."
+
+  elara:
+    name: "엘라라"
+    title: "바람의 마을 촌장"
+    age: 60
+    personality: "온화하지만 단호한 지도자"
+    appearance: "백발, 녹색 로브, 지팡이"
+    role: "튜토리얼 가이드 + 챕터1 퀘스트 부여"
+    voice_tone: "할머니 같은 따뜻함"
+    key_lines:
+      greeting: "어서 오거라, 젊은이. 네가 올 줄 알고 있었단다."
+      quest_give: "마을 밖에 고블린이 나타났어. 조심하거라."
+      farewell: "큰 운명이 널 기다리고 있어. 조심히 가거라."
+
+  kael:
+    name: "카엘"
+    title: "수호자 기사단장"
+    age: 35
+    personality: "정의감 넘치지만 융통성 없음"
+    appearance: "은색 갑옷, 금발 단발, 검"
+    role: "메인 스토리 동행 NPC, 챕터2~3 핵심"
+    voice_tone: "카리스마 있는 군인"
+    key_lines:
+      first_meet: "수호자 기사단의 카엘이다. 네 이름이 기사단에까지 알려졌더군."
+      battle_cry: "물러서지 마라! 이 봉인은 반드시 지킨다!"
+      betrayal_reveal: "믿었던 자에게 배신당하는 것... 이 고통을 알겠나."
+
+  mira:
+    name: "미라"
+    title: "자유 탐험가 연구원"
+    age: 25
+    personality: "호기심 많고 수다스러움"
+    appearance: "갈색 포니테일, 안경, 가방 가득 책"
+    role: "고대 유적 관련 퀘스트 가이드, 로어 설명"
+    voice_tone: "밝고 빠른 말투"
+    key_lines:
+      excited: "이게... 이게 진짜 고대의 룬이야?! 대박대박대박!"
+      explain: "이 유적은 1차 봉인전쟁 때 만들어진 거야. 무려 3천 년 전!"
+
+  shadow_lord:
+    name: "그림자 군주 발쿠스"
+    title: "그림자 결사 수장"
+    age: "불명"
+    personality: "냉소적이고 계산적"
+    appearance: "검은 로브, 얼굴 반쪽 가면, 붉은 눈"
+    role: "챕터1~3 악역, 챕터4에서 진짜 위협 드러남"
+    voice_tone: "저음의 차가운 목소리"
+    key_lines:
+      taunt: "인간의 저항이라... 재밌군."
+      reveal: "나는 그저 문을 열 뿐이다. 진정한 공포는 문 너머에 있다."
+
+# ──────────────────────────────────────────────────────────
+# 2. 메인 퀘스트 대사 스크립트
+# ──────────────────────────────────────────────────────────
+main_quest_dialogs:
+  # ── 챕터 1: 모험의 시작 ──
+  chapter_1:
+    # 퀘스트 MQ001: 마을의 위기
+    MQ001_start:
+      quest_name: "마을의 위기"
+      location: "바람의 마을 광장"
+      npc: "elara"
+      dialog:
+        - speaker: "elara"
+          portrait: "elara_worried"
+          lines:
+            - "젊은이, 큰일이 났어."
+            - "마을 밖 초원에서 고블린 무리가 나타났단다."
+            - "예전엔 이렇지 않았는데... 요즘 들어 마물이 부쩍 늘었어."
+        - speaker: "player"
+          choices:
+            - { text: "제가 처리하겠습니다.", next: "accept" }
+            - { text: "왜 갑자기 몬스터가 늘었나요?", next: "lore_hint" }
+        - id: "lore_hint"
+          speaker: "elara"
+          portrait: "elara_serious"
+          lines:
+            - "글쎄... 옛 전설에 의하면, 대봉인이 약해질 때 마물이 늘어난다고 하더구나."
+            - "설마 그건 아니겠지... 아무튼, 먼저 고블린부터 처리해주겠니?"
+        - id: "accept"
+          speaker: "elara"
+          lines:
+            - "고마워! 초원의 고블린 10마리를 처치하고 오거라."
+          quest_accept: true
+          objectives:
+            - { type: "kill", target: "goblin", count: 10 }
+
+    MQ001_complete:
+      npc: "elara"
+      dialog:
+        - speaker: "elara"
+          portrait: "elara_happy"
+          lines:
+            - "잘했어! 역시 보통 젊은이가 아니구나."
+            - "그런데... 고블린 야영지에서 이상한 걸 발견하지 않았니?"
+        - speaker: "player"
+          lines:
+            - "(어둠의 부적을 건넨다)"
+        - speaker: "elara"
+          portrait: "elara_shocked"
+          lines:
+            - "이건...! 어둠의 마법 부적이야!"
+            - "누군가가 의도적으로 마물을 몰고 온 거란 말인가..."
+            - "젊은이, 이 마을은 네가 지켜줘야 해. 더 큰 일이 벌어질 것 같구나."
+          quest_complete: true
+          rewards:
+            exp: 500
+            gold: 200
+            item: "iron_sword"
+          unlock_quest: "MQ002"
+
+    # 퀘스트 MQ002: 동굴의 비밀
+    MQ002_start:
+      quest_name: "동굴의 비밀"
+      npc: "elara"
+      dialog:
+        - speaker: "elara"
+          lines:
+            - "어둠의 부적이 어디서 온 건지 알아야 해."
+            - "초원 동쪽에 오래된 동굴이 있어. 거기서 뭔가 감지되고 있단다."
+        - speaker: "system"
+          text: "[첫 번째 던전 '고블린 동굴'이 해금되었습니다!]"
+          color: "#FFD700"
+      objectives:
+        - { type: "dungeon_clear", dungeon: "goblin_cave", difficulty: "normal" }
+
+    # 챕터1 클라이맥스: 고블린 족장 보스
+    MQ005_boss:
+      quest_name: "동굴의 심장"
+      location: "고블린 동굴 최심부"
+      pre_boss_dialog:
+        - speaker: "narrator"
+          text: "[동굴 깊은 곳에서 어둠의 기운이 느껴진다...]"
+        - speaker: "goblin_chief"
+          portrait: "goblin_chief_angry"
+          lines:
+            - "크카카! 인간이 여기까지 왔다고?"
+            - "어둠의 주인님이 주신 힘을 보여주마!"
+      post_boss_dialog:
+        - speaker: "narrator"
+          text: "[고블린 족장을 쓰러뜨렸다. 뒤에 고대의 제단이 보인다.]"
+        - speaker: "player"
+          lines:
+            - "(제단에서 빛나는 돌을 발견한다)"
+        - speaker: "system"
+          text: "[봉인석 파편 1/5 획득]"
+          color: "#FF8000"
+        - speaker: "narrator"
+          lines:
+            - "이 돌이 전설 속 봉인석의 파편인 걸까?"
+            - "엘라라 촌장에게 가져가 보자."
+          unlock_chapter: 2
+
+  # ── 챕터 2: 어둠의 그림자 (개요) ──
+  chapter_2:
+    MQ010_start:
+      quest_name: "기사단의 부름"
+      npc: "kael"
+      location: "항구 도시 아쿠아"
+      dialog:
+        - speaker: "kael"
+          portrait: "kael_serious"
+          lines:
+            - "수호자 기사단의 카엘이다."
+            - "네가 봉인석 파편을 찾았다는 소식을 들었다."
+            - "지금 대봉인이 서서히 약해지고 있어. 나머지 4개의 파편을 찾아야 한다."
+        - speaker: "player"
+          choices:
+            - { text: "함께 찾겠습니다.", next: "accept" }
+            - { text: "대봉인이 뭔가요?", next: "explain_seal" }
+        - id: "explain_seal"
+          speaker: "kael"
+          lines:
+            - "3천 년 전, 다섯 신이 어둠의 신 니힐을 봉인했다."
+            - "봉인석 5개가 대봉인을 유지하고 있지만, 누군가가 파편을 흩뜨렸어."
+            - "파편이 모두 모이지 않으면... 니힐이 부활한다."
+
+  # ── 챕터 3: 전쟁의 서막 (개요) ──
+  chapter_3:
+    MQ030_climax:
+      quest_name: "마왕성 돌입"
+      pre_battle_dialog:
+        - speaker: "kael"
+          portrait: "kael_determined"
+          lines:
+            - "여기가 마왕의 요새다. 봉인석 4번째 파편이 여기 있다."
+            - "각오해라. 쉬운 싸움이 아닐 거다."
+        - speaker: "mira"
+          portrait: "mira_nervous"
+          lines:
+            - "연구 자료에 의하면 이 요새는 1차 봉인전쟁 때 건설된 거야."
+            - "내부에 고대 함정이 남아있을 수 있으니 조심해!"
+
+  # ── 챕터 4: 고대의 비밀 (엔딩) ──
+  chapter_4:
+    MQ045_twist:
+      quest_name: "진실"
+      dialog:
+        - speaker: "shadow_lord"
+          portrait: "valkus_reveal"
+          lines:
+            - "하하하... 봉인석을 모두 모았군."
+            - "고맙다. 네 덕분에 봉인을 '다시 걸' 준비가 됐어."
+        - speaker: "player"
+          lines:
+            - "무슨 뜻이지...?"
+        - speaker: "shadow_lord"
+          lines:
+            - "니힐은 이미 부활했다. 5년 전에."
+            - "내가 봉인석을 흩뜨린 건, 네가 모아서 더 강력한 봉인을 만들게 하려는 것이었지."
+            - "나는... 니힐에게서 이 세상을 지키는 자다. 방법이 잔인했을 뿐."
+        - speaker: "narrator"
+          text: "[그림자 군주 발쿠스의 진짜 정체가 밝혀졌다]"
+
+# ──────────────────────────────────────────────────────────
+# 3. 서브 퀘스트 대사 템플릿
+# ──────────────────────────────────────────────────────────
+side_quest_templates:
+  # 기본 심부름형
+  fetch_quest:
+    dialog_pattern:
+      start:
+        - "{npc_name}: {problem_description}"
+        - "{npc_name}: {item_name} {count}개만 구해다 주면 안 되겠나?"
+      progress:
+        - "{npc_name}: {item_name}은 구했나? {current}/{count}개야."
+      complete:
+        - "{npc_name}: 고맙네! 이걸로 {resolution}. 여기 보상이야."
+
+  # 호위형
+  escort_quest:
+    dialog_pattern:
+      start:
+        - "{npc_name}: {destination}까지 가야 하는데, 길이 위험해서 혼자는 못 가겠어."
+        - "{npc_name}: 호위해줄 수 있겠나?"
+      during:
+        - "{npc_name}: 저기 몬스터다! 조심해!"
+        - "{npc_name}: 거의 다 왔어, 조금만 더!"
+      complete:
+        - "{npc_name}: 덕분에 무사히 도착했어. 정말 고맙네!"
+
+  # 토벌형
+  kill_quest:
+    dialog_pattern:
+      start:
+        - "{npc_name}: {monster_name}이 {area}에 너무 많아졌어."
+        - "{npc_name}: {count}마리만 처치해주면 마을이 안전해질 거야."
+      complete:
+        - "{npc_name}: 덕분에 안심이야! 여기 약소하지만 받아줘."
+
+# ──────────────────────────────────────────────────────────
+# 4. 컷씬 스크립트
+# ──────────────────────────────────────────────────────────
+cutscenes:
+  # 게임 오프닝
+  opening:
+    trigger: "first_login"
+    skip: true
+    duration: 60                       # 60초
+    sequence:
+      - { time: 0, camera: "establishing_shot", target: "world_overview" }
+      - { time: 0, bgm: "bgm_opening_epic" }
+      - { time: 0, narration: "태초에 여섯 원소의 신들이 이 땅을 창조했다." }
+      - { time: 5, camera: "pan", from: "sky", to: "continent" }
+      - { time: 5, narration: "수천 년간 평화가 이어졌으나..." }
+      - { time: 10, vfx: "dark_sky", camera: "shake_light" }
+      - { time: 10, narration: "어둠의 신 니힐이 마계의 문을 열었다." }
+      - { time: 15, camera: "battle_scene", vfx: "war_panorama" }
+      - { time: 15, narration: "다섯 신이 목숨을 바쳐 니힐을 봉인했다." }
+      - { time: 25, camera: "close_up", target: "seal_stone" }
+      - { time: 25, narration: "다섯 봉인석이 대봉인을 유지하고 있었다." }
+      - { time: 30, camera: "fade_to_black" }
+      - { time: 32, camera: "fade_in", target: "village_morning" }
+      - { time: 32, narration: "3천 년이 흐른 지금..." }
+      - { time: 35, camera: "close_up", target: "player_sleeping" }
+      - { time: 38, sfx: "sfx_rooster_crow" }
+      - { time: 38, narration: "이름 없는 모험가의 이야기가 시작된다." }
+      - { time: 42, camera: "zoom_out", transition: "gameplay" }
+      - { time: 42, text: "Chapter 1: 모험의 시작", font_size: 48, duration: 4.0 }
+
+  # 보스 등장
+  boss_intro_template:
+    trigger: "boss_room_enter"
+    skip: true
+    duration: 8
+    sequence:
+      - { time: 0, player_control: false }
+      - { time: 0, camera: "crane_shot", target: "boss" }
+      - { time: 0, bgm_fade: 0.5 }
+      - { time: 1, camera: "close_up", target: "boss_face" }
+      - { time: 1.5, boss_animation: "intro_roar" }
+      - { time: 1.5, sfx: "sfx_boss_roar" }
+      - { time: 3, camera: "establishing_shot", include: ["boss", "player_party"] }
+      - { time: 3, nameplate: { name: "{boss_name}", title: "{boss_title}", animation: "slide_in" } }
+      - { time: 5, bgm: "bgm_boss_phase1" }
+      - { time: 6, camera: "return_to_gameplay" }
+      - { time: 6, player_control: true }
+
+  # 챕터 전환
+  chapter_transition:
+    trigger: "chapter_complete"
+    duration: 10
+    sequence:
+      - { time: 0, camera: "fade_to_black" }
+      - { time: 1, text: "Chapter {n} Complete", duration: 3, font_size: 40 }
+      - { time: 4, text: "{chapter_title}", duration: 3, font_size: 48, color: "#FFD700" }
+      - { time: 7, camera: "fade_in" }
+
+# ──────────────────────────────────────────────────────────
+# 5. 시스템 메시지 / 팁
+# ──────────────────────────────────────────────────────────
+system_texts:
+  # 로딩 화면 팁
+  loading_tips:
+    - "Shift를 누르면 달릴 수 있습니다. 스태미나 소모에 주의하세요."
+    - "장비 강화는 대장장이 NPC에서 할 수 있습니다."
+    - "던전은 파티를 구성하면 더 쉽게 클리어할 수 있습니다."
+    - "엘리트 몬스터는 일반 몬스터보다 훨씬 강하지만, 좋은 아이템을 줍니다."
+    - "밤이 되면 특수한 몬스터가 출현합니다."
+    - "채집은 에너지를 소모합니다. 에너지는 시간이 지나면 회복됩니다."
+    - "죽으면 내구도가 10% 감소합니다. 수리 비용에 주의하세요."
+    - "경매장에서 다른 플레이어의 아이템을 구매할 수 있습니다."
+    - "길드에 가입하면 길드 버프를 받을 수 있습니다."
+    - "도감을 채우면 영구적인 스탯 보너스를 받습니다."
+    - "보스의 빨간색 범위 표시를 피하세요!"
+    - "상점에서 귀환 주문서를 구매하면 마을로 즉시 돌아갈 수 있습니다."
+    - "스킬 레벨을 올리면 데미지와 효과가 증가합니다."
+    - "트라이포드를 설정하면 스킬을 커스터마이즈할 수 있습니다."
+    - "PvP 아레나에서 승리하면 시즌 보상을 받을 수 있습니다."
+
+  # UI 텍스트
+  ui_texts:
+    confirm: "확인"
+    cancel: "취소"
+    close: "닫기"
+    accept: "수락"
+    decline: "거절"
+    buy: "구매"
+    sell: "판매"
+    equip: "장착"
+    unequip: "해제"
+    enhance: "강화"
+    craft: "제작"
+    use: "사용"
+    discard: "버리기"
+    sort: "정렬"
+    search: "검색"
+    not_enough_gold: "골드가 부족합니다."
+    not_enough_level: "레벨이 부족합니다."
+    inventory_full: "인벤토리가 가득 찼습니다."
+    quest_complete: "퀘스트 완료!"
+    level_up: "레벨 업!"
+    enhance_success: "강화 성공!"
+    enhance_fail: "강화에 실패했습니다."
+    revive_confirm: "마을에서 부활하시겠습니까?"
+    logout_confirm: "정말 로그아웃 하시겠습니까?"
+    exit_confirm: "게임을 종료하시겠습니까?"
+    party_invite: "{name}님이 파티에 초대했습니다."
+    guild_invite: "{name}님이 길드에 초대했습니다."
+    trade_request: "{name}님이 거래를 요청했습니다."
+    friend_request: "{name}님이 친구 추가를 요청했습니다."
+    mail_received: "새 우편이 도착했습니다."
+    daily_reset: "일일 초기화가 완료되었습니다."

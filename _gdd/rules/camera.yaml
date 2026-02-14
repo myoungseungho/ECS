@@ -1,0 +1,382 @@
+# ============================================================
+# CAMERA SYSTEM — 카메라 연출 완전 정의
+# Reference: Lost Ark / Diablo 4 / God of War
+# ============================================================
+# Unity Cinemachine 기반
+# 쿼터뷰(아이소메트릭) + 상황별 전환
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 기본 카메라 설정
+# ──────────────────────────────────────────────────────────
+default:
+  type: "virtual_camera"               # Cinemachine Virtual Camera
+  projection: "perspective"
+  fov: 50
+  near_clip: 0.3
+  far_clip: 300
+
+  # 쿼터뷰 기본값 (로아 스타일)
+  follow:
+    target: "player"
+    body: "transposer"
+    follow_offset: [0, 15, -10]        # 위에서 15m, 뒤에서 10m
+    damping: [0.5, 0.5, 0.5]          # 부드러운 추적
+    look_at_offset: [0, 1, 0]          # 캐릭터 허리 높이
+
+  aim:
+    type: "composer"
+    tracked_offset: [0, 1, 0]
+    lookahead_time: 0.0
+    dead_zone:
+      width: 0.1
+      height: 0.1
+    soft_zone:
+      width: 0.8
+      height: 0.8
+
+  # 카메라 회전
+  rotation:
+    enabled: true
+    input: "middle_mouse_drag"
+    speed: 120                         # 초당 120도
+    min_angle: -360                    # 제한 없음 (자유 회전)
+    max_angle: 360
+    smooth: true
+    smooth_speed: 10.0
+
+  # 줌
+  zoom:
+    input: "scroll_wheel"
+    min_distance: 8.0                  # 최소 줌 (가까이)
+    max_distance: 25.0                 # 최대 줌 (멀리)
+    default_distance: 15.0
+    speed: 3.0
+    smooth: true
+    smooth_speed: 8.0
+
+  # 충돌
+  collision:
+    enabled: true
+    strategy: "push_camera_forward"
+    collision_filter: "environment"
+    minimum_distance: 2.0
+    smooth_time: 0.2
+    transparent_layers: ["foliage"]    # 풀/나무는 반투명 처리
+
+# ──────────────────────────────────────────────────────────
+# 1. 상황별 카메라 프리셋
+# ──────────────────────────────────────────────────────────
+presets:
+  # 필드 탐험 (기본)
+  field:
+    follow_offset: [0, 15, -10]
+    fov: 50
+    zoom_range: [8, 25]
+    rotation_enabled: true
+    transition_time: 1.0
+
+  # 마을 (약간 더 가까이)
+  town:
+    follow_offset: [0, 12, -8]
+    fov: 50
+    zoom_range: [6, 18]
+    rotation_enabled: true
+    transition_time: 1.5
+
+  # 던전 (좁은 공간, 더 가까이)
+  dungeon:
+    follow_offset: [0, 12, -8]
+    fov: 55                            # 약간 넓은 시야
+    zoom_range: [6, 15]
+    rotation_enabled: true
+    transition_time: 0.8
+    auto_adjust: true                  # 벽에 따라 자동 조정
+
+  # 보스전 (넓은 시야)
+  boss_fight:
+    follow_offset: [0, 18, -12]
+    fov: 55
+    zoom_range: [12, 22]
+    rotation_enabled: true
+    transition_time: 0.5
+    include_boss_in_frame: true        # 보스도 화면에 포함
+
+  # PvP 아레나
+  pvp_arena:
+    follow_offset: [0, 16, -10]
+    fov: 55
+    zoom_range: [10, 20]
+    rotation_enabled: true
+
+  # 실내 (천장 낮음)
+  indoor:
+    follow_offset: [0, 8, -6]
+    fov: 60
+    zoom_range: [5, 10]
+    collision_extra: true              # 천장 충돌 더 민감
+
+  # 대화 (NPC 줌인)
+  dialog:
+    type: "two_shot"                   # 플레이어+NPC 둘 다 보이게
+    follow_offset: [2, 3, -4]
+    fov: 40
+    look_at: "midpoint_player_npc"
+    depth_of_field:
+      enabled: true
+      focus_distance: 5.0
+      aperture: 2.8
+      blur_background: true
+    transition_time: 0.8
+
+  # 컷씬
+  cutscene:
+    type: "dolly_track"                # Cinemachine Dolly
+    fov: "dynamic"                     # 컷씬마다 다름
+    player_control: false              # 조작 불가
+    letterbox: true
+    letterbox_amount: 0.12             # 상하 12% 검은띠
+    depth_of_field: true
+
+# ──────────────────────────────────────────────────────────
+# 2. 카메라 이펙트
+# ──────────────────────────────────────────────────────────
+effects:
+  # 화면 흔들림 (Cinemachine Impulse)
+  shake:
+    profiles:
+      light:
+        amplitude: 0.3
+        frequency: 15
+        duration: 0.15
+        triggers: ["normal_hit", "small_explosion"]
+
+      medium:
+        amplitude: 0.8
+        frequency: 12
+        duration: 0.25
+        triggers: ["critical_hit", "skill_impact", "boss_attack"]
+
+      heavy:
+        amplitude: 1.5
+        frequency: 10
+        duration: 0.4
+        triggers: ["boss_slam", "meteor_impact", "enhance_success"]
+
+      earthquake:
+        amplitude: 2.5
+        frequency: 8
+        duration: 1.0
+        triggers: ["boss_phase_transition", "world_event"]
+
+    settings:
+      player_toggle: true              # 설정에서 끌 수 있음
+      intensity_setting: [0, 0.5, 1.0] # 세기 조절
+
+  # 히트스톱 (프레임 정지)
+  hit_stop:
+    normal: { duration: 0.03, time_scale: 0.0 }
+    critical: { duration: 0.06, time_scale: 0.0 }
+    boss_stagger: { duration: 0.1, time_scale: 0.1 }
+    ultimate: { duration: 0.15, time_scale: 0.05 }
+
+  # 슬로우 모션
+  slow_motion:
+    boss_death: { time_scale: 0.3, duration: 1.5, ease_out: 0.5 }
+    last_hit: { time_scale: 0.5, duration: 0.5 }
+    counter_success: { time_scale: 0.2, duration: 0.3 }
+
+  # 줌 펀치 (급격한 줌인/아웃)
+  zoom_punch:
+    skill_ultimate:
+      zoom_in: 0.9                     # 10% 줌인
+      duration: 0.2
+      ease: "ease_out_elastic"
+    level_up:
+      zoom_out: 1.1                    # 10% 줌아웃
+      duration: 0.3
+    boss_intro:
+      zoom_in: 0.7                     # 30% 줌인
+      duration: 1.0
+
+  # 포스트 프로세싱 이펙트
+  post_processing:
+    # 비네팅 (화면 가장자리 어둡게)
+    vignette:
+      low_hp:
+        threshold: 0.3                 # HP 30% 이하
+        intensity: 0.4
+        color: "#FF0000"
+        pulse: true
+        pulse_speed: 2.0
+      boss_mechanic:
+        intensity: 0.5
+        color: "#FF0000"
+
+    # 색수차 (Chromatic Aberration)
+    chromatic_aberration:
+      on_heavy_hit:
+        intensity: 0.5
+        duration: 0.15
+
+    # 블룸
+    bloom:
+      default_intensity: 0.3
+      skill_cast_boost: 0.8
+      duration: 0.5
+      legendary_drop: 1.0
+
+    # DOF (피사계 심도)
+    depth_of_field:
+      dialog: { focus_distance: 5, aperture: 2.8 }
+      cutscene: { focus_distance: "dynamic", aperture: 2.0 }
+      inventory_open: { focus_distance: 2, aperture: 4.0, blur_background: true }
+
+    # 색 보정
+    color_grading:
+      dungeon_dark:
+        temperature: -10               # 차가운 톤
+        saturation: -15
+        contrast: 10
+      volcanic:
+        temperature: 20                # 따뜻한 톤
+        saturation: 10
+        tint: "#FF440010"
+      void_rift:
+        temperature: -20
+        saturation: -30
+        contrast: 20
+        tint: "#4A008020"
+
+# ──────────────────────────────────────────────────────────
+# 3. 컷씬 카메라
+# ──────────────────────────────────────────────────────────
+cutscene_cameras:
+  # 컷씬 카메라 기법
+  techniques:
+    establishing_shot:
+      desc: "전경 와이드 샷 → 서서히 줌인"
+      fov_start: 70
+      fov_end: 50
+      duration: 3.0
+      use_for: "새로운 존 진입, 보스 등장"
+
+    close_up:
+      desc: "NPC 얼굴 클로즈업"
+      fov: 30
+      offset: [0, 0.2, -1.5]
+      depth_of_field: true
+      use_for: "중요 대사, 감정 표현"
+
+    over_shoulder:
+      desc: "어깨 너머 샷"
+      offset: [0.5, 0.2, -1.0]
+      fov: 45
+      use_for: "대화 씬"
+
+    dolly_zoom:
+      desc: "줌인하면서 카메라 후진 (버티고 효과)"
+      fov_change: 20
+      camera_move: -5.0
+      duration: 1.5
+      use_for: "충격적 반전, 위기 순간"
+
+    orbit:
+      desc: "캐릭터 주변 360도 회전"
+      radius: 5.0
+      speed: 30                        # 초당 30도
+      height_variation: [2, 4]
+      use_for: "변신, 각성, 승리 연출"
+
+    crane_shot:
+      desc: "높은 곳에서 내려다보는 샷"
+      start_height: 20
+      end_height: 5
+      fov: 40
+      duration: 4.0
+      use_for: "전장 전체 조감, 보스 방 진입"
+
+  # 컷씬 전환 효과
+  transitions:
+    cut:
+      desc: "즉시 전환"
+      duration: 0.0
+    fade_black:
+      desc: "검은 화면 페이드"
+      duration: 1.0
+      color: "#000000"
+    fade_white:
+      desc: "흰 화면 페이드"
+      duration: 0.8
+      color: "#FFFFFF"
+    cross_dissolve:
+      desc: "크로스 디졸브"
+      duration: 0.5
+    wipe:
+      desc: "화면 밀기"
+      direction: "left_to_right"
+      duration: 0.3
+
+# ──────────────────────────────────────────────────────────
+# 4. 특수 카메라 상황
+# ──────────────────────────────────────────────────────────
+special:
+  # 보스 등장 시
+  boss_intro_camera:
+    sequence:
+      - { type: "crane_shot", target: "boss", duration: 2.0 }
+      - { type: "close_up", target: "boss_face", duration: 1.5 }
+      - { type: "establishing_shot", include: ["boss", "player"], duration: 1.5 }
+      - { type: "return_to_gameplay", transition: "fade_black", duration: 0.5 }
+    letterbox: true
+    player_control: false
+    skip_on_button: true               # 아무 키나 누르면 스킵
+
+  # 궁극기 사용 시
+  ultimate_camera:
+    sequence:
+      - { type: "zoom_in", target: "player", fov: 35, duration: 0.3 }
+      - { type: "slow_motion", time_scale: 0.3, duration: 0.5 }
+      - { type: "orbit", speed: 180, duration: 0.5 }
+      - { type: "zoom_out", fov: 55, duration: 0.3 }
+    letterbox: false
+    player_control: true               # 스킬은 계속 조작 가능
+
+  # 사망 시
+  death_camera:
+    sequence:
+      - { type: "slow_motion", time_scale: 0.5, duration: 0.5 }
+      - { type: "zoom_in", target: "player", fov: 40, duration: 1.0 }
+      - { type: "gray_scale", intensity: 0.7, duration: 1.0 }
+    transition_to: "respawn_ui"
+
+  # 레벨업 시
+  levelup_camera:
+    sequence:
+      - { type: "zoom_out", amount: 1.2, duration: 0.3 }
+      - { type: "orbit", speed: 60, duration: 2.0 }
+    non_blocking: true                 # 게임 플레이 중단 안 함
+
+  # 던전 입장 시
+  dungeon_enter_camera:
+    sequence:
+      - { type: "fade_black", duration: 0.5 }
+      - { type: "loading_screen" }
+      - { type: "establishing_shot", target: "dungeon_entrance", duration: 2.0 }
+      - { type: "return_to_gameplay", duration: 0.5 }
+
+# ──────────────────────────────────────────────────────────
+# 5. 미니맵 카메라
+# ──────────────────────────────────────────────────────────
+minimap_camera:
+  type: "orthographic"
+  position: "above_player"
+  height: 30                           # 30m 위
+  rotation: [90, 0, 0]                 # 직각 아래
+  orthographic_size: 25                # 줌 레벨별 변경
+  culling_mask: ["terrain", "buildings", "roads"]  # 몬스터/이펙트 제외
+  render_texture:
+    size: [256, 256]
+    format: "ARGB32"
+    depth: 16
+  update_rate: 10                      # 초당 10회 (성능)

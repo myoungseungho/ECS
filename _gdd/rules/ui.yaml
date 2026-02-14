@@ -1,0 +1,1437 @@
+# ============================================================
+# UI SYSTEM — 전체 UI 레이아웃/위젯/스타일 완전 정의
+# Reference: Lost Ark / Diablo 4 / Genshin Impact
+# ============================================================
+# 기준 해상도: 1920x1080 (16:9)
+# 앵커 시스템: Unity RectTransform 기반
+# 좌표: 좌하단 (0,0) ~ 우상단 (1920, 1080)
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 0. 글로벌 UI 설정
+# ──────────────────────────────────────────────────────────
+global:
+  reference_resolution: [1920, 1080]
+  scale_mode: "scale_with_screen_size"
+  match_width_or_height: 0.5          # 0=width, 1=height, 0.5=둘다
+  pixels_per_unit: 100
+
+  fonts:
+    primary: "NotoSansKR-Regular"      # 본문
+    bold: "NotoSansKR-Bold"            # 강조
+    title: "NotoSansKR-Black"          # 제목
+    damage_number: "RobotoCondensed-Bold"  # 데미지 숫자
+
+  font_sizes:
+    xs: 10
+    sm: 12
+    md: 14
+    lg: 18
+    xl: 24
+    xxl: 32
+    title: 48
+    damage: 28
+
+  colors:
+    # 등급 색상
+    rarity_common:    "#FFFFFF"
+    rarity_uncommon:  "#1EFF00"
+    rarity_rare:      "#0070DD"
+    rarity_epic:      "#A335EE"
+    rarity_legendary: "#FF8000"
+
+    # UI 기본 색상
+    bg_dark:          "#1A1A2E"
+    bg_panel:         "#16213ECC"      # 반투명
+    bg_tooltip:       "#0F0F1FEE"
+    border_default:   "#3A3A5C"
+    border_hover:     "#5A5A8C"
+    border_selected:  "#FFD700"
+    text_primary:     "#FFFFFF"
+    text_secondary:   "#B0B0C0"
+    text_disabled:    "#606070"
+
+    # 상태 색상
+    hp_bar:           "#E74C3C"
+    mp_bar:           "#3498DB"
+    exp_bar:          "#F1C40F"
+    stamina_bar:      "#2ECC71"
+
+    # 버튼 색상
+    btn_primary:      "#2980B9"
+    btn_primary_hover: "#3498DB"
+    btn_danger:       "#C0392B"
+    btn_confirm:      "#27AE60"
+    btn_disabled:     "#4A4A5A"
+
+  # 공통 애니메이션
+  animations:
+    panel_open:
+      type: "scale"
+      from: [0.8, 0.8]
+      to: [1.0, 1.0]
+      duration: 0.2
+      ease: "ease_out_back"
+      alpha_from: 0
+      alpha_to: 1
+    panel_close:
+      type: "scale"
+      from: [1.0, 1.0]
+      to: [0.8, 0.8]
+      duration: 0.15
+      ease: "ease_in"
+      alpha_from: 1
+      alpha_to: 0
+    button_hover:
+      type: "scale"
+      to: [1.05, 1.05]
+      duration: 0.1
+    button_click:
+      type: "scale"
+      to: [0.95, 0.95]
+      duration: 0.05
+    toast_slide:
+      type: "move_y"
+      from: -50
+      to: 0
+      duration: 0.3
+      ease: "ease_out"
+    fade_in:
+      duration: 0.3
+      alpha_from: 0
+      alpha_to: 1
+    fade_out:
+      duration: 0.2
+      alpha_from: 1
+      alpha_to: 0
+
+# ──────────────────────────────────────────────────────────
+# 1. HUD (인게임 상시 표시)
+# ──────────────────────────────────────────────────────────
+hud:
+  # Unity Hierarchy: Canvas_HUD (Sort Order: 0)
+  canvas:
+    name: "Canvas_HUD"
+    render_mode: "screen_space_overlay"
+    sort_order: 0
+
+  # ── 캐릭터 정보 (좌상단) ──
+  player_info:
+    anchor: "top_left"
+    position: [20, -20]                 # 좌상단에서 20px 여백
+    size: [300, 100]
+    hierarchy:
+      - name: "Panel_PlayerInfo"
+        type: "Image"
+        sprite: "ui_hud_player_bg"
+        color: "#00000088"
+        children:
+          - name: "Img_Portrait"
+            type: "Image"
+            anchor: "left"
+            position: [10, 0]
+            size: [60, 60]
+            sprite: "dynamic"          # 직업별 초상화
+            mask: "circle"
+
+          - name: "Txt_Name"
+            type: "Text"
+            anchor: "top_left"
+            position: [80, -10]
+            size: [150, 20]
+            font: "bold"
+            font_size: "md"
+            color: "text_primary"
+            alignment: "left"
+
+          - name: "Txt_Level"
+            type: "Text"
+            anchor: "top_left"
+            position: [230, -10]
+            size: [50, 20]
+            font: "bold"
+            font_size: "md"
+            color: "#FFD700"
+            format: "Lv.{level}"
+
+          - name: "Bar_HP"
+            type: "Slider"
+            anchor: "top_left"
+            position: [80, -35]
+            size: [200, 16]
+            fill_color: "hp_bar"
+            bg_color: "#1A1A1A"
+            border: { color: "#333333", width: 1 }
+            text_overlay: "{current}/{max}"
+            text_font_size: "xs"
+
+          - name: "Bar_MP"
+            type: "Slider"
+            anchor: "top_left"
+            position: [80, -55]
+            size: [200, 14]
+            fill_color: "mp_bar"
+            bg_color: "#1A1A1A"
+            border: { color: "#333333", width: 1 }
+            text_overlay: "{current}/{max}"
+            text_font_size: "xs"
+
+          - name: "Bar_EXP"
+            type: "Slider"
+            anchor: "top_left"
+            position: [80, -73]
+            size: [200, 8]
+            fill_color: "exp_bar"
+            bg_color: "#1A1A1A"
+            text_overlay: false
+
+  # ── 타겟 정보 (상단 중앙) ──
+  target_info:
+    anchor: "top_center"
+    position: [0, -20]
+    size: [350, 70]
+    visible_when: "target_selected"
+    hierarchy:
+      - name: "Panel_TargetInfo"
+        type: "Image"
+        sprite: "ui_hud_target_bg"
+        color: "#00000088"
+        children:
+          - name: "Txt_TargetName"
+            type: "Text"
+            position: [0, -10]
+            size: [300, 24]
+            font: "bold"
+            font_size: "lg"
+            color: "dynamic"            # 몬스터→빨강, NPC→노랑, 플레이어→흰색
+            alignment: "center"
+
+          - name: "Bar_TargetHP"
+            type: "Slider"
+            position: [0, -40]
+            size: [300, 18]
+            fill_color: "hp_bar"
+            bg_color: "#1A1A1A"
+            text_overlay: "{percent}%"
+
+  # ── 미니맵 (우상단) ──
+  minimap:
+    anchor: "top_right"
+    position: [-20, -20]
+    size: [200, 200]
+    hierarchy:
+      - name: "Panel_Minimap"
+        type: "Image"
+        children:
+          - name: "Mask_Circle"
+            type: "Mask"
+            shape: "circle"
+            size: [180, 180]
+            children:
+              - name: "Img_MapTexture"
+                type: "RawImage"
+                desc: "렌더 텍스처 (탑뷰 카메라)"
+
+          - name: "Img_Border"
+            type: "Image"
+            sprite: "ui_minimap_border"
+            size: [200, 200]
+            raycast_target: false
+
+          - name: "Img_PlayerArrow"
+            type: "Image"
+            sprite: "ui_minimap_arrow"
+            size: [16, 16]
+            position: [0, 0]            # 항상 중앙
+            color: "#00FF00"
+            rotation: "dynamic"          # 캐릭터 방향
+
+          - name: "Txt_ZoneName"
+            type: "Text"
+            anchor: "top_center"
+            position: [0, 5]
+            size: [180, 20]
+            font_size: "sm"
+            alignment: "center"
+
+          - name: "Txt_Coordinates"
+            type: "Text"
+            anchor: "bottom_center"
+            position: [0, -5]
+            size: [180, 16]
+            font_size: "xs"
+            format: "({x}, {y})"
+
+          - name: "Btn_ZoomIn"
+            type: "Button"
+            anchor: "bottom_right"
+            position: [-5, 5]
+            size: [24, 24]
+            sprite: "ui_icon_plus"
+
+          - name: "Btn_ZoomOut"
+            type: "Button"
+            anchor: "bottom_right"
+            position: [-32, 5]
+            size: [24, 24]
+            sprite: "ui_icon_minus"
+
+  # ── 스킬바 (하단 중앙) ──
+  skill_bar:
+    anchor: "bottom_center"
+    position: [0, 20]
+    size: [700, 80]
+    hierarchy:
+      - name: "Panel_SkillBar"
+        type: "Image"
+        sprite: "ui_hud_skillbar_bg"
+        children:
+          # 기본 공격 (좌클릭)
+          - name: "Slot_BasicAttack"
+            type: "Button"
+            position: [-300, 0]
+            size: [56, 56]
+            sprite_bg: "ui_slot_bg"
+            sprite_icon: "dynamic"
+            keybind_text: "LMB"
+            keybind_position: "bottom_right"
+            cooldown_overlay: true
+
+          # 스킬 슬롯 8개 (Q, W, E, R, A, S, D, F)
+          - name: "Slot_Skill_{i}"     # i = 0~7
+            type: "Button"
+            count: 8
+            start_position: [-230, 0]
+            spacing: 62                  # 슬롯 간격
+            size: [56, 56]
+            sprite_bg: "ui_slot_bg"
+            sprite_icon: "dynamic"
+            keybind_labels: ["Q", "W", "E", "R", "A", "S", "D", "F"]
+            keybind_position: "top_left"
+            keybind_font_size: "xs"
+            cooldown_overlay:
+              type: "radial_fill"
+              color: "#00000088"
+              text: "{remaining}s"
+              text_font_size: "md"
+            level_indicator:
+              position: "bottom_left"
+              font_size: 8
+              format: "Lv.{lv}"
+
+          # 궁극기 슬롯 (V)
+          - name: "Slot_Ultimate"
+            type: "Button"
+            position: [270, 0]
+            size: [64, 64]              # 약간 더 큼
+            sprite_bg: "ui_slot_ultimate_bg"
+            sprite_icon: "dynamic"
+            keybind_text: "V"
+            glow_when_ready: true
+            glow_color: "#FFD70088"
+
+          # 물약 슬롯 (1, 2)
+          - name: "Slot_Potion_{i}"
+            type: "Button"
+            count: 2
+            start_position: [320, -10]
+            spacing: 44
+            size: [40, 40]
+            sprite_bg: "ui_slot_small_bg"
+            keybind_labels: ["1", "2"]
+            stack_count:
+              position: "bottom_right"
+              font_size: "xs"
+              format: "{count}"
+
+  # ── 퀵메뉴 (하단 우측) ──
+  quick_menu:
+    anchor: "bottom_right"
+    position: [-20, 20]
+    size: [360, 50]
+    hierarchy:
+      - name: "Panel_QuickMenu"
+        type: "HorizontalLayoutGroup"
+        spacing: 4
+        children:
+          - { name: "Btn_Character", icon: "ui_icon_character", keybind: "C", tooltip: "캐릭터 정보" }
+          - { name: "Btn_Inventory", icon: "ui_icon_inventory", keybind: "I", tooltip: "인벤토리" }
+          - { name: "Btn_Skill", icon: "ui_icon_skill", keybind: "K", tooltip: "스킬" }
+          - { name: "Btn_Quest", icon: "ui_icon_quest", keybind: "J", tooltip: "퀘스트" }
+          - { name: "Btn_Map", icon: "ui_icon_map", keybind: "M", tooltip: "지도" }
+          - { name: "Btn_Guild", icon: "ui_icon_guild", keybind: "G", tooltip: "길드" }
+          - { name: "Btn_Social", icon: "ui_icon_social", keybind: "O", tooltip: "소셜" }
+          - { name: "Btn_Settings", icon: "ui_icon_settings", keybind: "ESC", tooltip: "설정" }
+        button_template:
+          size: [40, 40]
+          sprite_bg: "ui_btn_round"
+          hover_color: "border_hover"
+          click_anim: "button_click"
+
+  # ── 채팅 (좌하단) ──
+  chat:
+    anchor: "bottom_left"
+    position: [20, 20]
+    size: [400, 200]
+    hierarchy:
+      - name: "Panel_Chat"
+        type: "Image"
+        color: "#0000004D"             # 30% 투명
+        children:
+          - name: "Scroll_Messages"
+            type: "ScrollRect"
+            position: [5, 30]
+            size: [390, 160]
+            scroll_direction: "vertical"
+            scrollbar_width: 6
+            max_messages: 100
+            message_format:
+              general:   "[{channel}] {name}: {message}"
+              whisper:   "[귓속말] {from}: {message}"
+              system:    "[시스템] {message}"
+            channel_colors:
+              general: "#FFFFFF"
+              party: "#3498DB"
+              guild: "#2ECC71"
+              whisper: "#E91E63"
+              trade: "#FFD700"
+              system: "#FF6B6B"
+
+          - name: "Tab_Channels"
+            type: "HorizontalLayoutGroup"
+            anchor: "top_left"
+            position: [5, -2]
+            size: [390, 24]
+            children:
+              - { name: "Tab_All", text: "전체", default: true }
+              - { name: "Tab_Party", text: "파티" }
+              - { name: "Tab_Guild", text: "길드" }
+              - { name: "Tab_Whisper", text: "귓속말" }
+              - { name: "Tab_System", text: "시스템" }
+            tab_template:
+              size: [60, 22]
+              font_size: "sm"
+              active_color: "btn_primary"
+              inactive_color: "#333333"
+
+          - name: "Input_Chat"
+            type: "InputField"
+            anchor: "bottom"
+            position: [0, 2]
+            size: [340, 26]
+            placeholder: "Enter로 채팅..."
+            font_size: "sm"
+            activate_key: "Return"
+
+          - name: "Btn_Send"
+            type: "Button"
+            anchor: "bottom_right"
+            position: [-5, 2]
+            size: [50, 26]
+            text: "전송"
+
+  # ── 버프/디버프 아이콘 (캐릭터 정보 아래) ──
+  buff_bar:
+    anchor: "top_left"
+    position: [20, -130]
+    size: [400, 30]
+    hierarchy:
+      - name: "Panel_Buffs"
+        type: "HorizontalLayoutGroup"
+        spacing: 2
+        children_template:
+          name: "Buff_{i}"
+          size: [28, 28]
+          sprite_bg: "ui_buff_bg"
+          sprite_icon: "dynamic"
+          timer_overlay: true
+          timer_position: "bottom"
+          timer_font_size: 8
+          tooltip_on_hover: true
+          # 버프 = 파란 테두리, 디버프 = 빨간 테두리
+          border_buff: "#3498DB"
+          border_debuff: "#E74C3C"
+          max_display: 12
+
+  # ── 데미지 숫자 (월드 스페이스) ──
+  damage_numbers:
+    canvas: "Canvas_WorldSpace"
+    render_mode: "world_space"
+    settings:
+      normal_damage:
+        font: "damage_number"
+        font_size: 24
+        color: "#FFFFFF"
+        animation: "float_up_fade"
+        duration: 1.0
+        rise_height: 80
+      critical_damage:
+        font: "damage_number"
+        font_size: 36
+        color: "#FFD700"
+        animation: "bounce_up_fade"
+        duration: 1.2
+        rise_height: 100
+        scale_punch: 1.5
+      heal:
+        font: "damage_number"
+        font_size: 22
+        color: "#2ECC71"
+        animation: "float_up_fade"
+        duration: 0.8
+        prefix: "+"
+      miss:
+        font: "damage_number"
+        font_size: 20
+        color: "#808080"
+        text: "MISS"
+        animation: "float_up_fade"
+        duration: 0.6
+      exp_gain:
+        font: "damage_number"
+        font_size: 16
+        color: "#F1C40F"
+        animation: "float_up_fade"
+        format: "+{exp} EXP"
+
+  # ── 보스 HP (상단 특수) ──
+  boss_hp:
+    anchor: "top_center"
+    position: [0, -100]
+    size: [600, 50]
+    visible_when: "boss_fight"
+    hierarchy:
+      - name: "Panel_BossHP"
+        children:
+          - name: "Txt_BossName"
+            size: [400, 28]
+            font: "title"
+            font_size: "xl"
+            color: "#FF4444"
+            alignment: "center"
+          - name: "Bar_BossHP"
+            size: [500, 22]
+            fill_color: "#FF4444"
+            segments: true               # x10 HP바 (다중 게이지)
+            segment_colors: ["#FF4444", "#FF8800", "#FFDD00", "#44FF44"]
+          - name: "Txt_BossPhase"
+            font_size: "sm"
+            format: "Phase {phase}"
+
+  # ── 알림 토스트 (우측) ──
+  notification:
+    anchor: "right_center"
+    position: [-20, 100]
+    size: [350, 0]                      # 높이 동적
+    max_visible: 5
+    template:
+      size: [350, 60]
+      sprite_bg: "ui_toast_bg"
+      animation_in: "toast_slide"
+      animation_out: "fade_out"
+      display_time: 3.0
+      types:
+        item_acquire:
+          icon_size: [40, 40]
+          text: "{item_name} 획득"
+          text_color: "dynamic"          # 등급 색상
+        level_up:
+          icon: "ui_icon_levelup"
+          text: "레벨 업! Lv.{level}"
+          text_color: "#FFD700"
+          special_effect: true
+        quest_complete:
+          icon: "ui_icon_quest_complete"
+          text: "퀘스트 완료: {quest_name}"
+          text_color: "#2ECC71"
+        system_message:
+          icon: "ui_icon_system"
+          text: "{message}"
+          text_color: "#FF6B6B"
+
+# ──────────────────────────────────────────────────────────
+# 2. 인벤토리 UI
+# ──────────────────────────────────────────────────────────
+inventory_panel:
+  canvas: "Canvas_UI"
+  sort_order: 10
+  toggle_key: "I"
+  anchor: "center_right"
+  position: [-50, 0]
+  size: [420, 550]
+
+  hierarchy:
+    - name: "Panel_Inventory"
+      sprite: "ui_panel_bg"
+      children:
+        - name: "Header"
+          size: [420, 40]
+          children:
+            - name: "Txt_Title"
+              text: "인벤토리"
+              font: "bold"
+              font_size: "lg"
+            - name: "Btn_Close"
+              anchor: "right"
+              size: [30, 30]
+              sprite: "ui_icon_close"
+
+        - name: "Tab_Bar"
+          size: [420, 30]
+          children:
+            - { text: "전체", filter: "all" }
+            - { text: "장비", filter: "equipment" }
+            - { text: "소비", filter: "consumable" }
+            - { text: "재료", filter: "material" }
+            - { text: "기타", filter: "etc" }
+
+        - name: "Grid_Items"
+          type: "GridLayoutGroup"
+          position: [10, -80]
+          size: [400, 380]
+          cell_size: [44, 44]
+          spacing: [4, 4]
+          columns: 8                     # 8x10 = 80슬롯 (확장 시 최대)
+          constraint: "fixed_column_count"
+          children_template:
+            name: "Slot_{i}"
+            size: [44, 44]
+            sprite_bg: "ui_slot_bg"
+            sprite_icon: "dynamic"
+            rarity_border: true          # 등급별 테두리 색
+            stack_count:
+              position: "bottom_right"
+              font_size: 10
+            locked_overlay:
+              sprite: "ui_slot_locked"
+              condition: "slot_index >= unlocked_slots"
+
+        - name: "Footer"
+          anchor: "bottom"
+          size: [400, 40]
+          children:
+            - name: "Txt_Gold"
+              icon: "ui_icon_gold"
+              format: "{gold:comma}"
+              font_size: "md"
+              position: [-100, 0]
+            - name: "Txt_SlotCount"
+              format: "{used}/{max}"
+              font_size: "sm"
+              position: [100, 0]
+            - name: "Btn_Sort"
+              text: "정렬"
+              size: [60, 28]
+              position: [170, 0]
+
+  # 슬롯 인터랙션
+  slot_interaction:
+    left_click: "equip_or_use"
+    right_click: "context_menu"
+    drag: "drag_and_drop"
+    shift_click: "split_stack"
+    ctrl_click: "quick_sell"
+    hover: "show_tooltip"
+    hover_delay: 0.3
+
+  # 아이템 툴팁
+  tooltip:
+    size: [280, 0]                      # 높이 동적
+    position: "follow_mouse_left"
+    offset: [15, 0]
+    sprite_bg: "bg_tooltip"
+    border: { color: "dynamic", width: 2 }  # 등급 색
+    padding: 10
+    sections:
+      - name: { font: "bold", font_size: "lg", color: "dynamic" }  # 등급색
+      - type_text: { font_size: "sm", color: "text_secondary" }     # "한손검 | 희귀"
+      - separator: { height: 1, color: "#333" }
+      - main_stat: { font_size: "md", color: "#2ECC71", format: "+{value} {stat}" }
+      - random_options: { font_size: "sm", color: "#9B59B6", format: "- {option}" }
+      - set_bonus: { font_size: "sm", color: "#F39C12" }
+      - separator: { height: 1, color: "#333" }
+      - requirements: { font_size: "xs", color: "dynamic" }  # 충족=회색, 미충족=빨강
+      - sell_price: { font_size: "xs", color: "#B0B0C0", icon: "ui_icon_gold" }
+      - flavor_text: { font_size: "xs", color: "#606060", italic: true }
+
+# ──────────────────────────────────────────────────────────
+# 3. 캐릭터 정보 UI
+# ──────────────────────────────────────────────────────────
+character_panel:
+  toggle_key: "C"
+  anchor: "center_left"
+  position: [50, 0]
+  size: [380, 550]
+
+  hierarchy:
+    - name: "Panel_Character"
+      sprite: "ui_panel_bg"
+      children:
+        # 3D 캐릭터 모델 뷰어
+        - name: "ModelViewer"
+          type: "RawImage"
+          position: [0, -60]
+          size: [200, 300]
+          render_texture: "RT_CharacterPreview"
+          camera: "Camera_CharPreview"
+          rotate_on_drag: true
+
+        # 장비 슬롯 (모델 주변 배치)
+        - name: "EquipSlots"
+          children:
+            # 왼쪽 (모델 왼쪽)
+            - { name: "Slot_Helmet",    position: [-140, -80],  size: [48,48], slot: "head" }
+            - { name: "Slot_Shoulder",  position: [-140, -135], size: [48,48], slot: "shoulder" }
+            - { name: "Slot_Chest",     position: [-140, -190], size: [48,48], slot: "chest" }
+            - { name: "Slot_Gloves",    position: [-140, -245], size: [48,48], slot: "gloves" }
+            - { name: "Slot_Pants",     position: [-140, -300], size: [48,48], slot: "pants" }
+            - { name: "Slot_Boots",     position: [-140, -355], size: [48,48], slot: "boots" }
+            # 오른쪽 (모델 오른쪽)
+            - { name: "Slot_Weapon",    position: [140, -80],   size: [48,48], slot: "weapon" }
+            - { name: "Slot_OffHand",   position: [140, -135],  size: [48,48], slot: "off_hand" }
+            - { name: "Slot_Necklace",  position: [140, -190],  size: [48,48], slot: "necklace" }
+            - { name: "Slot_Ring1",     position: [140, -245],  size: [48,48], slot: "ring_1" }
+            - { name: "Slot_Ring2",     position: [140, -300],  size: [48,48], slot: "ring_2" }
+            - { name: "Slot_Earring",   position: [140, -355],  size: [48,48], slot: "earring" }
+            # 하단
+            - { name: "Slot_Belt",      position: [-45, -355],  size: [48,48], slot: "belt" }
+            - { name: "Slot_Artifact",  position: [45, -355],   size: [48,48], slot: "artifact" }
+
+        # 스탯 패널
+        - name: "Panel_Stats"
+          anchor: "bottom"
+          size: [360, 140]
+          children:
+            - name: "Txt_CombatPower"
+              text: "전투력"
+              value_format: "{power:comma}"
+              value_color: "#FFD700"
+              font_size: "xl"
+
+            - name: "Grid_Stats"
+              type: "GridLayoutGroup"
+              columns: 2
+              cell_size: [170, 20]
+              stats:
+                - { label: "공격력", value: "{atk}", icon: "stat_atk" }
+                - { label: "방어력", value: "{def}", icon: "stat_def" }
+                - { label: "최대 HP", value: "{max_hp}", icon: "stat_hp" }
+                - { label: "최대 MP", value: "{max_mp}", icon: "stat_mp" }
+                - { label: "치명타 확률", value: "{crit_rate}%", icon: "stat_crit" }
+                - { label: "치명타 피해", value: "{crit_dmg}%", icon: "stat_critdmg" }
+                - { label: "이동 속도", value: "{move_spd}", icon: "stat_spd" }
+                - { label: "특화", value: "{spec}", icon: "stat_spec" }
+
+# ──────────────────────────────────────────────────────────
+# 4. 스킬 UI
+# ──────────────────────────────────────────────────────────
+skill_panel:
+  toggle_key: "K"
+  anchor: "center"
+  size: [700, 500]
+
+  hierarchy:
+    - name: "Panel_Skill"
+      children:
+        - name: "Tab_SkillType"
+          tabs: ["전직 1", "전직 2", "공용", "각성"]
+
+        - name: "Grid_Skills"
+          type: "GridLayoutGroup"
+          columns: 4
+          cell_size: [150, 70]
+          spacing: [10, 10]
+          children_template:
+            name: "SkillEntry_{i}"
+            children:
+              - name: "Img_Icon"
+                size: [56, 56]
+              - name: "Txt_Name"
+                font_size: "sm"
+              - name: "Txt_Level"
+                format: "Lv.{lv}/{max_lv}"
+                font_size: "xs"
+              - name: "Btn_LevelUp"
+                size: [20, 20]
+                sprite: "ui_icon_plus"
+                visible_when: "has_skill_points"
+
+        - name: "Panel_SkillDetail"
+          anchor: "right"
+          size: [250, 400]
+          children:
+            - name: "Txt_SkillName"
+              font: "bold"
+              font_size: "xl"
+            - name: "Txt_Description"
+              font_size: "sm"
+              color: "text_secondary"
+            - name: "Txt_Cooldown"
+              format: "쿨타임: {cd}초"
+            - name: "Txt_ManaCost"
+              format: "MP 소모: {mp}"
+            - name: "Txt_DamageInfo"
+              format: "피해: {damage}%"
+            - name: "Panel_Tripod"
+              desc: "트라이포드 (3단계 커스터마이즈)"
+              rows: 3
+              options_per_row: 3
+
+        - name: "Panel_SkillSlots"
+          anchor: "bottom"
+          desc: "하단에 8슬롯 → 드래그로 배치"
+          size: [500, 70]
+
+# ──────────────────────────────────────────────────────────
+# 5. 퀘스트 UI
+# ──────────────────────────────────────────────────────────
+quest_panel:
+  toggle_key: "J"
+  anchor: "center"
+  size: [650, 500]
+
+  hierarchy:
+    - name: "Panel_Quest"
+      children:
+        - name: "Tab_QuestType"
+          tabs:
+            - { text: "진행중", filter: "active" }
+            - { text: "메인", filter: "main" }
+            - { text: "서브", filter: "side" }
+            - { text: "일일", filter: "daily" }
+            - { text: "완료", filter: "completed" }
+
+        - name: "List_Quests"
+          type: "ScrollRect"
+          size: [250, 420]
+          anchor: "left"
+          children_template:
+            size: [240, 50]
+            children:
+              - name: "Img_TypeIcon"
+                size: [20, 20]
+                color: "dynamic"         # 퀘스트 타입별 색상
+              - name: "Txt_QuestName"
+                font_size: "md"
+              - name: "Txt_Progress"
+                font_size: "xs"
+                color: "text_secondary"
+                format: "{current}/{total}"
+              - name: "Img_Tracking"
+                sprite: "ui_icon_pin"
+                size: [16, 16]
+                toggle: true
+
+        - name: "Panel_QuestDetail"
+          anchor: "right"
+          size: [370, 420]
+          children:
+            - name: "Txt_Title"
+              font: "bold"
+              font_size: "xl"
+            - name: "Txt_Description"
+              font_size: "sm"
+              max_lines: 6
+            - name: "Separator"
+            - name: "List_Objectives"
+              children_template:
+                format: "- {objective} ({current}/{target})"
+                color_complete: "#2ECC71"
+                color_incomplete: "text_secondary"
+                strikethrough_on_complete: true
+            - name: "Separator"
+            - name: "Panel_Rewards"
+              title: "보상"
+              children:
+                - name: "Txt_Exp"
+                  format: "경험치: {exp}"
+                - name: "Txt_Gold"
+                  format: "골드: {gold}"
+                - name: "Grid_ItemRewards"
+                  type: "HorizontalLayoutGroup"
+                  slot_size: [40, 40]
+
+  # HUD 퀘스트 트래커 (우측)
+  quest_tracker:
+    anchor: "right"
+    position: [-20, 0]
+    size: [250, 300]
+    max_tracked: 5
+    template:
+      children:
+        - name: "Txt_QuestName"
+          font: "bold"
+          font_size: "sm"
+          color: "dynamic"
+        - name: "List_Objectives"
+          font_size: "xs"
+          color: "text_secondary"
+          format: "  - {obj} {current}/{target}"
+          highlight_on_update: true
+          highlight_duration: 2.0
+          highlight_color: "#FFD700"
+
+# ──────────────────────────────────────────────────────────
+# 6. NPC 대화 UI
+# ──────────────────────────────────────────────────────────
+dialog_panel:
+  anchor: "bottom_center"
+  position: [0, 50]
+  size: [800, 220]
+
+  hierarchy:
+    - name: "Panel_Dialog"
+      sprite: "ui_dialog_bg"
+      children:
+        - name: "Img_Portrait"
+          anchor: "left"
+          position: [30, 10]
+          size: [120, 160]
+
+        - name: "Txt_SpeakerName"
+          position: [170, -10]
+          size: [200, 30]
+          font: "bold"
+          font_size: "lg"
+          color: "#FFD700"
+
+        - name: "Txt_Dialog"
+          position: [170, -50]
+          size: [580, 100]
+          font_size: "md"
+          line_spacing: 1.4
+          typing_effect: true
+          typing_speed: 30               # 초당 30자
+          click_to_complete: true
+
+        - name: "Panel_Choices"
+          position: [170, -160]
+          size: [580, 50]
+          visible_when: "has_choices"
+          children_template:
+            type: "Button"
+            size: [280, 36]
+            font_size: "md"
+            normal_color: "#2980B966"
+            hover_color: "#3498DB"
+
+        - name: "Img_NextArrow"
+          anchor: "bottom_right"
+          position: [-20, 10]
+          size: [20, 20]
+          sprite: "ui_icon_arrow_down"
+          animation: "bounce_y"
+          visible_when: "has_next"
+
+# ──────────────────────────────────────────────────────────
+# 7. 상점 UI
+# ──────────────────────────────────────────────────────────
+shop_panel:
+  anchor: "center"
+  size: [750, 520]
+
+  hierarchy:
+    - name: "Panel_Shop"
+      children:
+        - name: "Tab_ShopCategory"
+          tabs: ["무기", "방어구", "포션", "재료", "기타"]
+
+        - name: "Grid_ShopItems"
+          anchor: "left"
+          size: [450, 420]
+          columns: 5
+          cell_size: [80, 100]
+          children_template:
+            children:
+              - name: "Img_Item"
+                size: [48, 48]
+                rarity_border: true
+              - name: "Txt_Name"
+                font_size: "xs"
+                max_chars: 8
+              - name: "Txt_Price"
+                font_size: "xs"
+                icon: "ui_icon_gold"
+                color: "dynamic"        # 살 수 있으면 흰색, 없으면 빨강
+
+        - name: "Panel_Preview"
+          anchor: "right"
+          size: [270, 420]
+          desc: "선택 아이템 상세 + 구매 버튼"
+          children:
+            - name: "Img_ItemLarge"
+              size: [80, 80]
+            - name: "Txt_ItemName"
+              font: "bold"
+              font_size: "lg"
+            - name: "Txt_ItemDesc"
+              font_size: "sm"
+            - name: "Spinner_Count"
+              min: 1
+              max: 99
+              default: 1
+            - name: "Txt_TotalPrice"
+              font_size: "md"
+              format: "합계: {total}"
+            - name: "Btn_Buy"
+              text: "구매"
+              size: [120, 40]
+              color: "btn_confirm"
+            - name: "Btn_Sell"
+              text: "판매"
+              size: [120, 40]
+              color: "btn_danger"
+
+# ──────────────────────────────────────────────────────────
+# 8. 세계 지도 UI
+# ──────────────────────────────────────────────────────────
+world_map_panel:
+  toggle_key: "M"
+  anchor: "center"
+  size: [1200, 800]
+  fullscreen: true
+
+  hierarchy:
+    - name: "Panel_WorldMap"
+      children:
+        - name: "Img_MapBackground"
+          type: "RawImage"
+          texture: "world_map_texture"
+          zoom_enabled: true
+          zoom_range: [0.5, 3.0]
+          pan_enabled: true
+
+        - name: "Container_ZoneLabels"
+          desc: "존 이름 + 레벨 범위 라벨"
+          children_template:
+            position: "dynamic"
+            children:
+              - name: "Txt_ZoneName"
+                font: "bold"
+                font_size: "md"
+              - name: "Txt_LevelRange"
+                font_size: "xs"
+                format: "Lv.{min}~{max}"
+                color: "dynamic"        # 적정=초록, 위험=빨강
+
+        - name: "Container_WaypointIcons"
+          desc: "워프 포인트 아이콘 (클릭 시 텔레포트)"
+          children_template:
+            type: "Button"
+            size: [32, 32]
+            sprite: "ui_icon_waypoint"
+            discovered_color: "#00FFFF"
+            undiscovered_color: "#333333"
+            click_action: "teleport"
+
+        - name: "Container_UserPins"
+          max: 5
+          pin_sprite: "ui_icon_pin"
+          pin_size: [24, 24]
+          right_click_to_place: true
+
+        - name: "Img_PlayerPosition"
+          sprite: "ui_icon_player_map"
+          size: [24, 24]
+          pulse_animation: true
+
+        - name: "Img_FogOfWar"
+          type: "mask"
+          desc: "미방문 지역 안개"
+          color: "#1A1A2ECC"
+
+# ──────────────────────────────────────────────────────────
+# 9. 강화 UI
+# ──────────────────────────────────────────────────────────
+enhance_panel:
+  anchor: "center"
+  size: [500, 450]
+
+  hierarchy:
+    - name: "Panel_Enhance"
+      children:
+        - name: "Slot_Equipment"
+          position: [0, -60]
+          size: [80, 80]
+          desc: "강화할 장비 드래그"
+          empty_text: "장비를 놓으세요"
+
+        - name: "Img_Arrow"
+          position: [0, -150]
+          sprite: "ui_icon_arrow_down"
+          size: [30, 30]
+
+        - name: "Panel_Result_Preview"
+          position: [0, -200]
+          size: [300, 80]
+          children:
+            - name: "Txt_CurrentLevel"
+              format: "+{current}"
+            - name: "Txt_Arrow"
+              text: "→"
+              color: "#FFD700"
+            - name: "Txt_NextLevel"
+              format: "+{next}"
+              color: "#FFD700"
+            - name: "Txt_StatChange"
+              format: "공격력 {old} → {new}"
+              color: "#2ECC71"
+
+        - name: "Panel_Materials"
+          position: [0, -300]
+          children:
+            - name: "Slot_Stone"
+              size: [48, 48]
+              required: "enhance_stone"
+              count_text: "{have}/{need}"
+            - name: "Txt_GoldCost"
+              format: "{gold:comma} G"
+
+        - name: "Txt_SuccessRate"
+          position: [0, -350]
+          font_size: "xl"
+          format: "성공 확률: {rate}%"
+          color: "dynamic"              # 80%+=초록, 50%+=노랑, 30%-=빨강
+
+        - name: "Btn_Enhance"
+          position: [0, -400]
+          size: [200, 50]
+          text: "강화"
+          font_size: "lg"
+          color: "btn_primary"
+          disabled_when: "insufficient_materials"
+
+  # 강화 결과 연출
+  result_animation:
+    success:
+      flash_color: "#FFD70044"
+      particle: "vfx_enhance_success"
+      sound: "sfx_enhance_success"
+      camera_shake: { intensity: 0.1, duration: 0.3 }
+      text: "강화 성공!"
+      text_color: "#FFD700"
+    failure:
+      flash_color: "#FF000044"
+      particle: "vfx_enhance_fail"
+      sound: "sfx_enhance_fail"
+      text: "강화 실패"
+      text_color: "#FF4444"
+
+# ──────────────────────────────────────────────────────────
+# 10. 경매장 UI
+# ──────────────────────────────────────────────────────────
+auction_panel:
+  anchor: "center"
+  size: [900, 600]
+
+  hierarchy:
+    - name: "Panel_Auction"
+      children:
+        - name: "Tab_Mode"
+          tabs: ["구매", "판매", "내 등록"]
+
+        - name: "Panel_Search"
+          size: [880, 40]
+          children:
+            - name: "Input_Search"
+              placeholder: "아이템 검색..."
+              size: [300, 32]
+            - name: "Dropdown_Category"
+              options: ["전체", "무기", "방어구", "소비", "재료", "보석"]
+            - name: "Dropdown_Rarity"
+              options: ["전체", "고급", "희귀", "영웅", "전설"]
+            - name: "Dropdown_Sort"
+              options: ["가격 낮은순", "가격 높은순", "최신순", "이름순"]
+            - name: "Btn_Search"
+              text: "검색"
+
+        - name: "List_Items"
+          type: "ScrollRect"
+          size: [600, 480]
+          columns_header: ["아이템", "등급", "가격", "남은시간", "판매자"]
+          row_height: 50
+
+        - name: "Panel_ItemDetail"
+          anchor: "right"
+          size: [270, 480]
+          desc: "선택 아이템 상세 + 구매/입찰"
+          children:
+            - name: "Btn_BuyNow"
+              text: "즉시 구매"
+              color: "btn_confirm"
+            - name: "Input_BidPrice"
+              type: "number"
+              placeholder: "입찰가"
+            - name: "Btn_Bid"
+              text: "입찰"
+              color: "btn_primary"
+
+# ──────────────────────────────────────────────────────────
+# 11. 설정 / ESC 메뉴
+# ──────────────────────────────────────────────────────────
+settings_panel:
+  toggle_key: "Escape"
+  anchor: "center"
+  size: [600, 500]
+  pause_game: false
+  dim_background: true
+  dim_color: "#00000066"
+
+  hierarchy:
+    - name: "Panel_Settings"
+      children:
+        - name: "Tab_Settings"
+          tabs: ["게임", "그래픽", "사운드", "조작", "접근성"]
+
+        - name: "Page_Game"
+          settings:
+            - { label: "언어", type: "dropdown", options: ["한국어", "English", "日本語"] }
+            - { label: "데미지 숫자 표시", type: "toggle", default: true }
+            - { label: "화면 흔들림", type: "toggle", default: true }
+            - { label: "자동 줍기", type: "toggle", default: false }
+            - { label: "자동 줍기 등급 필터", type: "dropdown", options: ["모두", "고급+", "희귀+"] }
+
+        - name: "Page_Graphics"
+          settings:
+            - { label: "해상도", type: "dropdown", options: "system_resolutions" }
+            - { label: "화면 모드", type: "dropdown", options: ["전체화면", "창모드", "테두리없는 창"] }
+            - { label: "그래픽 프리셋", type: "dropdown", options: ["낮음", "중간", "높음", "최고"] }
+            - { label: "안티앨리어싱", type: "dropdown", options: ["끔", "FXAA", "SMAA", "TAA"] }
+            - { label: "그림자 품질", type: "dropdown", options: ["끔", "낮음", "중간", "높음"] }
+            - { label: "이펙트 품질", type: "dropdown", options: ["낮음", "중간", "높음"] }
+            - { label: "FPS 제한", type: "dropdown", options: ["30", "60", "120", "무제한"] }
+            - { label: "VSync", type: "toggle", default: true }
+
+        - name: "Page_Sound"
+          settings:
+            - { label: "마스터 볼륨", type: "slider", range: [0, 100], default: 80 }
+            - { label: "BGM", type: "slider", range: [0, 100], default: 60 }
+            - { label: "효과음", type: "slider", range: [0, 100], default: 80 }
+            - { label: "환경음", type: "slider", range: [0, 100], default: 50 }
+            - { label: "UI 효과음", type: "slider", range: [0, 100], default: 70 }
+            - { label: "음성", type: "slider", range: [0, 100], default: 80 }
+
+        - name: "Page_Controls"
+          desc: "키바인딩 변경 (flow.yaml의 keybindings 참조)"
+          rebindable: true
+          reset_to_default: true
+
+        - name: "Page_Accessibility"
+          settings:
+            - { label: "색맹 모드", type: "dropdown", options: ["끔", "적녹색맹", "청황색맹", "전색맹"] }
+            - { label: "UI 크기", type: "slider", range: [80, 150], default: 100, format: "{value}%" }
+            - { label: "자막 크기", type: "slider", range: [80, 200], default: 100 }
+            - { label: "화면 읽기 지원", type: "toggle", default: false }
+
+        - name: "Footer_Buttons"
+          children:
+            - { name: "Btn_Resume", text: "게임으로 돌아가기", color: "btn_primary" }
+            - { name: "Btn_Character_Select", text: "캐릭터 선택" }
+            - { name: "Btn_Logout", text: "로그아웃" }
+            - { name: "Btn_Exit", text: "게임 종료", color: "btn_danger" }
+
+# ──────────────────────────────────────────────────────────
+# 12. 파티 UI
+# ──────────────────────────────────────────────────────────
+party_ui:
+  # 파티원 프레임 (좌측)
+  party_frames:
+    anchor: "left"
+    position: [20, 0]
+    size: [180, 400]
+    visible_when: "in_party"
+    max_members: 4
+    template:
+      size: [170, 80]
+      spacing: 5
+      children:
+        - name: "Img_ClassIcon"
+          size: [24, 24]
+        - name: "Txt_Name"
+          font_size: "sm"
+        - name: "Bar_HP"
+          size: [130, 12]
+          fill_color: "hp_bar"
+        - name: "Bar_MP"
+          size: [130, 8]
+          fill_color: "mp_bar"
+        - name: "Img_StatusIcon"
+          desc: "죽음/오프라인 상태"
+          size: [16, 16]
+
+  # 파티 초대 팝업
+  party_invite:
+    size: [300, 120]
+    anchor: "center"
+    children:
+      - name: "Txt_Message"
+        format: "{name}님이 파티에 초대했습니다."
+      - name: "Btn_Accept"
+        text: "수락"
+        color: "btn_confirm"
+      - name: "Btn_Decline"
+        text: "거절"
+        color: "btn_danger"
+    auto_decline: 30                   # 30초 후 자동 거절
+
+# ──────────────────────────────────────────────────────────
+# 13. 로딩 화면 UI
+# ──────────────────────────────────────────────────────────
+loading_screen:
+  size: [1920, 1080]
+  hierarchy:
+    - name: "Img_Background"
+      type: "Image"
+      size: [1920, 1080]
+      sprite: "dynamic"                # 존별 일러스트
+
+    - name: "Txt_ZoneName"
+      anchor: "center"
+      position: [0, 100]
+      font: "title"
+      font_size: 48
+      color: "#FFFFFF"
+
+    - name: "Txt_ZoneDesc"
+      anchor: "center"
+      position: [0, 60]
+      font_size: "md"
+      color: "text_secondary"
+
+    - name: "Bar_Loading"
+      anchor: "bottom_center"
+      position: [0, 80]
+      size: [600, 8]
+      fill_color: "#3498DB"
+      bg_color: "#1A1A2E"
+      corner_radius: 4
+
+    - name: "Txt_Tip"
+      anchor: "bottom_center"
+      position: [0, 110]
+      size: [800, 40]
+      font_size: "sm"
+      color: "text_secondary"
+      prefix: "TIP: "
+      random_from: "tips_pool"
+
+    - name: "Img_Logo"
+      anchor: "bottom_right"
+      position: [-40, 40]
+      size: [120, 40]
+      sprite: "ui_logo_small"
+
+# ──────────────────────────────────────────────────────────
+# 14. 확인/알림 팝업
+# ──────────────────────────────────────────────────────────
+popups:
+  confirm_dialog:
+    size: [400, 200]
+    anchor: "center"
+    modal: true                        # 뒷배경 클릭 차단
+    dim_background: true
+    children:
+      - name: "Txt_Title"
+        font: "bold"
+        font_size: "lg"
+      - name: "Txt_Message"
+        font_size: "md"
+      - name: "Btn_Confirm"
+        text: "확인"
+        color: "btn_confirm"
+        size: [120, 40]
+      - name: "Btn_Cancel"
+        text: "취소"
+        size: [120, 40]
+
+  item_acquire_popup:
+    size: [300, 150]
+    anchor: "center"
+    auto_close: 3.0
+    children:
+      - name: "Img_ItemIcon"
+        size: [64, 64]
+        rarity_glow: true
+      - name: "Txt_ItemName"
+        font: "bold"
+        color: "dynamic"
+      - name: "Txt_ItemCount"
+        format: "x{count}"
+
+  level_up_popup:
+    size: [400, 300]
+    anchor: "center"
+    auto_close: 5.0
+    animation: "level_up_fanfare"
+    children:
+      - name: "Txt_LevelUp"
+        text: "LEVEL UP!"
+        font: "title"
+        font_size: 64
+        color: "#FFD700"
+        animation: "pulse_glow"
+      - name: "Txt_NewLevel"
+        format: "Lv.{level}"
+        font_size: "xxl"
+      - name: "Panel_Unlocks"
+        desc: "해금된 컨텐츠 목록"
+        children_template:
+          format: "- {unlock_name} 해금!"
+          color: "#2ECC71"
+
+# ──────────────────────────────────────────────────────────
+# 15. 던전 UI (특수)
+# ──────────────────────────────────────────────────────────
+dungeon_ui:
+  # 던전 타이머
+  dungeon_timer:
+    anchor: "top_center"
+    position: [0, -60]
+    size: [200, 40]
+    format: "{minutes}:{seconds:02d}"
+    font_size: "xl"
+    warning_color: "#FF4444"           # 남은 시간 1분 이하
+    warning_blink: true
+
+  # 스테이지 진행
+  stage_progress:
+    anchor: "top_center"
+    position: [0, -30]
+    size: [400, 20]
+    format: "Stage {current}/{total}"
+    progress_dots: true
+
+  # 보스 기믹 안내
+  mechanic_alert:
+    anchor: "center"
+    position: [0, 150]
+    size: [600, 60]
+    font_size: "xxl"
+    color: "#FF4444"
+    animation: "pulse"
+    examples:
+      safe_zone: "안전지대로 이동하세요!"
+      stagger: "무력화 게이지를 깎으세요!"
+      counter: "카운터 공격!"
+
+  # 결과 화면
+  result_screen:
+    size: [700, 500]
+    anchor: "center"
+    children:
+      - name: "Txt_Result"
+        text: "dynamic"                # "클리어!" or "실패"
+        font: "title"
+        font_size: 48
+      - name: "Txt_Time"
+        format: "클리어 시간: {time}"
+      - name: "Panel_Rewards"
+        type: "GridLayoutGroup"
+        desc: "획득 아이템 목록"
+      - name: "Panel_Stats"
+        desc: "딜량, 힐량, 받은 피해 등"
+      - name: "Btn_Exit"
+        text: "나가기"
+      - name: "Btn_Retry"
+        text: "재도전"
+        visible_when: "failed"
