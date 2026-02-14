@@ -502,28 +502,30 @@ def build_quest_complete_result(result, quest_id, reward_exp, reward_item_id, re
         struct.pack("<BIIIH", result, quest_id, reward_exp, reward_item_id, reward_item_count))
 
 
-def build_chat_message(channel, sender_name, message):
-    """CHAT_MESSAGE(241): channel(u8) sender_len(u8) sender(var) msg_len(u16) msg(var)"""
-    sender_bytes = sender_name.encode("utf-8")
+def build_chat_message(channel, sender_entity_id, sender_name, message):
+    """CHAT_MESSAGE(241): channel(u8) sender_entity(u64) sender_name(32B) msg_len(u8) msg(var)"""
+    name_bytes = sender_name.encode("utf-8")[:32]
+    name_fixed = name_bytes + b"\x00" * (32 - len(name_bytes))
     msg_bytes = message.encode("utf-8")
-    payload = struct.pack("<BB", channel, len(sender_bytes)) + sender_bytes
-    payload += struct.pack("<H", len(msg_bytes)) + msg_bytes
+    payload = struct.pack("<BQ", channel, sender_entity_id) + name_fixed
+    payload += struct.pack("<B", len(msg_bytes)) + msg_bytes
     return build_packet(Msg.CHAT_MESSAGE, payload)
 
 
 def build_whisper_result(result, direction, partner_name, message):
-    """WHISPER_RESULT(243): result(u8) direction(u8) name_len(u8) name(var) msg_len(u16) msg(var)"""
-    name_bytes = partner_name.encode("utf-8")
+    """WHISPER_RESULT(243): result(u8) direction(u8) other_name(32B) msg_len(u8) msg(var)"""
+    name_bytes = partner_name.encode("utf-8")[:32]
+    name_fixed = name_bytes + b"\x00" * (32 - len(name_bytes))
     msg_bytes = message.encode("utf-8")
-    payload = struct.pack("<BBB", result, direction, len(name_bytes)) + name_bytes
-    payload += struct.pack("<H", len(msg_bytes)) + msg_bytes
+    payload = struct.pack("<BB", result, direction) + name_fixed
+    payload += struct.pack("<B", len(msg_bytes)) + msg_bytes
     return build_packet(Msg.WHISPER_RESULT, payload)
 
 
 def build_system_message(message):
-    """SYSTEM_MESSAGE(244): msg_len(u16) msg(var)"""
+    """SYSTEM_MESSAGE(244): msg_len(u8) msg(var)"""
     msg_bytes = message.encode("utf-8")
-    payload = struct.pack("<H", len(msg_bytes)) + msg_bytes
+    payload = struct.pack("<B", len(msg_bytes)) + msg_bytes
     return build_packet(Msg.SYSTEM_MESSAGE, payload)
 
 
@@ -536,8 +538,8 @@ def build_shop_list(npc_id, items):
 
 
 def build_shop_result(result, action, item_id, count, gold):
-    """SHOP_RESULT(254): result(u8) action(u8) item_id(u32) count(u8) gold(u32) = 11B"""
-    return build_packet(Msg.SHOP_RESULT, struct.pack("<BBIBI", result, action, item_id, count, gold))
+    """SHOP_RESULT(254): result(u8) action(u8) item_id(i32) count(i16) gold(i32) = 12B"""
+    return build_packet(Msg.SHOP_RESULT, struct.pack("<BBihI", result, action, item_id, count, gold))
 
 
 def build_skill_level_up_result(result, skill_id, new_level):
@@ -1343,10 +1345,10 @@ class ClientSession:
 
     def _on_chat_send(self, payload):
         channel = payload[0]
-        msg_len = struct.unpack_from("<H", payload, 1)[0]
-        message = payload[3:3 + msg_len].decode("utf-8")
+        msg_len = payload[1]  # u8
+        message = payload[2:2 + msg_len].decode("utf-8")
         # Echo back as CHAT_MESSAGE + broadcast to zone
-        pkt = build_chat_message(channel, self.char_name, message)
+        pkt = build_chat_message(channel, self.entity_id or 0, self.char_name, message)
         self.world.broadcast_zone(self.zone, pkt)
         print(f"[{self.addr}] Chat[ch={channel}]: {self.char_name}: {message}")
 
@@ -1354,8 +1356,8 @@ class ClientSession:
         name_len = payload[0]
         target_name = payload[1:1 + name_len].decode("utf-8")
         msg_off = 1 + name_len
-        msg_len = struct.unpack_from("<H", payload, msg_off)[0]
-        message = payload[msg_off + 2:msg_off + 2 + msg_len].decode("utf-8")
+        msg_len = payload[msg_off]  # u8
+        message = payload[msg_off + 1:msg_off + 1 + msg_len].decode("utf-8")
         # Find target player by name
         target_session = None
         with self.world.lock:
