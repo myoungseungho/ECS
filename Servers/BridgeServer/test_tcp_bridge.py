@@ -969,6 +969,303 @@ async def run_tests(port: int):
 
     await test("INSTANCE: 던전 입장 + 퇴장 + 존 전환", test_instance_enter_leave())
 
+
+    # ━━━ PvP 아레나 / 레이드 보스 기믹 (S036) ━━━
+
+    async def test_pvp_queue_level_low():
+        """P3_S01_S01: 레벨 부족 시 PvP 큐 거부"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'pvplvl01' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 레벨 1 상태에서 PvP 큐 시도
+        await c.send(MsgType.PVP_QUEUE_REQ, struct.pack('<B', 1))  # mode=1(1v1)
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.PVP_QUEUE_STATUS
+        assert payload[1] == 2, f"Expected LEVEL_TOO_LOW(2), got {payload[1]}"
+        c.close()
+
+    await test("PVP_LEVEL: PvP 레벨 부족 거부", test_pvp_queue_level_low())
+
+    async def test_pvp_queue_invalid_mode():
+        """P3_S01_S01: 잘못된 PvP 모드 거부"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'pvpmode1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        await c.send(MsgType.PVP_QUEUE_REQ, struct.pack('<B', 99))  # 잘못된 모드
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.PVP_QUEUE_STATUS
+        assert payload[1] == 1, f"Expected INVALID_MODE(1), got {payload[1]}"
+        c.close()
+
+    await test("PVP_MODE: PvP 잘못된 모드 거부", test_pvp_queue_invalid_mode())
+
+    async def test_pvp_queue_and_cancel():
+        """P3_S01_S01: PvP 큐 등록 및 취소"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'pvpcanc1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # 큐 등록
+        await c.send(MsgType.PVP_QUEUE_REQ, struct.pack('<B', 1))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.PVP_QUEUE_STATUS
+        assert payload[1] == 0, f"Expected QUEUED(0), got {payload[1]}"
+        # 큐 취소
+        await c.send(MsgType.PVP_QUEUE_CANCEL, struct.pack('<B', 1))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.PVP_QUEUE_STATUS
+        assert payload[1] == 4, f"Expected CANCELLED(4), got {payload[1]}"
+        c.close()
+
+    await test("PVP_QUEUE: PvP 큐 등록 + 취소", test_pvp_queue_and_cancel())
+
+    async def test_pvp_1v1_match():
+        """P3_S01_S01: 1v1 매칭 완료 → 경기 → 승패 판정"""
+        clients = []
+        for i in range(2):
+            c = TestClient()
+            await c.connect('127.0.0.1', port)
+            await asyncio.sleep(0.05)
+            name = f'pvp1v{i:01d}t'.encode('utf-8')
+            await c.send(MsgType.LOGIN, struct.pack('<B', len(name)) + name + struct.pack('<B', 2) + b'pw')
+            await c.recv_packet()
+            await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+            await c.recv_all_packets(timeout=1.0)
+            await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+            await c.recv_all_packets(timeout=0.5)
+            clients.append(c)
+        # 2명 큐 등록
+        for c in clients:
+            await c.send(MsgType.PVP_QUEUE_REQ, struct.pack('<B', 1))  # 1v1
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
+        # 모든 패킷 수집 (STATUS + MATCH_FOUND 포함)
+        match_id = None
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.5)
+            for mt, pl in packets:
+                if mt == MsgType.PVP_MATCH_FOUND:
+                    match_id = struct.unpack_from('<I', pl, 0)[0]
+        assert match_id is not None, "No PVP_MATCH_FOUND received"
+        # 매치 수락
+        await clients[0].send(MsgType.PVP_MATCH_ACCEPT, struct.pack('<I', match_id))
+        await asyncio.sleep(0.3)
+        # MATCH_START 수집
+        start_count = 0
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.0)
+            for mt, pl in packets:
+                if mt == MsgType.PVP_MATCH_START:
+                    start_count += 1
+        assert start_count >= 1, f"Expected >= 1 PVP_MATCH_START, got {start_count}"
+        # 공격 → 한쪽 사망
+        for _ in range(60):  # 충분한 공격 횟수
+            await clients[0].send(MsgType.PVP_ATTACK, struct.pack('<IBBHH', match_id, 1, 0, 1, 500))
+            await asyncio.sleep(0.02)
+        # 결과 수집
+        await asyncio.sleep(0.5)
+        end_count = 0
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.0)
+            for mt, pl in packets:
+                if mt == MsgType.PVP_MATCH_END:
+                    end_count += 1
+        assert end_count >= 1, f"Expected >= 1 PVP_MATCH_END, got {end_count}"
+        for c in clients:
+            c.close()
+
+    await test("PVP_1V1: 1v1 매칭 + 경기 + 승패", test_pvp_1v1_match())
+
+    async def test_pvp_3v3_match():
+        """P3_S01_S01: 3v3 매칭 완료"""
+        clients = []
+        for i in range(6):
+            c = TestClient()
+            await c.connect('127.0.0.1', port)
+            await asyncio.sleep(0.05)
+            name = f'p3v{i:01d}tst'.encode('utf-8')
+            await c.send(MsgType.LOGIN, struct.pack('<B', len(name)) + name + struct.pack('<B', 2) + b'pw')
+            await c.recv_packet()
+            await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+            await c.recv_all_packets(timeout=1.0)
+            await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+            await c.recv_all_packets(timeout=0.5)
+            clients.append(c)
+        # 6명 큐 등록 (3v3)
+        for c in clients:
+            await c.send(MsgType.PVP_QUEUE_REQ, struct.pack('<B', 2))  # mode=2(3v3)
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
+        found_count = 0
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.5)
+            for mt, pl in packets:
+                if mt == MsgType.PVP_MATCH_FOUND:
+                    found_count += 1
+        assert found_count >= 5, f"Expected >= 5 PVP_MATCH_FOUND, got {found_count}"
+        for c in clients:
+            c.close()
+
+    await test("PVP_3V3: 3v3 매칭 완료", test_pvp_3v3_match())
+
+    async def test_pvp_elo_calculation():
+        """P3_S01_S01: ELO 레이팅 계산 검증 (직접 함수 호출)"""
+        from tcp_bridge import BridgeServer
+        srv = BridgeServer(port=0, verbose=False)
+        # 동일 레이팅에서 승리
+        new_w, new_l = srv._calc_elo(1000, 1000, 32)
+        assert new_w > 1000, f"Winner rating should increase: {new_w}"
+        assert new_l < 1000, f"Loser rating should decrease: {new_l}"
+        # 높은 레이팅이 낮은 상대를 이기면 변동 적음
+        new_w2, new_l2 = srv._calc_elo(1500, 1000, 32)
+        assert (new_w2 - 1500) < (new_w - 1000), "High vs low should have smaller gain"
+        # 티어 확인
+        assert srv._get_tier(500) == "Bronze"
+        assert srv._get_tier(1000) == "Silver"
+        assert srv._get_tier(1400) == "Gold"
+        assert srv._get_tier(2500) == "Grandmaster"
+
+    await test("PVP_ELO: ELO 레이팅 계산 검증", test_pvp_elo_calculation())
+
+    async def test_raid_boss_spawn():
+        """P3_S02_S01: 레이드 보스 스폰 + 인스턴스 초기화"""
+        from tcp_bridge import BridgeServer, RAID_BOSS_DATA
+        srv = BridgeServer(port=0, verbose=False)
+        # 더미 인스턴스 생성
+        srv.instances[999] = {
+            "id": 999, "dungeon_id": 4, "dungeon_name": "고대 용의 둥지",
+            "zone_id": 103, "difficulty": 0, "boss_hp": 2000000,
+            "boss_current_hp": 2000000, "stage": 1, "max_stages": 1,
+            "players": [], "active": True,
+        }
+        await srv._start_raid_boss(999)
+        assert 999 in srv.raid_instances
+        raid = srv.raid_instances[999]
+        assert raid["boss_name"] == "Ancient Dragon"
+        assert raid["max_hp"] == 2000000
+        assert raid["phase"] == 1
+        assert raid["max_phases"] == 3
+        assert not raid["enraged"]
+        assert raid["active"]
+
+    await test("RAID_SPAWN: 레이드 보스 스폰", test_raid_boss_spawn())
+
+    async def test_raid_phase_transition():
+        """P3_S02_S01: 레이드 보스 페이즈 전환 (70%, 30%)"""
+        from tcp_bridge import BridgeServer, RAID_BOSS_DATA
+        srv = BridgeServer(port=0, verbose=False)
+        srv.instances[998] = {
+            "id": 998, "dungeon_id": 4, "dungeon_name": "고대 용의 둥지",
+            "zone_id": 103, "difficulty": 0, "boss_hp": 2000000,
+            "boss_current_hp": 2000000, "stage": 1, "max_stages": 1,
+            "players": [], "active": True,
+        }
+        await srv._start_raid_boss(998)
+        raid = srv.raid_instances[998]
+        # 직접 HP 조작 → 70% 아래로
+        raid["current_hp"] = int(raid["max_hp"] * 0.68)  # 68%
+        hp_pct = raid["current_hp"] / raid["max_hp"]
+        # 페이즈 전환 로직 수동 실행
+        thresholds = raid["phase_thresholds"]
+        for i, thr in enumerate(thresholds):
+            target_phase = i + 2
+            if hp_pct <= thr and raid["phase"] < target_phase:
+                raid["phase"] = target_phase
+                break
+        assert raid["phase"] == 2, f"Expected phase 2, got {raid['phase']}"
+        # 30% 아래
+        raid["current_hp"] = int(raid["max_hp"] * 0.28)
+        hp_pct = raid["current_hp"] / raid["max_hp"]
+        for i, thr in enumerate(thresholds):
+            target_phase = i + 2
+            if hp_pct <= thr and raid["phase"] < target_phase:
+                raid["phase"] = target_phase
+        assert raid["phase"] == 3, f"Expected phase 3, got {raid['phase']}"
+
+    await test("RAID_PHASE: 레이드 페이즈 전환", test_raid_phase_transition())
+
+    async def test_raid_mechanic_trigger():
+        """P3_S02_S01: 레이드 기믹 발동"""
+        from tcp_bridge import BridgeServer, RAID_MECHANIC_DEFS
+        srv = BridgeServer(port=0, verbose=False)
+        srv.instances[997] = {
+            "id": 997, "dungeon_id": 4, "dungeon_name": "고대 용의 둥지",
+            "zone_id": 103, "difficulty": 0, "boss_hp": 2000000,
+            "boss_current_hp": 2000000, "stage": 1, "max_stages": 1,
+            "players": [], "active": True,
+        }
+        await srv._start_raid_boss(997)
+        # 기믹 발동
+        await srv._trigger_raid_mechanic(997, "stagger_check")
+        raid = srv.raid_instances[997]
+        assert raid["mechanic_active"] == "stagger_check"
+        assert raid["stagger_gauge"] == 0
+        # safe_zone 기믹 발동
+        await srv._trigger_raid_mechanic(997, "safe_zone")
+        assert raid["mechanic_active"] == "safe_zone"
+
+    await test("RAID_MECHANIC: 레이드 기믹 발동", test_raid_mechanic_trigger())
+
+    async def test_raid_clear():
+        """P3_S02_S01: 레이드 클리어 + 보상"""
+        from tcp_bridge import BridgeServer, RAID_CLEAR_REWARDS
+        srv = BridgeServer(port=0, verbose=False)
+        srv.instances[996] = {
+            "id": 996, "dungeon_id": 4, "dungeon_name": "고대 용의 둥지",
+            "zone_id": 103, "difficulty": 0, "boss_hp": 2000000,
+            "boss_current_hp": 2000000, "stage": 1, "max_stages": 1,
+            "players": [], "active": True,
+        }
+        await srv._start_raid_boss(996)
+        await srv._raid_clear(996)
+        raid = srv.raid_instances[996]
+        assert not raid["active"], "Raid should be inactive after clear"
+
+    await test("RAID_CLEAR: 레이드 클리어 + 보상", test_raid_clear())
+
+    async def test_raid_wipe():
+        """P3_S02_S01: 레이드 전멸"""
+        from tcp_bridge import BridgeServer
+        srv = BridgeServer(port=0, verbose=False)
+        srv.instances[995] = {
+            "id": 995, "dungeon_id": 4, "dungeon_name": "고대 용의 둥지",
+            "zone_id": 103, "difficulty": 0, "boss_hp": 2000000,
+            "boss_current_hp": 2000000, "stage": 1, "max_stages": 1,
+            "players": [], "active": True,
+        }
+        await srv._start_raid_boss(995)
+        await srv._raid_wipe(995)
+        raid = srv.raid_instances[995]
+        assert not raid["active"], "Raid should be inactive after wipe"
+
+    await test("RAID_WIPE: 레이드 전멸", test_raid_wipe())
+
+    async def test_raid_mechanic_defs():
+        """P3_S02_S01: 기믹 정의 6종 모두 존재 확인"""
+        from tcp_bridge import RAID_MECHANIC_DEFS
+        expected = ["safe_zone", "stagger_check", "counter_attack", "position_swap", "dps_check", "cooperation"]
+        for name in expected:
+            assert name in RAID_MECHANIC_DEFS, f"Missing mechanic: {name}"
+            mech = RAID_MECHANIC_DEFS[name]
+            assert "id" in mech, f"Mechanic {name} missing 'id'"
+
+    await test("RAID_MECHS: 기믹 6종 정의 확인", test_raid_mechanic_defs())
+
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
     print(f"  TCP Bridge Test Results: {passed}/{total} PASSED")

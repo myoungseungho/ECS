@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-14T23:25:00"
+last_session: "2026-02-15T00:35:00"
 
 # ── 현재 상태 ──
-current_status: "S035 GDD 서버 태스크 2건 구현 완료 — 필드 몬스터 확장(P2_S01_S01)+던전 매칭(P2_S03_S01) (34/34 PASS). P3 PvP/레이드 대기."
+current_status: "S036 GDD P3 서버 태스크 2건 완료 — PvP 아레나(P3_S01_S01, 350-359)+레이드 보스 기믹(P3_S02_S01, 370-379) (46/46 PASS). GDD 서버 태스크 전부 done."
 
 # ── 완료된 작업 ──
 completed:
@@ -52,6 +52,9 @@ completed:
   - id: S035
     desc: "GDD 서버 태스크 2건: 필드 몬스터 확장(P2_S01_S01, zone1-3 총 30마리)+던전 매칭(P2_S03_S01, MATCH/INSTANCE 핸들러 6개+던전 4종). 34/34 PASS."
     files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch_s035.py"]
+  - id: S036
+    desc: "GDD P3 서버 태스크 2건: PvP 아레나(P3_S01_S01, 1v1/3v3 매칭+스탯정규화+ELO+승패판정, MsgType 350-359)+레이드 보스 기믹(P3_S02_S01, 3페이즈+기믹6종+enrage+클리어보상, MsgType 370-379). 46/46 PASS."
+    files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch_s036.py"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked:
@@ -69,15 +72,16 @@ pending_tasks:
     priority: P0
     blocked: true
     blocked_reason: "클라이언트 테스트 결과 대기"
-  - id: "gdd_remaining_tasks"
-    desc: "GDD 남은 서버 태스크: P3_S01_S01(PvP 아레나), P3_S02_S01(레이드 보스 기믹)"
-    priority: P1
-    blocked: false
   - id: "entity_pipeline_review"
     desc: "C016 엔티티 파이프라인 제안 상세 검토 (Phase 2 이후)"
     priority: P3
     blocked: true
     blocked_reason: "Phase 2 완료 후"
+  - id: "gdd_polish"
+    desc: "GDD 서버 태스크 전부 done — 추후 밸런싱/폴리싱 대기"
+    priority: P3
+    blocked: true
+    blocked_reason: "클라이언트 구현 + 통합 테스트 후"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -124,4 +128,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python test_tcp_bridge.py

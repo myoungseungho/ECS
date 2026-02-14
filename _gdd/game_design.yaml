@@ -806,7 +806,10 @@ phases:
         - id: "P3_S01_S01"
           task: "PVP_MATCH 패킷 + 아레나 로직"
           detail: "매칭 큐 + 별도 존 생성 + 스탯 정규화 + 승패 판정"
-          status: todo
+          status: done
+          impl_session: S036
+          packets: "PVP_QUEUE_REQ(350)~PVP_RATING_INFO(359)"
+          features: "1v1/3v3 매칭, 스탯 정규화(pvp.yaml), ELO 레이팅, 공격+승패판정"
 
     - id: "P3_S02"
       name: "레이드 보스"
@@ -825,7 +828,10 @@ phases:
         - id: "P3_S02_S01"
           task: "레이드 인스턴스 + 보스 기믹"
           detail: "기존 보스(Session 34) 확장. 8인 파티. 기믹 패턴 추가."
-          status: todo
+          status: done
+          impl_session: S036
+          packets: "RAID_BOSS_SPAWN(370)~RAID_ATTACK_RESULT(379)"
+          features: "3페이즈 보스, 기믹 6종(safe_zone/stagger/counter/position_swap/dps_check/cooperation), enrage, 클리어 보상"
 
 # ============================================================
 # HUD & 공통 UI (모든 씬에서 사용)

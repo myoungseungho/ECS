@@ -245,6 +245,30 @@ class MsgType(IntEnum):
     ENHANCE_REQ = 340
     ENHANCE_RESULT = 341
 
+    # PvP Arena (P3_S01_S01)
+    PVP_QUEUE_REQ = 350       # 아레나 매칭 큐 등록
+    PVP_QUEUE_CANCEL = 351    # 아레나 매칭 큐 취소
+    PVP_QUEUE_STATUS = 352    # 아레나 매칭 상태
+    PVP_MATCH_FOUND = 353     # 아레나 매칭 완료
+    PVP_MATCH_ACCEPT = 354    # 아레나 매칭 수락
+    PVP_MATCH_START = 355     # 아레나 경기 시작
+    PVP_MATCH_END = 356       # 아레나 경기 종료 (결과)
+    PVP_ATTACK = 357          # PvP 공격
+    PVP_ATTACK_RESULT = 358   # PvP 공격 결과
+    PVP_RATING_INFO = 359     # 레이팅 정보
+
+    # Raid Boss Gimmick (P3_S02_S01)
+    RAID_BOSS_SPAWN = 370     # 레이드 보스 스폰
+    RAID_PHASE_CHANGE = 371   # 보스 페이즈 전환
+    RAID_MECHANIC = 372       # 기믹 발동
+    RAID_MECHANIC_RESULT = 373  # 기믹 결과 (성공/실패)
+    RAID_STAGGER = 374        # 스태거 게이지 업데이트
+    RAID_ENRAGE = 375         # 격노
+    RAID_WIPE = 376           # 전멸
+    RAID_CLEAR = 377          # 클리어
+    RAID_ATTACK = 378         # 레이드 공격
+    RAID_ATTACK_RESULT = 379  # 레이드 공격 결과
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -487,6 +511,9 @@ ZONE_BOUNDS = {
     101: {"min_x": 0, "max_x": 800, "min_z": 0, "max_z": 800},    # frozen_temple
     102: {"min_x": 0, "max_x": 600, "min_z": 0, "max_z": 600},    # demon_fortress
     103: {"min_x": 0, "max_x": 1000, "min_z": 0, "max_z": 1000},  # ancient_dragon_raid
+    # PvP 아레나
+    200: {"min_x": 0, "max_x": 300, "min_z": 0, "max_z": 300},    # pvp_arena_1v1
+    201: {"min_x": 0, "max_x": 500, "min_z": 0, "max_z": 500},    # pvp_arena_3v3
 }
 
 # 서버 리스트 (서버 선택 화면용)
@@ -583,6 +610,64 @@ DIFFICULTY_MULT = {
     "hell":   {"hp": 4.0, "atk": 2.5, "reward": 4.0},
 }
 
+# ──── PvP 아레나 상수 (P3_S01_S01) ────
+PVP_MODES = {
+    1: {"name": "1v1", "party_size": 1, "time_limit": 180, "overtime": 60},
+    2: {"name": "3v3", "party_size": 3, "time_limit": 300, "overtime": 60},
+}
+PVP_NORMALIZED_STATS = {
+    1: {"hp": 12000, "mp": 3000, "atk": 350, "def": 250, "name": "warrior"},  # warrior
+    2: {"hp": 7000, "mp": 6000, "atk": 450, "def": 120, "name": "mage"},      # mage
+    3: {"hp": 8000, "mp": 4000, "atk": 400, "def": 150, "name": "archer"},     # archer
+}
+PVP_DAMAGE_REDUCTION = 0.40
+PVP_HEALING_REDUCTION = 0.30
+PVP_CC_REDUCTION = 0.50
+PVP_MIN_LEVEL = 20
+PVP_ELO_INITIAL = 1000
+PVP_ELO_K_BASE = 32
+PVP_ELO_K_PLACEMENT = 64
+PVP_ELO_K_HIGH = 16  # rating >= 2000
+PVP_MATCH_RANGE_INITIAL = 100
+PVP_MATCH_RANGE_EXPAND = 50
+PVP_MATCH_RANGE_MAX = 500
+PVP_TIERS = [
+    (0, 999, "Bronze"), (1000, 1299, "Silver"), (1300, 1599, "Gold"),
+    (1600, 1899, "Platinum"), (1900, 2199, "Diamond"),
+    (2200, 2499, "Master"), (2500, 9999, "Grandmaster"),
+]
+PVP_ZONE_ID = 200  # PvP arena zone
+
+# ──── 레이드 보스 상수 (P3_S02_S01) ────
+RAID_BOSS_DATA = {
+    "ancient_dragon": {
+        "name": "Ancient Dragon",
+        "phases": 3,
+        "hp": {"normal": 2000000, "hard": 5000000},
+        "atk": {"normal": 500, "hard": 800},
+        "phase_thresholds": [0.70, 0.30],  # 70%, 30% HP
+        "enrage_timer": {"normal": 600, "hard": 480},
+        "mechanics_by_phase": {
+            1: ["safe_zone", "counter_attack"],
+            2: ["safe_zone", "stagger_check", "position_swap"],
+            3: ["safe_zone", "stagger_check", "counter_attack", "dps_check", "cooperation"],
+        },
+    },
+}
+RAID_MECHANIC_DEFS = {
+    "safe_zone":      {"id": 1, "warn_time": 3.0, "damage_pct": 0.80},
+    "stagger_check":  {"id": 2, "gauge": 100, "time_limit": 10.0, "fail": "wipe"},
+    "counter_attack": {"id": 3, "window": 1.5, "stun_dur": 5.0},
+    "position_swap":  {"id": 4, "warn_time": 5.0, "damage_pct": 0.60},
+    "dps_check":      {"id": 5, "time_limit": 15.0, "threshold_pct": 0.10, "fail": "wipe"},
+    "cooperation":    {"id": 6, "tolerance": 1.0, "fail_damage_pct": 0.50},
+}
+RAID_CLEAR_REWARDS = {
+    "normal": {"gold": 10000, "exp": 50000, "tokens": 200},
+    "hard":   {"gold": 25000, "exp": 100000, "tokens": 500},
+}
+RAID_ZONE_ID = 103  # ancient_dragon_raid zone
+
 # 이동 상수
 MOVEMENT = {
     "base_speed": 200.0,
@@ -619,6 +704,11 @@ class BridgeServer:
         self.instances: Dict[int, dict] = {}  # instance_id -> instance data
         self.next_instance_id = 1
         self.match_queue: Dict[int, dict] = {}  # dungeon_id -> {players: [], created_at: float}
+        self.pvp_queue: Dict[int, list] = {}  # mode_id -> [{session, rating, joined_at}]
+        self.pvp_matches: Dict[int, dict] = {}  # match_id -> match data
+        self.next_pvp_match_id = 1
+        self.pvp_ratings: Dict[str, dict] = {}  # username -> {rating, wins, losses, matches}
+        self.raid_instances: Dict[int, dict] = {}  # instance_id -> raid data
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -821,6 +911,11 @@ class BridgeServer:
             MsgType.MATCH_ACCEPT: self._on_match_accept,
             MsgType.INSTANCE_ENTER: self._on_instance_enter,
             MsgType.INSTANCE_LEAVE: self._on_instance_leave,
+            MsgType.PVP_QUEUE_REQ: self._on_pvp_queue_req,
+            MsgType.PVP_QUEUE_CANCEL: self._on_pvp_queue_cancel,
+            MsgType.PVP_MATCH_ACCEPT: self._on_pvp_match_accept,
+            MsgType.PVP_ATTACK: self._on_pvp_attack,
+            MsgType.RAID_ATTACK: self._on_raid_attack,
         }
 
         handler = handlers.get(msg_type)
@@ -2836,6 +2931,355 @@ class BridgeServer:
         session.pos.z = 150.0
         self.log(f"InstanceLeave: {session.char_name} ← Instance#{inst_id}", "GAME")
         self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 0))  # 0=OK
+
+    # ━━━ PvP 아레나 시스템 (P3_S01_S01) ━━━
+
+    def _get_pvp_rating(self, username: str) -> dict:
+        """PvP 레이팅 조회 (없으면 초기값 생성)"""
+        if username not in self.pvp_ratings:
+            self.pvp_ratings[username] = {
+                "rating": PVP_ELO_INITIAL,
+                "wins": 0, "losses": 0, "matches": 0,
+            }
+        return self.pvp_ratings[username]
+
+    def _get_tier(self, rating: int) -> str:
+        """ELO 레이팅으로 티어 문자열 반환"""
+        for lo, hi, name in PVP_TIERS:
+            if lo <= rating <= hi:
+                return name
+        return "Bronze"
+
+    def _calc_elo(self, winner_r: int, loser_r: int, k: int) -> tuple:
+        """ELO 계산 → (new_winner_rating, new_loser_rating)"""
+        exp_w = 1.0 / (1.0 + 10 ** ((loser_r - winner_r) / 400.0))
+        exp_l = 1.0 - exp_w
+        new_w = max(0, int(winner_r + k * (1.0 - exp_w)))
+        new_l = max(0, int(loser_r + k * (0.0 - exp_l)))
+        return new_w, new_l
+
+    async def _on_pvp_queue_req(self, session: PlayerSession, payload: bytes):
+        """PVP_QUEUE_REQ: mode(u8). 아레나 매칭 큐 등록."""
+        if not session.in_game or len(payload) < 1:
+            return
+        mode_id = payload[0]
+        mode = PVP_MODES.get(mode_id)
+        if not mode:
+            self._send(session, MsgType.PVP_QUEUE_STATUS, struct.pack("<BBH", mode_id, 1, 0))  # 1=INVALID_MODE
+            return
+        if session.stats.level < PVP_MIN_LEVEL:
+            self._send(session, MsgType.PVP_QUEUE_STATUS, struct.pack("<BBH", mode_id, 2, 0))  # 2=LEVEL_TOO_LOW
+            return
+        if mode_id not in self.pvp_queue:
+            self.pvp_queue[mode_id] = []
+        queue = self.pvp_queue[mode_id]
+        if any(e["session"] is session for e in queue):
+            self._send(session, MsgType.PVP_QUEUE_STATUS, struct.pack("<BBH", mode_id, 3, len(queue)))  # 3=ALREADY_QUEUED
+            return
+        import time as _t
+        rating_info = self._get_pvp_rating(session.username)
+        queue.append({"session": session, "rating": rating_info["rating"], "joined_at": _t.time()})
+        self.log(f"PvPQueue: {session.char_name} joined mode={mode['name']} rating={rating_info['rating']} ({len(queue)} in queue)", "PVP")
+        self._send(session, MsgType.PVP_QUEUE_STATUS, struct.pack("<BBH", mode_id, 0, len(queue)))  # 0=QUEUED
+        # 매칭 시도
+        needed = mode["party_size"] * 2  # 양쪽 합계
+        if len(queue) >= needed:
+            await self._pvp_match_found(mode_id, mode)
+
+    async def _pvp_match_found(self, mode_id: int, mode: dict):
+        """PvP 매칭 완료 → 매치 생성"""
+        queue = self.pvp_queue.get(mode_id, [])
+        needed = mode["party_size"] * 2
+        if len(queue) < needed:
+            return
+        # 레이팅 가까운 순으로 정렬 후 추출
+        queue.sort(key=lambda e: e["rating"])
+        picked = queue[:needed]
+        self.pvp_queue[mode_id] = queue[needed:]
+        # 팀 분배: 짝수=Team A, 홀수=Team B (레이팅 밸런스)
+        team_a = [picked[i] for i in range(0, needed, 2)]
+        team_b = [picked[i] for i in range(1, needed, 2)]
+        match_id = self.next_pvp_match_id
+        self.next_pvp_match_id += 1
+        # 스탯 정규화 적용
+        match_data = {
+            "id": match_id,
+            "mode_id": mode_id,
+            "mode": mode,
+            "team_a": [e["session"] for e in team_a],
+            "team_b": [e["session"] for e in team_b],
+            "team_a_hp": {},  # session -> current_hp
+            "team_b_hp": {},
+            "active": True,
+            "zone_id": 200 if mode_id == 1 else 201,
+            "started": False,
+        }
+        # 각 플레이어에 정규화 스탯 적용
+        all_players = team_a + team_b
+        for entry in all_players:
+            s = entry["session"]
+            job = 1  # default warrior
+            if hasattr(s, "job_id"):
+                job = s.job_id
+            norm = PVP_NORMALIZED_STATS.get(job, PVP_NORMALIZED_STATS[1])
+            hp = norm["hp"]
+            if s in [e["session"] for e in team_a]:
+                match_data["team_a_hp"][id(s)] = hp
+            else:
+                match_data["team_b_hp"][id(s)] = hp
+        self.pvp_matches[match_id] = match_data
+        self.log(f"PvP Match #{match_id} created: {mode['name']} ({len(team_a)}v{len(team_b)})", "PVP")
+        # PVP_MATCH_FOUND 전송
+        for entry in all_players:
+            s = entry["session"]
+            team_id = 0 if s in match_data["team_a"] else 1
+            self._send(s, MsgType.PVP_MATCH_FOUND, struct.pack("<IBB", match_id, mode_id, team_id))
+
+    async def _on_pvp_queue_cancel(self, session: PlayerSession, payload: bytes):
+        """PVP_QUEUE_CANCEL: mode(u8). 큐에서 이탈."""
+        if not session.in_game or len(payload) < 1:
+            return
+        mode_id = payload[0]
+        queue = self.pvp_queue.get(mode_id, [])
+        self.pvp_queue[mode_id] = [e for e in queue if e["session"] is not session]
+        self.log(f"PvPQueue: {session.char_name} left mode={mode_id}", "PVP")
+        self._send(session, MsgType.PVP_QUEUE_STATUS, struct.pack("<BBH", mode_id, 4, 0))  # 4=CANCELLED
+
+    async def _on_pvp_match_accept(self, session: PlayerSession, payload: bytes):
+        """PVP_MATCH_ACCEPT: match_id(u32). 매치 수락 → 시작."""
+        if not session.in_game or len(payload) < 4:
+            return
+        match_id = struct.unpack("<I", payload[:4])[0]
+        match = self.pvp_matches.get(match_id)
+        if not match or not match["active"]:
+            return
+        if not match["started"]:
+            match["started"] = True
+            import time as _t
+            match["start_time"] = _t.time()
+            # 존 전환 + 스탯 정규화 적용
+            all_players = match["team_a"] + match["team_b"]
+            for s in all_players:
+                s.zone_id = match["zone_id"]
+            # PVP_MATCH_START 전송: match_id(u32) + mode(u8) + time_limit(u16)
+            for s in all_players:
+                team_id = 0 if s in match["team_a"] else 1
+                self._send(s, MsgType.PVP_MATCH_START, struct.pack("<IBH", match_id, team_id, match["mode"]["time_limit"]))
+            self.log(f"PvP Match #{match_id} STARTED", "PVP")
+
+    async def _on_pvp_attack(self, session: PlayerSession, payload: bytes):
+        """PVP_ATTACK: match_id(u32) + target_team(u8) + target_idx(u8) + skill_id(u16) + damage(u16)."""
+        if not session.in_game or len(payload) < 10:
+            return
+        match_id, target_team, target_idx, skill_id, raw_dmg = struct.unpack("<IBBHH", payload[:10])
+        match = self.pvp_matches.get(match_id)
+        if not match or not match["active"] or not match["started"]:
+            return
+        # PvP 데미지 감소 적용
+        damage = int(raw_dmg * (1.0 - PVP_DAMAGE_REDUCTION))
+        # 타겟 팀에서 대상 찾기
+        target_list = match["team_b"] if target_team == 1 else match["team_a"]
+        hp_map = match["team_b_hp"] if target_team == 1 else match["team_a_hp"]
+        if target_idx >= len(target_list):
+            return
+        target = target_list[target_idx]
+        target_key = id(target)
+        current_hp = hp_map.get(target_key, 0)
+        new_hp = max(0, current_hp - damage)
+        hp_map[target_key] = new_hp
+        # PVP_ATTACK_RESULT: match_id(u32) + attacker_team(u8) + target_team(u8) + target_idx(u8) + damage(u16) + remaining_hp(u32)
+        attacker_team = 0 if session in match["team_a"] else 1
+        result_pkt = struct.pack("<IBBBHI", match_id, attacker_team, target_team, target_idx, damage, new_hp)
+        for s in match["team_a"] + match["team_b"]:
+            self._send(s, MsgType.PVP_ATTACK_RESULT, result_pkt)
+        # 승패 확인
+        if new_hp <= 0:
+            alive_a = sum(1 for s in match["team_a"] if match["team_a_hp"].get(id(s), 0) > 0)
+            alive_b = sum(1 for s in match["team_b"] if match["team_b_hp"].get(id(s), 0) > 0)
+            if alive_a == 0 or alive_b == 0:
+                winner_team = 1 if alive_a == 0 else 0
+                await self._pvp_match_end(match_id, winner_team)
+
+    async def _pvp_match_end(self, match_id: int, winner_team: int):
+        """PvP 경기 종료 → ELO 계산 → 결과 전송"""
+        match = self.pvp_matches.get(match_id)
+        if not match or not match["active"]:
+            return
+        match["active"] = False
+        winners = match["team_a"] if winner_team == 0 else match["team_b"]
+        losers = match["team_b"] if winner_team == 0 else match["team_a"]
+        # ELO 계산
+        for w in winners:
+            w_info = self._get_pvp_rating(w.username)
+            avg_loser_r = sum(self._get_pvp_rating(l.username)["rating"] for l in losers) // max(1, len(losers))
+            k = PVP_ELO_K_PLACEMENT if w_info["matches"] < 10 else (PVP_ELO_K_HIGH if w_info["rating"] >= 2000 else PVP_ELO_K_BASE)
+            new_r, _ = self._calc_elo(w_info["rating"], avg_loser_r, k)
+            w_info["rating"] = new_r
+            w_info["wins"] += 1
+            w_info["matches"] += 1
+        for l in losers:
+            l_info = self._get_pvp_rating(l.username)
+            avg_winner_r = sum(self._get_pvp_rating(w.username)["rating"] for w in winners) // max(1, len(winners))
+            k = PVP_ELO_K_PLACEMENT if l_info["matches"] < 10 else (PVP_ELO_K_HIGH if l_info["rating"] >= 2000 else PVP_ELO_K_BASE)
+            _, new_r = self._calc_elo(avg_winner_r, l_info["rating"], k)
+            l_info["rating"] = new_r
+            l_info["losses"] += 1
+            l_info["matches"] += 1
+        # PVP_MATCH_END 전송: match_id(u32) + winner_team(u8) + new_rating(u16) + rating_change(i16)
+        all_players = match["team_a"] + match["team_b"]
+        for s in all_players:
+            r_info = self._get_pvp_rating(s.username)
+            team_id = 0 if s in match["team_a"] else 1
+            won = 1 if team_id == winner_team else 0
+            tier_str = self._get_tier(r_info["rating"])
+            tier_bytes = tier_str.encode("utf-8")[:16].ljust(16, b"\x00")
+            buf = struct.pack("<IBBH", match_id, winner_team, won, r_info["rating"])
+            buf += tier_bytes
+            self._send(s, MsgType.PVP_MATCH_END, buf)
+            # 마을로 복귀
+            s.zone_id = 10
+        self.log(f"PvP Match #{match_id} ended: Team {winner_team} wins", "PVP")
+
+    # ━━━ 레이드 보스 기믹 시스템 (P3_S02_S01) ━━━
+
+    async def _start_raid_boss(self, instance_id: int):
+        """레이드 인스턴스에 보스 스폰 + 기믹 초기화"""
+        instance = self.instances.get(instance_id)
+        if not instance:
+            return
+        boss_key = "ancient_dragon"
+        boss_def = RAID_BOSS_DATA[boss_key]
+        diff_name = ["normal", "hard"][min(instance.get("difficulty", 0), 1)]
+        import time as _t
+        raid_data = {
+            "instance_id": instance_id,
+            "boss_key": boss_key,
+            "boss_name": boss_def["name"],
+            "max_hp": boss_def["hp"][diff_name],
+            "current_hp": boss_def["hp"][diff_name],
+            "atk": boss_def["atk"][diff_name],
+            "phase": 1,
+            "max_phases": boss_def["phases"],
+            "phase_thresholds": boss_def["phase_thresholds"],
+            "enrage_timer": boss_def["enrage_timer"][diff_name],
+            "start_time": _t.time(),
+            "enraged": False,
+            "difficulty": diff_name,
+            "mechanics": boss_def["mechanics_by_phase"],
+            "stagger_gauge": 0,
+            "mechanic_active": None,
+            "active": True,
+        }
+        self.raid_instances[instance_id] = raid_data
+        # RAID_BOSS_SPAWN 전송
+        name_bytes = raid_data["boss_name"].encode("utf-8")[:32].ljust(32, b"\x00")
+        buf = struct.pack("<I", instance_id) + name_bytes
+        buf += struct.pack("<IIBB", raid_data["max_hp"], raid_data["current_hp"],
+                           raid_data["phase"], raid_data["max_phases"])
+        buf += struct.pack("<H", raid_data["enrage_timer"])
+        for s in instance.get("players", []):
+            self._send(s, MsgType.RAID_BOSS_SPAWN, buf)
+        self.log(f"Raid Boss spawned: {raid_data['boss_name']} ({diff_name}) in Instance#{instance_id}", "RAID")
+
+    async def _on_raid_attack(self, session: PlayerSession, payload: bytes):
+        """RAID_ATTACK: instance_id(u32) + skill_id(u16) + damage(u32)."""
+        if not session.in_game or len(payload) < 10:
+            return
+        inst_id = struct.unpack("<I", payload[:4])[0]
+        skill_id = struct.unpack("<H", payload[4:6])[0]
+        raw_dmg = struct.unpack("<I", payload[6:10])[0]
+        raid = self.raid_instances.get(inst_id)
+        if not raid or not raid["active"]:
+            return
+        instance = self.instances.get(inst_id)
+        if not instance:
+            return
+        # 데미지 적용
+        raid["current_hp"] = max(0, raid["current_hp"] - raw_dmg)
+        hp_pct = raid["current_hp"] / raid["max_hp"] if raid["max_hp"] > 0 else 0
+        # 스태거 게이지 증가 (스킬 공격 시)
+        if raid.get("mechanic_active") == "stagger_check":
+            raid["stagger_gauge"] = min(100, raid["stagger_gauge"] + 15)
+            stagger_buf = struct.pack("<IB", inst_id, raid["stagger_gauge"])
+            for s in instance.get("players", []):
+                self._send(s, MsgType.RAID_STAGGER, stagger_buf)
+            if raid["stagger_gauge"] >= 100:
+                raid["mechanic_active"] = None
+                raid["stagger_gauge"] = 0
+                # 기믹 성공
+                for s in instance.get("players", []):
+                    self._send(s, MsgType.RAID_MECHANIC_RESULT, struct.pack("<IBB", inst_id, 2, 1))  # id=2(stagger), success=1
+        # RAID_ATTACK_RESULT 전송
+        result_buf = struct.pack("<IHI II", inst_id, skill_id, raw_dmg,
+                                raid["current_hp"], raid["max_hp"])
+        for s in instance.get("players", []):
+            self._send(s, MsgType.RAID_ATTACK_RESULT, result_buf)
+        # 페이즈 전환 체크
+        thresholds = raid["phase_thresholds"]
+        for i, thr in enumerate(thresholds):
+            target_phase = i + 2
+            if hp_pct <= thr and raid["phase"] < target_phase:
+                raid["phase"] = target_phase
+                phase_buf = struct.pack("<IBB", inst_id, raid["phase"], raid["max_phases"])
+                for s in instance.get("players", []):
+                    self._send(s, MsgType.RAID_PHASE_CHANGE, phase_buf)
+                self.log(f"Raid Boss phase → {raid['phase']} (HP {hp_pct:.1%})", "RAID")
+                # 새 페이즈 기믹 발동
+                mechanics = raid["mechanics"].get(raid["phase"], [])
+                if mechanics:
+                    await self._trigger_raid_mechanic(inst_id, mechanics[0])
+                break
+        # 클리어 체크
+        if raid["current_hp"] <= 0:
+            await self._raid_clear(inst_id)
+
+    async def _trigger_raid_mechanic(self, inst_id: int, mechanic_name: str):
+        """레이드 기믹 발동"""
+        raid = self.raid_instances.get(inst_id)
+        instance = self.instances.get(inst_id)
+        if not raid or not instance:
+            return
+        mech_def = RAID_MECHANIC_DEFS.get(mechanic_name)
+        if not mech_def:
+            return
+        raid["mechanic_active"] = mechanic_name
+        if mechanic_name == "stagger_check":
+            raid["stagger_gauge"] = 0
+        # RAID_MECHANIC 전송: instance_id(u32) + mechanic_id(u8) + phase(u8)
+        buf = struct.pack("<IBB", inst_id, mech_def["id"], raid["phase"])
+        for s in instance.get("players", []):
+            self._send(s, MsgType.RAID_MECHANIC, buf)
+        self.log(f"Raid Mechanic: {mechanic_name} (phase {raid['phase']}) in Instance#{inst_id}", "RAID")
+
+    async def _raid_clear(self, inst_id: int):
+        """레이드 클리어 → 보상 지급"""
+        raid = self.raid_instances.get(inst_id)
+        instance = self.instances.get(inst_id)
+        if not raid or not instance:
+            return
+        raid["active"] = False
+        diff = raid["difficulty"]
+        rewards = RAID_CLEAR_REWARDS.get(diff, RAID_CLEAR_REWARDS["normal"])
+        # RAID_CLEAR 전송: instance_id(u32) + gold(u32) + exp(u32) + tokens(u16)
+        buf = struct.pack("<IIIH", inst_id, rewards["gold"], rewards["exp"], rewards["tokens"])
+        for s in instance.get("players", []):
+            s.gold += rewards["gold"]
+            s.stats.add_exp(rewards["exp"])
+            self._send(s, MsgType.RAID_CLEAR, buf)
+        self.log(f"Raid CLEAR! Instance#{inst_id} ({diff}) - rewards: {rewards}", "RAID")
+
+    async def _raid_wipe(self, inst_id: int):
+        """레이드 전멸"""
+        raid = self.raid_instances.get(inst_id)
+        instance = self.instances.get(inst_id)
+        if not raid or not instance:
+            return
+        raid["active"] = False
+        buf = struct.pack("<IB", inst_id, raid["phase"])
+        for s in instance.get("players", []):
+            self._send(s, MsgType.RAID_WIPE, buf)
+            s.zone_id = 10  # 마을로 복귀
+        self.log(f"Raid WIPE at phase {raid['phase']} in Instance#{inst_id}", "RAID")
 
     # ━━━ 몬스터 시스템 ━━━
 
