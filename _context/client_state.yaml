@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T22:30:00"
+last_session: "2026-02-14T22:47:00"
 
 # ── 현재 상태 ──
-current_status: "카메라 쿼터뷰 전환 + HUD ui.yaml 리뉴얼 완료, C018 전달"
+current_status: "Animator 콤보/대시/피격 확장 + HitVFX 파티클 풀 + URP 라이팅/포스트프로세싱 완료"
 
 # ── 완료된 작업 ──
 completed:
@@ -46,24 +46,21 @@ completed:
   - id: C018
     desc: "S031 응답 — 카메라 전환 + HUD 리뉴얼 완료 보고"
     files: ["_comms/client_to_server/C018_s031_response_camera_converted_hud_renewed.md"]
+  - id: A9
+    desc: "animation.yaml 기반 Animator 확장 — 콤보4단/대시/피격/스킬/전투 상태"
+    files: ["Assets/Editor/ProjectSetup.cs", "Assets/Scripts/Entity/LocalPlayer.cs", "Assets/Scripts/Entity/MonsterEntity.cs", "Assets/Scripts/Entity/RemotePlayer.cs", "Assets/Scripts/Managers/MonsterManager.cs"]
+  - id: A10
+    desc: "vfx.yaml 기반 HitVFXManager — 파티클 오브젝트 풀 (일반/크리티컬)"
+    files: ["Assets/Scripts/Managers/HitVFXManager.cs", "Assets/Editor/ProjectSetup.cs", "Assets/Scripts/interaction-map.yaml"]
+  - id: A11
+    desc: "art_style.yaml 기반 URP 라이팅/포스트프로세싱 (포그/앰비언트/디렉셔널/볼륨)"
+    files: ["Assets/Editor/ProjectSetup.cs"]
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
-  - id: "animator_setup"
-    desc: "animation.yaml 기반 Animator 재설정 — 콤보/대시/피격 상태 추가"
-    priority: P1
-    blocked: false
-  - id: "vfx_hit"
-    desc: "vfx.yaml 기반 타격 이펙트 ParticleSystem"
-    priority: P1
-    blocked: false
-  - id: "art_lighting"
-    desc: "art_style.yaml 기반 URP 라이팅/포스트프로세싱"
-    priority: P1
-    blocked: false
   - id: "phase2_tcp"
     desc: "Phase 2 TCP 브릿지 연동 테스트 (서버 준비 후)"
     priority: P0
@@ -79,6 +76,10 @@ recent_decisions:
   - "모든 코드는 validate_all.py --skip-unity 통과 필수"
   - "Agent Loop 시스템으로 자율 소통 체계 구축 완료"
   - "GDD 권위(Authority) 기준 정립 (flow.yaml=키바인딩, ui.yaml=UI, 등)"
+  - "Animator 12파라미터/11상태 확장 (animation.yaml 기반 콤보/대시/피격/스킬)"
+  - "HitVFXManager Reflection 기반 Volume 설정 (URP 직접 참조 대신)"
+  - "크리티컬 판정 임시 기준: Damage>=50 (서버 IsCritical 필드 추가 전)"
+  - "SSAO는 Renderer Feature이므로 Volume이 아닌 URP Asset 설정 필요 → 추후"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:

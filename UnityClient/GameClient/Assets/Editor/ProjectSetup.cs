@@ -9,6 +9,7 @@ using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.Rendering;
 using System.IO;
 using System.Linq;
 
@@ -135,10 +136,19 @@ public static class ProjectSetup
 
         var controller = AnimatorController.CreateAnimatorControllerAtPath(AnimControllerPath);
 
-        // 파라미터
+        // ── animation.yaml 기반 파라미터 ──
+        controller.AddParameter("Speed", AnimatorControllerParameterType.Float);
         controller.AddParameter("IsMoving", AnimatorControllerParameterType.Bool);
-        controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("InCombat", AnimatorControllerParameterType.Bool);
+        controller.AddParameter("IsGrounded", AnimatorControllerParameterType.Bool);
         controller.AddParameter("IsDead", AnimatorControllerParameterType.Bool);
+        controller.AddParameter("Attack", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("AttackIndex", AnimatorControllerParameterType.Int);
+        controller.AddParameter("Dash", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("Hit", AnimatorControllerParameterType.Trigger);
+        controller.AddParameter("HitDirection", AnimatorControllerParameterType.Float);
+        controller.AddParameter("SkillIndex", AnimatorControllerParameterType.Int);
+        controller.AddParameter("Skill", AnimatorControllerParameterType.Trigger);
 
         var rootStateMachine = controller.layers[0].stateMachine;
 
@@ -148,54 +158,171 @@ public static class ProjectSetup
         var attackClip = LoadAnimationClip(AttackAnimPath);
         var deathClip = LoadAnimationClip(DeathAnimPath);
 
-        // 상태 생성
+        // ── 기본 상태 ──
         var idleState = rootStateMachine.AddState("Idle");
         idleState.motion = idleClip;
 
         var walkState = rootStateMachine.AddState("Walk");
         walkState.motion = walkClip;
+        walkState.speedParameterActive = true;
+        walkState.speedParameter = "Speed";
 
-        var attackState = rootStateMachine.AddState("Attack");
-        attackState.motion = attackClip;
+        // ── 전투 대기 ──
+        var combatIdleState = rootStateMachine.AddState("CombatIdle");
+        combatIdleState.motion = idleClip;
 
+        // ── 전투 이동 ──
+        var combatWalkState = rootStateMachine.AddState("CombatWalk");
+        combatWalkState.motion = walkClip;
+        combatWalkState.speedParameterActive = true;
+        combatWalkState.speedParameter = "Speed";
+
+        // ── 공격 콤보 (4단) ──
+        var attack1State = rootStateMachine.AddState("Attack1");
+        attack1State.motion = attackClip;
+        var attack2State = rootStateMachine.AddState("Attack2");
+        attack2State.motion = attackClip;
+        var attack3State = rootStateMachine.AddState("Attack3");
+        attack3State.motion = attackClip;
+        var attack4State = rootStateMachine.AddState("Attack4");
+        attack4State.motion = attackClip;
+
+        // ── 대시/회피 ──
+        var dashState = rootStateMachine.AddState("Dash");
+        dashState.motion = walkClip;
+
+        // ── 피격 ──
+        var hitState = rootStateMachine.AddState("HitReact");
+        hitState.motion = idleClip;
+
+        // ── 사망 ──
         var deathState = rootStateMachine.AddState("Death");
         deathState.motion = deathClip;
 
-        // 기본 상태 = Idle
+        // ── 스킬 시전 ──
+        var skillState = rootStateMachine.AddState("SkillCast");
+        skillState.motion = attackClip;
+
         rootStateMachine.defaultState = idleState;
 
-        // Idle → Walk (IsMoving == true)
+        // ── 비전투 전환 ──
         var idleToWalk = idleState.AddTransition(walkState);
-        idleToWalk.AddCondition(AnimatorConditionMode.If, 0, "IsMoving");
+        idleToWalk.AddCondition(AnimatorConditionMode.Greater, 0.1f, "Speed");
         idleToWalk.hasExitTime = false;
         idleToWalk.duration = 0.15f;
 
-        // Walk → Idle (IsMoving == false)
         var walkToIdle = walkState.AddTransition(idleState);
-        walkToIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "IsMoving");
+        walkToIdle.AddCondition(AnimatorConditionMode.Less, 0.1f, "Speed");
         walkToIdle.hasExitTime = false;
         walkToIdle.duration = 0.15f;
 
-        // AnyState → Attack (Attack trigger)
-        var anyToAttack = rootStateMachine.AddAnyStateTransition(attackState);
-        anyToAttack.AddCondition(AnimatorConditionMode.If, 0, "Attack");
-        anyToAttack.hasExitTime = false;
-        anyToAttack.duration = 0.1f;
+        var idleToCombat = idleState.AddTransition(combatIdleState);
+        idleToCombat.AddCondition(AnimatorConditionMode.If, 0, "InCombat");
+        idleToCombat.hasExitTime = false;
+        idleToCombat.duration = 0.15f;
 
-        // Attack → Idle (exit time)
-        var attackToIdle = attackState.AddTransition(idleState);
-        attackToIdle.hasExitTime = true;
-        attackToIdle.exitTime = 0.9f;
-        attackToIdle.duration = 0.15f;
+        var walkToCombatWalk = walkState.AddTransition(combatWalkState);
+        walkToCombatWalk.AddCondition(AnimatorConditionMode.If, 0, "InCombat");
+        walkToCombatWalk.hasExitTime = false;
+        walkToCombatWalk.duration = 0.15f;
 
-        // AnyState → Death (IsDead == true)
+        // ── 전투 상태 전환 ──
+        var combatIdleToWalk = combatIdleState.AddTransition(combatWalkState);
+        combatIdleToWalk.AddCondition(AnimatorConditionMode.Greater, 0.1f, "Speed");
+        combatIdleToWalk.hasExitTime = false;
+        combatIdleToWalk.duration = 0.08f;
+
+        var combatWalkToIdle = combatWalkState.AddTransition(combatIdleState);
+        combatWalkToIdle.AddCondition(AnimatorConditionMode.Less, 0.1f, "Speed");
+        combatWalkToIdle.hasExitTime = false;
+        combatWalkToIdle.duration = 0.08f;
+
+        var combatToIdle = combatIdleState.AddTransition(idleState);
+        combatToIdle.AddCondition(AnimatorConditionMode.IfNot, 0, "InCombat");
+        combatToIdle.hasExitTime = false;
+        combatToIdle.duration = 0.15f;
+
+        var combatWalkToWalk = combatWalkState.AddTransition(walkState);
+        combatWalkToWalk.AddCondition(AnimatorConditionMode.IfNot, 0, "InCombat");
+        combatWalkToWalk.hasExitTime = false;
+        combatWalkToWalk.duration = 0.15f;
+
+        // ── 공격 콤보 체인 ──
+        var anyToAttack1 = rootStateMachine.AddAnyStateTransition(attack1State);
+        anyToAttack1.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+        anyToAttack1.AddCondition(AnimatorConditionMode.Equals, 0, "AttackIndex");
+        anyToAttack1.hasExitTime = false;
+        anyToAttack1.duration = 0.08f;
+
+        var anyToAttack2 = rootStateMachine.AddAnyStateTransition(attack2State);
+        anyToAttack2.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+        anyToAttack2.AddCondition(AnimatorConditionMode.Equals, 1, "AttackIndex");
+        anyToAttack2.hasExitTime = false;
+        anyToAttack2.duration = 0.08f;
+
+        var anyToAttack3 = rootStateMachine.AddAnyStateTransition(attack3State);
+        anyToAttack3.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+        anyToAttack3.AddCondition(AnimatorConditionMode.Equals, 2, "AttackIndex");
+        anyToAttack3.hasExitTime = false;
+        anyToAttack3.duration = 0.08f;
+
+        var anyToAttack4 = rootStateMachine.AddAnyStateTransition(attack4State);
+        anyToAttack4.AddCondition(AnimatorConditionMode.If, 0, "Attack");
+        anyToAttack4.AddCondition(AnimatorConditionMode.Equals, 3, "AttackIndex");
+        anyToAttack4.hasExitTime = false;
+        anyToAttack4.duration = 0.08f;
+
+        AnimatorState[] attackStates = { attack1State, attack2State, attack3State, attack4State };
+        float[] exitTimes = { 0.9f, 0.9f, 0.85f, 0.85f };
+        for (int i = 0; i < attackStates.Length; i++)
+        {
+            var toIdle = attackStates[i].AddTransition(combatIdleState);
+            toIdle.hasExitTime = true;
+            toIdle.exitTime = exitTimes[i];
+            toIdle.duration = 0.15f;
+        }
+
+        // ── 대시 ──
+        var anyToDash = rootStateMachine.AddAnyStateTransition(dashState);
+        anyToDash.AddCondition(AnimatorConditionMode.If, 0, "Dash");
+        anyToDash.hasExitTime = false;
+        anyToDash.duration = 0.05f;
+
+        var dashToIdle = dashState.AddTransition(combatIdleState);
+        dashToIdle.hasExitTime = true;
+        dashToIdle.exitTime = 0.9f;
+        dashToIdle.duration = 0.15f;
+
+        // ── 피격 ──
+        var anyToHit = rootStateMachine.AddAnyStateTransition(hitState);
+        anyToHit.AddCondition(AnimatorConditionMode.If, 0, "Hit");
+        anyToHit.hasExitTime = false;
+        anyToHit.duration = 0.05f;
+
+        var hitToIdle = hitState.AddTransition(combatIdleState);
+        hitToIdle.hasExitTime = true;
+        hitToIdle.exitTime = 0.8f;
+        hitToIdle.duration = 0.15f;
+
+        // ── 스킬 시전 ──
+        var anyToSkill = rootStateMachine.AddAnyStateTransition(skillState);
+        anyToSkill.AddCondition(AnimatorConditionMode.If, 0, "Skill");
+        anyToSkill.hasExitTime = false;
+        anyToSkill.duration = 0.08f;
+
+        var skillToIdle = skillState.AddTransition(combatIdleState);
+        skillToIdle.hasExitTime = true;
+        skillToIdle.exitTime = 0.9f;
+        skillToIdle.duration = 0.15f;
+
+        // ── 사망 (최고 우선순위) ──
         var anyToDeath = rootStateMachine.AddAnyStateTransition(deathState);
         anyToDeath.AddCondition(AnimatorConditionMode.If, 0, "IsDead");
         anyToDeath.hasExitTime = false;
         anyToDeath.duration = 0.15f;
 
         EditorUtility.SetDirty(controller);
-        Debug.Log("  [Animator] CharacterAnimator.controller 생성 완료");
+        Debug.Log("  [Animator] CharacterAnimator.controller 생성 완료 (animation.yaml 기반 확장)");
     }
 
     private static AnimationClip LoadAnimationClip(string fbxPath)
@@ -408,20 +535,29 @@ public static class ProjectSetup
             floorRenderer.sharedMaterial = floorMat;
         }
 
-        // --- Environment ---
+        // --- Environment (art_style.yaml lighting.time_lighting.day) ---
         RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.Exponential;
-        RenderSettings.fogDensity = 0.015f;
-        RenderSettings.fogColor = new Color(0.7f, 0.82f, 0.95f);
-        RenderSettings.ambientSkyColor = new Color(0.6f, 0.75f, 0.95f);
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogStartDistance = 80f;
+        RenderSettings.fogEndDistance = 200f;
+        RenderSettings.fogColor = new Color(0.784f, 0.847f, 0.910f); // #C8D8E8
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.529f, 0.808f, 0.922f);     // #87CEEB sky
+        RenderSettings.ambientEquatorColor = new Color(0.871f, 0.722f, 0.529f);  // #DEB887 equator
+        RenderSettings.ambientGroundColor = new Color(0.545f, 0.451f, 0.333f);   // #8B7355 ground
 
-        // --- Directional Light ---
+        // --- Directional Light (art_style.yaml directional_light) ---
         var lightGo = new GameObject("Directional Light");
         var light = lightGo.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.color = new Color(1f, 0.95f, 0.84f);
-        light.intensity = 1.0f;
+        light.color = new Color(1f, 0.980f, 0.804f);  // #FFFACD (day sun_color)
+        light.intensity = 1.2f;
+        light.shadows = LightShadows.Soft;
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.High;
         lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+
+        // --- Post-Processing Volume (art_style.yaml post_processing.global_volume) ---
+        SetupPostProcessingVolume();
 
         // --- Main Camera ---
         var camGo = new GameObject("Main Camera");
@@ -446,6 +582,7 @@ public static class ProjectSetup
         var chatManagerGo = CreateManagerObject("ChatManager", typeof(ChatManager));
         var shopManagerGo = CreateManagerObject("ShopManager", typeof(ShopManager));
         var bossManagerGo = CreateManagerObject("BossManager", typeof(BossManager));
+        var hitVFXManagerGo = CreateManagerObject("HitVFXManager", typeof(HitVFXManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");
@@ -476,6 +613,92 @@ public static class ProjectSetup
         // Scene 저장
         EditorSceneManager.SaveScene(scene, GameScenePath);
         Debug.Log("  [Scene] GameScene 생성 완료");
+    }
+
+    /// <summary>
+    /// art_style.yaml post_processing.global_volume 기반 URP Volume 생성
+    /// Bloom, Tonemapping, ColorAdjustments, Vignette
+    /// </summary>
+    private static void SetupPostProcessingVolume()
+    {
+        var volumeGo = new GameObject("GlobalVolume_PostProcess");
+        var volume = volumeGo.AddComponent<Volume>();
+        volume.isGlobal = true;
+        volume.priority = 0;
+
+        var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+
+        // Bloom (intensity 0.3, threshold 0.9, scatter 0.7)
+        AddVolumeOverride(profile, "UnityEngine.Rendering.Universal.Bloom",
+            ("intensity", 0.3f), ("threshold", 0.9f), ("scatter", 0.7f));
+
+        // Tonemapping (ACES = 2)
+        AddVolumeOverride(profile, "UnityEngine.Rendering.Universal.Tonemapping",
+            ("mode", 2));  // TonemappingMode.ACES = 2
+
+        // Color Adjustments (postExposure 0, contrast 10, saturation 10)
+        AddVolumeOverride(profile, "UnityEngine.Rendering.Universal.ColorAdjustments",
+            ("postExposure", 0f), ("contrast", 10f), ("saturation", 10f));
+
+        // Vignette (intensity 0.2, smoothness 0.5)
+        AddVolumeOverride(profile, "UnityEngine.Rendering.Universal.Vignette",
+            ("intensity", 0.2f), ("smoothness", 0.5f));
+
+        // Save profile as asset
+        const string profilePath = "Assets/Settings/GlobalVolumeProfile.asset";
+        AssetDatabase.CreateAsset(profile, profilePath);
+        volume.sharedProfile = profile;
+
+        Debug.Log("  [PostProcess] Global Volume 생성 완료");
+    }
+
+    /// <summary>
+    /// Reflection 기반 VolumeComponent 추가 — URP 어셈블리 직접 참조 없이 동적 설정
+    /// </summary>
+    private static void AddVolumeOverride(VolumeProfile profile, string typeName,
+        params (string field, object value)[] overrides)
+    {
+        var type = System.Type.GetType(typeName + ", Unity.RenderPipelines.Universal.Runtime");
+        if (type == null)
+        {
+            Debug.LogWarning($"  [PostProcess] Type not found: {typeName}");
+            return;
+        }
+
+        var component = (VolumeComponent)ScriptableObject.CreateInstance(type);
+        component.active = true;
+
+        foreach (var (field, value) in overrides)
+        {
+            var fieldInfo = type.GetField(field,
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (fieldInfo == null) continue;
+
+            // VolumeParameter의 실제 값 설정 — overrideState + value
+            var param = fieldInfo.GetValue(component);
+            if (param == null) continue;
+
+            var paramType = param.GetType();
+
+            // overrideState = true
+            var overrideProp = paramType.GetProperty("overrideState");
+            overrideProp?.SetValue(param, true);
+
+            // value 설정
+            var valueProp = paramType.GetProperty("value");
+            if (valueProp != null)
+            {
+                // Enum 타입 (TonemappingMode 등)은 int→enum 변환 필요
+                if (valueProp.PropertyType.IsEnum && value is int intVal)
+                    valueProp.SetValue(param, System.Enum.ToObject(valueProp.PropertyType, intVal));
+                else if (value is float f && valueProp.PropertyType == typeof(float))
+                    valueProp.SetValue(param, f);
+                else
+                    valueProp.SetValue(param, value);
+            }
+        }
+
+        profile.components.Add(component);
     }
 
     // ━━━ 5. TestScene ━━━

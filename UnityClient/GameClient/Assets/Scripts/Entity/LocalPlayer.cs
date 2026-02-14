@@ -21,8 +21,17 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float cameraCollisionMinDist = 2f;
 
     [Header("Combat")]
-    [SerializeField] private float attackCooldown = 1.0f;
     [SerializeField] private float attackRange = 15f;
+    [SerializeField] private float comboResetTime = 1.0f;
+    [SerializeField] private int maxComboCount = 4;
+
+    [Header("Dash")]
+    [SerializeField] private float dashSpeed = 15f;
+    [SerializeField] private float dashDuration = 0.35f;
+    [SerializeField] private float dashCooldown = 1.5f;
+
+    [Header("Animation")]
+    [SerializeField] private float combatExitDelay = 5f;
 
     public ulong EntityId { get; set; }
 
@@ -40,8 +49,19 @@ public class LocalPlayer : MonoBehaviour
     // Targeting
     private ulong _currentTarget;
     private GameObject _targetHighlight;
-    private float _lastAttackTime;
     private int _tabIndex;
+
+    // Combo
+    private int _comboIndex;
+    private float _lastAttackTime;
+    private float _lastCombatActionTime;
+    private bool _inCombat;
+
+    // Dash
+    private bool _isDashing;
+    private float _dashTimer;
+    private float _lastDashTime;
+    private Vector3 _dashDirection;
 
     private void Start()
     {
@@ -67,6 +87,9 @@ public class LocalPlayer : MonoBehaviour
 
         if (MonsterManager.Instance != null)
             MonsterManager.Instance.OnMonsterDied += HandleMonsterDied;
+
+        if (CombatManager.Instance != null)
+            CombatManager.Instance.OnAttackFeedback += HandleAttackFeedback;
     }
 
     private void OnDestroy()
@@ -77,6 +100,9 @@ public class LocalPlayer : MonoBehaviour
 
         if (MonsterManager.Instance != null)
             MonsterManager.Instance.OnMonsterDied -= HandleMonsterDied;
+
+        if (CombatManager.Instance != null)
+            CombatManager.Instance.OnAttackFeedback -= HandleAttackFeedback;
 
         if (_targetHighlight != null)
             Destroy(_targetHighlight);
@@ -90,9 +116,11 @@ public class LocalPlayer : MonoBehaviour
 
         HandleCameraRotation();
         HandleCameraZoom();
+        HandleDash();
         HandleMovement();
         HandleTargeting();
         HandleAttack();
+        UpdateCombatState();
         UpdateCamera();
         UpdateTargetHighlight();
     }
@@ -121,14 +149,59 @@ public class LocalPlayer : MonoBehaviour
         _currentZoom = Mathf.Lerp(_currentZoom, _targetZoom, Time.deltaTime * zoomSmoothSpeed);
     }
 
+    // ━━━ Dash (Space) ━━━
+
+    private void HandleDash()
+    {
+        if (_isDashing)
+        {
+            _dashTimer -= Time.deltaTime;
+            transform.position += _dashDirection * dashSpeed * Time.deltaTime;
+
+            if (_dashTimer <= 0f)
+                _isDashing = false;
+
+            return;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space) && Time.time - _lastDashTime >= dashCooldown)
+        {
+            float h = Input.GetAxis("Horizontal");
+            float v = Input.GetAxis("Vertical");
+
+            Vector3 camForward = Quaternion.Euler(0, _yaw, 0) * Vector3.forward;
+            Vector3 camRight = Quaternion.Euler(0, _yaw, 0) * Vector3.right;
+            _dashDirection = (camForward * v + camRight * h).normalized;
+
+            if (_dashDirection.sqrMagnitude < 0.01f)
+                _dashDirection = transform.forward;
+
+            _isDashing = true;
+            _dashTimer = dashDuration;
+            _lastDashTime = Time.time;
+            _lastCombatActionTime = Time.time;
+
+            _animator?.SetTrigger("Dash");
+        }
+    }
+
     // ━━━ Movement (Camera-relative WASD) ━━━
 
     private void HandleMovement()
     {
+        if (_isDashing)
+        {
+            _animator?.SetFloat("Speed", 2f);
+            return;
+        }
+
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
 
-        bool isMoving = Mathf.Abs(h) > 0.01f || Mathf.Abs(v) > 0.01f;
+        float inputMagnitude = new Vector2(h, v).magnitude;
+        bool isMoving = inputMagnitude > 0.01f;
+
+        _animator?.SetFloat("Speed", isMoving ? Mathf.Clamp(inputMagnitude, 0f, 2f) : 0f);
         _animator?.SetBool("IsMoving", isMoving);
 
         if (!isMoving) return;
@@ -214,13 +287,13 @@ public class LocalPlayer : MonoBehaviour
             CombatManager.Instance.SelectTarget(entityId);
     }
 
-    // ━━━ Attack ━━━
+    // ━━━ Attack (Combo System) ━━━
 
     private void HandleAttack()
     {
+        if (_isDashing) return;
         if (!Input.GetMouseButtonDown(0)) return;
         if (_currentTarget == 0) return;
-        if (Time.time - _lastAttackTime < attackCooldown) return;
 
         if (MonsterManager.Instance == null) return;
 
@@ -234,11 +307,39 @@ public class LocalPlayer : MonoBehaviour
         float dist = Vector3.Distance(transform.position, monster.transform.position);
         if (dist > attackRange) return;
 
-        _lastAttackTime = Time.time;
+        // Combo timing: reset if too slow
+        if (Time.time - _lastAttackTime > comboResetTime)
+            _comboIndex = 0;
+
+        _animator?.SetInteger("AttackIndex", _comboIndex);
         _animator?.SetTrigger("Attack");
+
+        _lastAttackTime = Time.time;
+        _lastCombatActionTime = Time.time;
 
         if (CombatManager.Instance != null)
             CombatManager.Instance.Attack(_currentTarget);
+
+        _comboIndex = (_comboIndex + 1) % maxComboCount;
+    }
+
+    // ━━━ Combat State ━━━
+
+    private void UpdateCombatState()
+    {
+        if (!_inCombat && _currentTarget != 0)
+        {
+            _inCombat = true;
+            _lastCombatActionTime = Time.time;
+        }
+
+        if (_inCombat && Time.time - _lastCombatActionTime > combatExitDelay)
+        {
+            _inCombat = false;
+            _comboIndex = 0;
+        }
+
+        _animator?.SetBool("InCombat", _inCombat);
     }
 
     // ━━━ Quarter View Camera ━━━
@@ -336,5 +437,12 @@ public class LocalPlayer : MonoBehaviour
             if (CombatManager.Instance != null)
                 CombatManager.Instance.SelectTarget(0);
         }
+    }
+
+    private void HandleAttackFeedback(AttackResultData data)
+    {
+        if (data.AttackerId != EntityId) return;
+
+        _lastCombatActionTime = Time.time;
     }
 }

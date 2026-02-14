@@ -348,6 +348,22 @@ managers:
       - GetBoss(ulong) → BossState
       - IsBoss(ulong) → bool
 
+  - name: HitVFXManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "타격 이펙트 파티클 관리 — Object Pool 방식 ParticleSystem 스폰"
+    reads: []
+    writes:
+      - _normalPool (Queue<ParticleSystem>)
+      - _critPool (Queue<ParticleSystem>)
+    fires_events: []
+    subscribes_to:
+      - CombatManager.OnAttackFeedback → 피격 위치에 이펙트 재생
+    public_api:
+      - PlayNormalHit(Vector3)
+      - PlayCriticalHit(Vector3)
+
   - name: QuestManager
     namespace: (global)
     singleton: true

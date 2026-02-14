@@ -173,11 +173,12 @@ public class MonsterManager : MonoBehaviour
 
     private void HandleAttackResult(AttackResultData data)
     {
-        // 공격 대상이 몬스터면 HP 갱신
+        // 공격 대상이 몬스터면 HP 갱신 + 피격 애니메이션
         if (!_monsterMap.TryGetValue(data.TargetId, out var monster)) return;
 
         monster.HP = data.TargetHP;
         monster.MaxHP = data.TargetMaxHP;
+        monster.PlayHit(0f);
         OnMonsterUpdated?.Invoke(monster);
     }
 

@@ -7,6 +7,13 @@
   Poll: 30s
 ==================================================
 
-[22:24:20] git pull...
-  [NEW] messages: ['S031']
-  [CLAUDE] 실행 시작 (1077자 프롬프트)
+[22:38:28] git pull...
+  [WARN] git pull rebase 실패: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+  [WARN] stash pop 충돌: error: Your local changes to the following files would be overwritten by merge:
+	_agent/daemon.log
+	_agent/daemon_err.log
+Please commit your changes or stash them before you merge.
+Aborting
+  [IDLE] 300s elapsed, working on pending_tasks
+  [CLAUDE] 실행 시작 (1024자 프롬프트)

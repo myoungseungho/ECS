@@ -22,7 +22,10 @@ public class RemotePlayer : MonoBehaviour
     private void Update()
     {
         float distance = Vector3.Distance(transform.position, _targetPos);
-        _animator?.SetBool("IsMoving", distance > 0.1f);
+        bool isMoving = distance > 0.1f;
+
+        _animator?.SetBool("IsMoving", isMoving);
+        _animator?.SetFloat("Speed", isMoving ? 1f : 0f);
 
         transform.position = Vector3.Lerp(
             transform.position, _targetPos, Time.deltaTime * lerpSpeed);
