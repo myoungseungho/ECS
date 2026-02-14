@@ -725,8 +725,8 @@ phases:
       server_tasks:
         - id: "P2_S01_S01"
           task: "필드 존 몬스터 스폰 테이블 확장"
-          detail: "zone_id=1 (field) 몬스터 다양화. 스폰 영역별 레벨 차등."
-          status: todo
+          detail: "zone별 레벨 차등 몬스터 배치. zone1(Lv3-8):슬라임/고블린/늑대/곰/산적 11종, zone2(Lv8-15):해골/오크/곰/산적/정예골렘 8종, zone3(Lv15-20):얼음골렘/서리늑대/예티/해골/얼음여왕정예 7종. 총 30마리."
+          status: done
 
     - id: "P2_S02"
       name: "장비 강화 시스템"
@@ -777,8 +777,8 @@ phases:
       server_tasks:
         - id: "P2_S03_S01"
           task: "던전 인스턴스 + 매칭 시스템 확장"
-          detail: "기존 던전 시스템(Session 21) 위에 매칭 큐 + 인스턴스 생성"
-          status: todo
+          detail: "MATCH_ENQUEUE/DEQUEUE/FOUND/ACCEPT + INSTANCE_ENTER/LEAVE/INFO. 4개 던전(고블린동굴/얼음신전/마왕요새/고대용둥지). 난이도(normal/hard/hell) 보정. 매칭 큐→자동 파티 구성→인스턴스 생성."
+          status: done
 
 # ============================================================
 # PHASE 3: 엔드게임 (레벨 15+)

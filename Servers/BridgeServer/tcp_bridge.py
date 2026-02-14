@@ -416,16 +416,35 @@ MONSTER_SPAWNS = [
     {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 100, "y": 0, "z": 120},
     {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 120, "y": 0, "z": 100},
     {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 80, "y": 0, "z": 140},
-    # Field zone 1
-    {"id": 1, "name": "Goblin", "level": 5, "hp": 100, "atk": 15, "zone": 1, "x": 200, "y": 0, "z": 200},
-    {"id": 1, "name": "Goblin", "level": 5, "hp": 100, "atk": 15, "zone": 1, "x": 300, "y": 0, "z": 150},
-    {"id": 2, "name": "Wolf", "level": 8, "hp": 200, "atk": 25, "zone": 1, "x": 500, "y": 0, "z": 400},
-    {"id": 2, "name": "Wolf", "level": 8, "hp": 200, "atk": 25, "zone": 1, "x": 600, "y": 0, "z": 300},
-    {"id": 3, "name": "Orc", "level": 12, "hp": 350, "atk": 35, "zone": 2, "x": 100, "y": 0, "z": 100},
-    {"id": 3, "name": "Orc", "level": 12, "hp": 350, "atk": 35, "zone": 2, "x": 300, "y": 0, "z": 200},
-    {"id": 4, "name": "Bear", "level": 15, "hp": 500, "atk": 40, "zone": 2, "x": 800, "y": 0, "z": 600},
-    {"id": 5, "name": "Skeleton", "level": 18, "hp": 300, "atk": 50, "zone": 3, "x": 200, "y": 0, "z": 200},
-    {"id": 5, "name": "Skeleton", "level": 18, "hp": 300, "atk": 50, "zone": 3, "x": 400, "y": 0, "z": 400},
+    # ──── Field zone 1: 초원 평야 (Lv.3~8) ────  P2_S01_S01
+    {"id": 1001, "name": "Slime", "level": 3, "hp": 50, "atk": 5, "zone": 1, "x": 100, "y": 0, "z": 100},
+    {"id": 1001, "name": "Slime", "level": 3, "hp": 50, "atk": 5, "zone": 1, "x": 150, "y": 0, "z": 180},
+    {"id": 1001, "name": "Slime", "level": 3, "hp": 50, "atk": 5, "zone": 1, "x": 200, "y": 0, "z": 120},
+    {"id": 1002, "name": "Goblin", "level": 5, "hp": 120, "atk": 12, "zone": 1, "x": 300, "y": 0, "z": 200},
+    {"id": 1002, "name": "Goblin", "level": 5, "hp": 120, "atk": 12, "zone": 1, "x": 350, "y": 0, "z": 250},
+    {"id": 1002, "name": "Goblin", "level": 5, "hp": 120, "atk": 12, "zone": 1, "x": 400, "y": 0, "z": 180},
+    {"id": 1003, "name": "Wolf", "level": 5, "hp": 180, "atk": 20, "zone": 1, "x": 500, "y": 0, "z": 400},
+    {"id": 1003, "name": "Wolf", "level": 5, "hp": 180, "atk": 20, "zone": 1, "x": 550, "y": 0, "z": 350},
+    {"id": 1004, "name": "Bear", "level": 7, "hp": 350, "atk": 30, "zone": 1, "x": 700, "y": 0, "z": 500},
+    {"id": 1007, "name": "Bandit", "level": 8, "hp": 300, "atk": 25, "zone": 1, "x": 800, "y": 0, "z": 700},
+    {"id": 1007, "name": "Bandit", "level": 8, "hp": 300, "atk": 25, "zone": 1, "x": 850, "y": 0, "z": 650},
+    # ──── Field zone 2: 어둠의 숲 (Lv.8~15) ────
+    {"id": 1005, "name": "Skeleton", "level": 8, "hp": 200, "atk": 25, "zone": 2, "x": 100, "y": 0, "z": 100},
+    {"id": 1005, "name": "Skeleton", "level": 8, "hp": 200, "atk": 25, "zone": 2, "x": 200, "y": 0, "z": 150},
+    {"id": 1005, "name": "Skeleton", "level": 10, "hp": 250, "atk": 30, "zone": 2, "x": 400, "y": 0, "z": 300},
+    {"id": 1006, "name": "Orc", "level": 10, "hp": 400, "atk": 35, "zone": 2, "x": 300, "y": 0, "z": 200},
+    {"id": 1006, "name": "Orc", "level": 12, "hp": 450, "atk": 40, "zone": 2, "x": 500, "y": 0, "z": 400},
+    {"id": 1004, "name": "Bear", "level": 12, "hp": 500, "atk": 40, "zone": 2, "x": 800, "y": 0, "z": 600},
+    {"id": 1007, "name": "Bandit", "level": 12, "hp": 350, "atk": 38, "zone": 2, "x": 600, "y": 0, "z": 500},
+    {"id": 2001, "name": "EliteGolem", "level": 15, "hp": 3000, "atk": 120, "zone": 2, "x": 1000, "y": 0, "z": 1000},
+    # ──── Field zone 3: 얼어붙은 봉우리 (Lv.15~20) ────
+    {"id": 1008, "name": "IceGolem", "level": 15, "hp": 600, "atk": 45, "zone": 3, "x": 200, "y": 0, "z": 200},
+    {"id": 1008, "name": "IceGolem", "level": 15, "hp": 600, "atk": 45, "zone": 3, "x": 400, "y": 0, "z": 300},
+    {"id": 1009, "name": "FrostWolf", "level": 15, "hp": 350, "atk": 35, "zone": 3, "x": 500, "y": 0, "z": 500},
+    {"id": 1009, "name": "FrostWolf", "level": 15, "hp": 350, "atk": 35, "zone": 3, "x": 600, "y": 0, "z": 400},
+    {"id": 1010, "name": "Yeti", "level": 18, "hp": 800, "atk": 55, "zone": 3, "x": 800, "y": 0, "z": 800},
+    {"id": 1005, "name": "Skeleton", "level": 18, "hp": 300, "atk": 50, "zone": 3, "x": 1000, "y": 0, "z": 600},
+    {"id": 2002, "name": "IceQueenElite", "level": 18, "hp": 2500, "atk": 100, "zone": 3, "x": 1500, "y": 0, "z": 1500},
 ]
 
 # 보스 데이터
@@ -463,6 +482,11 @@ ZONE_BOUNDS = {
     2: {"min_x": 0, "max_x": 2000, "min_z": 0, "max_z": 2000},
     3: {"min_x": 0, "max_x": 3000, "min_z": 0, "max_z": 3000},
     10: {"min_x": 0, "max_x": 300, "min_z": 0, "max_z": 300},     # village
+    # 던전 존 (인스턴스)
+    100: {"min_x": 0, "max_x": 500, "min_z": 0, "max_z": 500},    # goblin_cave
+    101: {"min_x": 0, "max_x": 800, "min_z": 0, "max_z": 800},    # frozen_temple
+    102: {"min_x": 0, "max_x": 600, "min_z": 0, "max_z": 600},    # demon_fortress
+    103: {"min_x": 0, "max_x": 1000, "min_z": 0, "max_z": 1000},  # ancient_dragon_raid
 }
 
 # 서버 리스트 (서버 선택 화면용)
@@ -541,6 +565,24 @@ ENHANCE_TABLE = {
 }
 ENHANCE_COST_BASE = 500  # 강화 비용 = base * level
 
+# ──── 던전 목록 데이터 (P2_S03_S01) ────
+DUNGEON_LIST_DATA = [
+    {"id": 1, "name": "고블린 동굴",    "type": "party", "min_level": 15, "stages": 3, "zone_id": 100, "party_size": 4, "boss_id": 3004, "boss_hp": 30000},
+    {"id": 2, "name": "얼어붙은 신전",  "type": "party", "min_level": 25, "stages": 4, "zone_id": 101, "party_size": 4, "boss_id": 3005, "boss_hp": 80000},
+    {"id": 3, "name": "마왕의 요새",    "type": "abyss", "min_level": 40, "stages": 3, "zone_id": 102, "party_size": 4, "boss_id": 3003, "boss_hp": 200000},
+    {"id": 4, "name": "고대 용의 둥지", "type": "raid",  "min_level": 50, "stages": 1, "zone_id": 103, "party_size": 8, "boss_id": 3002, "boss_hp": 2000000},
+]
+
+MATCH_TIMEOUT = 300  # 매칭 최대 대기 5분
+MATCH_FLEX_AFTER = 120  # 2분 후 조건 완화
+
+# 던전 난이도 보정
+DIFFICULTY_MULT = {
+    "normal": {"hp": 1.0, "atk": 1.0, "reward": 1.0},
+    "hard":   {"hp": 2.0, "atk": 1.5, "reward": 2.0},
+    "hell":   {"hp": 4.0, "atk": 2.5, "reward": 4.0},
+}
+
 # 이동 상수
 MOVEMENT = {
     "base_speed": 200.0,
@@ -574,6 +616,9 @@ class BridgeServer:
         self.characters: Dict[int, List[dict]] = {}  # account_id -> character list
         self.next_char_id = 1
         self.npcs: Dict[int, dict] = {}  # entity_id -> npc data
+        self.instances: Dict[int, dict] = {}  # instance_id -> instance data
+        self.next_instance_id = 1
+        self.match_queue: Dict[int, dict] = {}  # dungeon_id -> {players: [], created_at: float}
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -771,6 +816,11 @@ class BridgeServer:
             MsgType.TUTORIAL_STEP_COMPLETE: self._on_tutorial_step_complete,
             MsgType.NPC_INTERACT: self._on_npc_interact,
             MsgType.ENHANCE_REQ: self._on_enhance_req,
+            MsgType.MATCH_ENQUEUE: self._on_match_enqueue,
+            MsgType.MATCH_DEQUEUE: self._on_match_dequeue,
+            MsgType.MATCH_ACCEPT: self._on_match_accept,
+            MsgType.INSTANCE_ENTER: self._on_instance_enter,
+            MsgType.INSTANCE_LEAVE: self._on_instance_leave,
         }
 
         handler = handlers.get(msg_type)
@@ -2647,6 +2697,145 @@ class BridgeServer:
         else:
             self.log(f"Enhance: +{current_level + 1} FAIL slot={slot_idx} ({session.char_name})", "GAME")
             self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 5, current_level))  # 5=FAIL (level preserved)
+
+    # ━━━ 던전 매칭 시스템 (P2_S03_S01) ━━━
+
+    async def _on_match_enqueue(self, session: PlayerSession, payload: bytes):
+        """MATCH_ENQUEUE: dungeon_id(u8) + difficulty(u8). 매칭 큐에 등록."""
+        if not session.in_game or len(payload) < 2:
+            return
+        dungeon_id = payload[0]
+        difficulty = payload[1]  # 0=normal, 1=hard, 2=hell
+        dungeon = next((d for d in DUNGEON_LIST_DATA if d["id"] == dungeon_id), None)
+        if not dungeon:
+            # result: 1=INVALID_DUNGEON
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 1, 0))
+            return
+        if session.stats.level < dungeon["min_level"]:
+            # result: 2=LEVEL_TOO_LOW
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 2, 0))
+            return
+        import time as _time
+        queue_key = dungeon_id
+        if queue_key not in self.match_queue:
+            self.match_queue[queue_key] = {"players": [], "created_at": _time.time(), "difficulty": difficulty}
+        queue = self.match_queue[queue_key]
+        # 중복 등록 방지
+        if any(p["session"] is session for p in queue["players"]):
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 3, len(queue["players"])))
+            return
+        queue["players"].append({"session": session, "joined_at": _time.time()})
+        self.log(f"MatchQueue: {session.char_name} joined dungeon={dungeon_id} ({len(queue['players'])}/{dungeon['party_size']})", "GAME")
+        # result: 0=QUEUED, count=현재 인원
+        self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 0, len(queue["players"])))
+        # 파티 모집 완료 확인
+        if len(queue["players"]) >= dungeon["party_size"]:
+            await self._match_found(queue_key, dungeon)
+
+    async def _match_found(self, queue_key: int, dungeon: dict):
+        """매칭 완료 → 인스턴스 생성 → MATCH_FOUND 전송"""
+        queue = self.match_queue.pop(queue_key, None)
+        if not queue:
+            return
+        inst_id = self.next_instance_id
+        self.next_instance_id += 1
+        diff_name = ["normal", "hard", "hell"][queue.get("difficulty", 0)]
+        mult = DIFFICULTY_MULT.get(diff_name, DIFFICULTY_MULT["normal"])
+        instance = {
+            "id": inst_id,
+            "dungeon_id": dungeon["id"],
+            "dungeon_name": dungeon["name"],
+            "zone_id": dungeon["zone_id"],
+            "difficulty": queue.get("difficulty", 0),
+            "boss_hp": int(dungeon["boss_hp"] * mult["hp"]),
+            "boss_current_hp": int(dungeon["boss_hp"] * mult["hp"]),
+            "stage": 1,
+            "max_stages": dungeon["stages"],
+            "players": [p["session"] for p in queue["players"]],
+            "active": True,
+        }
+        self.instances[inst_id] = instance
+        self.log(f"Instance #{inst_id} created: {dungeon['name']} ({diff_name}) with {len(instance['players'])} players", "GAME")
+        # MATCH_FOUND: instance_id(u32) + dungeon_id(u8) + difficulty(u8)
+        for s in instance["players"]:
+            self._send(s, MsgType.MATCH_FOUND, struct.pack("<IBB", inst_id, dungeon["id"], instance["difficulty"]))
+
+    async def _on_match_dequeue(self, session: PlayerSession, payload: bytes):
+        """MATCH_DEQUEUE: dungeon_id(u8). 매칭 큐에서 이탈."""
+        if not session.in_game or len(payload) < 1:
+            return
+        dungeon_id = payload[0]
+        queue = self.match_queue.get(dungeon_id)
+        if queue:
+            queue["players"] = [p for p in queue["players"] if p["session"] is not session]
+            if not queue["players"]:
+                del self.match_queue[dungeon_id]
+        self.log(f"MatchQueue: {session.char_name} left dungeon={dungeon_id}", "GAME")
+        self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 4, 0))  # 4=DEQUEUED
+
+    async def _on_match_accept(self, session: PlayerSession, payload: bytes):
+        """MATCH_ACCEPT: instance_id(u32). 매칭 수락 (현재는 자동 수락)."""
+        if not session.in_game or len(payload) < 4:
+            return
+        inst_id = struct.unpack("<I", payload[:4])[0]
+        instance = self.instances.get(inst_id)
+        if not instance or not instance["active"]:
+            return
+        # INSTANCE_INFO 전송
+        await self._send_instance_info(session, instance)
+
+    async def _send_instance_info(self, session: PlayerSession, instance: dict):
+        """인스턴스 정보 전송"""
+        name_bytes = instance["dungeon_name"].encode("utf-8")[:32].ljust(32, b"\x00")
+        buf = struct.pack("<IBB", instance["id"], instance["dungeon_id"], instance["difficulty"])
+        buf += name_bytes
+        buf += struct.pack("<BBII", instance["stage"], instance["max_stages"],
+                           instance["boss_hp"], instance["boss_current_hp"])
+        buf += struct.pack("<B", len(instance["players"]))
+        self._send(session, MsgType.INSTANCE_INFO, buf)
+
+    async def _on_instance_enter(self, session: PlayerSession, payload: bytes):
+        """INSTANCE_ENTER: instance_id(u32). 던전 인스턴스 입장."""
+        if not session.in_game or len(payload) < 4:
+            return
+        inst_id = struct.unpack("<I", payload[:4])[0]
+        instance = self.instances.get(inst_id)
+        if not instance or not instance["active"]:
+            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 1))  # 1=NOT_FOUND
+            return
+        if session not in instance["players"]:
+            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 2))  # 2=NOT_MEMBER
+            return
+        # 존 전환
+        old_zone = session.zone_id
+        session.zone_id = instance["zone_id"]
+        session.pos.x = 50.0
+        session.pos.y = 0.0
+        session.pos.z = 50.0
+        self.log(f"InstanceEnter: {session.char_name} → Instance#{inst_id} zone={instance['zone_id']}", "GAME")
+        await self._send_instance_info(session, instance)
+
+    async def _on_instance_leave(self, session: PlayerSession, payload: bytes):
+        """INSTANCE_LEAVE: instance_id(u32). 던전 퇴장."""
+        if not session.in_game or len(payload) < 4:
+            return
+        inst_id = struct.unpack("<I", payload[:4])[0]
+        instance = self.instances.get(inst_id)
+        if not instance:
+            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 1))
+            return
+        if session in instance["players"]:
+            instance["players"].remove(session)
+        if not instance["players"]:
+            instance["active"] = False
+            self.log(f"Instance #{inst_id} closed (no players left)", "GAME")
+        # 마을로 복귀
+        session.zone_id = 10
+        session.pos.x = 150.0
+        session.pos.y = 0.0
+        session.pos.z = 150.0
+        self.log(f"InstanceLeave: {session.char_name} ← Instance#{inst_id}", "GAME")
+        self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 0))  # 0=OK
 
     # ━━━ 몬스터 시스템 ━━━
 

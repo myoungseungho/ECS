@@ -793,6 +793,182 @@ async def run_tests(port: int):
 
     await test("ENHANCE: 빈 슬롯 강화 거부", test_enhance_empty_slot())
 
+
+    # ━━━ 필드 몬스터 확장 / 던전 매칭 (S035) ━━━
+
+    async def test_field_monsters_expanded():
+        """P2_S01_S01: 필드 존별 다양한 몬스터가 스폰되었는지 확인"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'fldmon01' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        packets = await c.recv_all_packets(timeout=1.0)
+        spawns = [p for mt, p in packets if mt == MsgType.MONSTER_SPAWN]
+        # zone 필터링 적용 — 기본 zone=1 에만 스폰: 슬라임3 + 고블린3 + 늑대2 + 곰1 + 산적2 = 11
+        assert len(spawns) >= 10, f"Expected >= 10 MONSTER_SPAWN packets (zone 1), got {len(spawns)}"
+        c.close()
+
+    await test("FIELD_MONSTERS: 필드 존 몬스터 다양화 확인", test_field_monsters_expanded())
+
+    async def test_match_enqueue_level_low():
+        """P2_S03_S01: 레벨 부족 시 매칭 거부"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'matchlv1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 레벨 1 상태에서 min_level=15 던전 매칭 시도
+        await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<BB', 1, 0))  # dungeon_id=1, normal
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.MATCH_STATUS
+        assert payload[1] == 2, f"Expected LEVEL_TOO_LOW(2), got {payload[1]}"
+        c.close()
+
+    await test("MATCH_LEVEL: 레벨 부족 매칭 거부", test_match_enqueue_level_low())
+
+    async def test_match_enqueue_invalid_dungeon():
+        """P2_S03_S01: 존재하지 않는 던전 매칭 거부"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'matchiv1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<BB', 99, 0))  # 존재하지 않는 던전
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.MATCH_STATUS
+        assert payload[1] == 1, f"Expected INVALID_DUNGEON(1), got {payload[1]}"
+        c.close()
+
+    await test("MATCH_INVALID: 잘못된 던전 ID 매칭 거부", test_match_enqueue_invalid_dungeon())
+
+    async def test_match_enqueue_and_dequeue():
+        """P2_S03_S01: 매칭 등록 및 취소"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'matchdq1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 레벨 올려서 매칭 가능하게
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # 매칭 등록
+        await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<BB', 1, 0))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.MATCH_STATUS
+        assert payload[1] == 0, f"Expected QUEUED(0), got {payload[1]}"
+        # 매칭 취소
+        await c.send(MsgType.MATCH_DEQUEUE, struct.pack('<B', 1))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.MATCH_STATUS
+        assert payload[1] == 4, f"Expected DEQUEUED(4), got {payload[1]}"
+        c.close()
+
+    await test("MATCH_QUEUE: 매칭 등록 및 취소", test_match_enqueue_and_dequeue())
+
+    async def test_match_found_full_party():
+        """P2_S03_S01: 4인 매칭 완료 → MATCH_FOUND + 인스턴스 생성"""
+        clients = []
+        for i in range(4):
+            c = TestClient()
+            await c.connect('127.0.0.1', port)
+            await asyncio.sleep(0.1)
+            name = f'mf{i:02d}test'.encode('utf-8')
+            await c.send(MsgType.LOGIN, struct.pack('<B', len(name)) + name + struct.pack('<B', 2) + b'pw')
+            await c.recv_packet()
+            await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+            await c.recv_all_packets(timeout=1.0)
+            # 레벨업
+            await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+            await c.recv_all_packets(timeout=1.0)
+            clients.append(c)
+        # 4명 순차 등록 — recv_all 사용해서 타이밍 이슈 방지
+        for i, c in enumerate(clients):
+            await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<BB', 1, 0))
+            await asyncio.sleep(0.2)
+        # 잠시 대기 후 모든 패킷 수집
+        await asyncio.sleep(0.5)
+        found_count = 0
+        status_count = 0
+        instance_ids = set()
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.0)
+            for mt, pl in packets:
+                if mt == MsgType.MATCH_STATUS:
+                    status_count += 1
+                if mt == MsgType.MATCH_FOUND:
+                    found_count += 1
+                    inst_id = struct.unpack_from('<I', pl, 0)[0]
+                    instance_ids.add(inst_id)
+        assert status_count >= 4, f"Expected >= 4 MATCH_STATUS, got {status_count}"
+        assert found_count >= 4, f"Expected >= 4 MATCH_FOUND, got {found_count}"
+        assert len(instance_ids) >= 1, "Expected at least 1 instance"
+        # 인스턴스 정보 요청
+        inst_id = list(instance_ids)[0]
+        await clients[0].send(MsgType.MATCH_ACCEPT, struct.pack('<I', inst_id))
+        packets = await clients[0].recv_all_packets(timeout=1.0)
+        info_found = any(mt == MsgType.INSTANCE_INFO for mt, _ in packets)
+        assert info_found, f"Expected INSTANCE_INFO in packets, got {[mt for mt, _ in packets]}"
+        # 인스턴스 퇴장
+        await clients[0].send(MsgType.INSTANCE_LEAVE, struct.pack('<I', inst_id))
+        packets = await clients[0].recv_all_packets(timeout=1.0)
+        leave_results = [(mt, pl) for mt, pl in packets if mt == MsgType.INSTANCE_LEAVE_RESULT]
+        assert len(leave_results) > 0, "Expected INSTANCE_LEAVE_RESULT"
+        assert leave_results[0][1][4] == 0, f"Expected OK(0), got {leave_results[0][1][4]}"
+        for c in clients:
+            c.close()
+
+    await test("MATCH_FOUND: 4인 파티 매칭 완료 + 인스턴스", test_match_found_full_party())
+
+    async def test_instance_enter_leave():
+        """P2_S03_S01: 인스턴스 입장/퇴장 + 존 전환"""
+        clients = []
+        for i in range(4):
+            c = TestClient()
+            await c.connect('127.0.0.1', port)
+            await asyncio.sleep(0.05)
+            name = f'ie{i:02d}test'.encode('utf-8')
+            await c.send(MsgType.LOGIN, struct.pack('<B', len(name)) + name + struct.pack('<B', 2) + b'pw')
+            await c.recv_packet()
+            await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+            await c.recv_all_packets(timeout=1.0)
+            await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+            await c.recv_all_packets(timeout=0.5)
+            clients.append(c)
+        # 매칭
+        for c in clients:
+            await c.send(MsgType.MATCH_ENQUEUE, struct.pack('<BB', 1, 0))
+            await c.recv_packet()
+        await asyncio.sleep(0.5)
+        # MATCH_FOUND에서 instance_id 수집
+        inst_id = None
+        for c in clients:
+            packets = await c.recv_all_packets(timeout=1.0)
+            for mt, pl in packets:
+                if mt == MsgType.MATCH_FOUND:
+                    inst_id = struct.unpack_from('<I', pl, 0)[0]
+        assert inst_id is not None, "No MATCH_FOUND received"
+        # 입장
+        await clients[0].send(MsgType.INSTANCE_ENTER, struct.pack('<I', inst_id))
+        msg_type, payload = await clients[0].recv_packet()
+        assert msg_type == MsgType.INSTANCE_INFO
+        # 퇴장
+        await clients[0].send(MsgType.INSTANCE_LEAVE, struct.pack('<I', inst_id))
+        msg_type, payload = await clients[0].recv_packet()
+        assert msg_type == MsgType.INSTANCE_LEAVE_RESULT
+        assert payload[4] == 0
+        for c in clients:
+            c.close()
+
+    await test("INSTANCE: 던전 입장 + 퇴장 + 존 전환", test_instance_enter_leave())
+
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
     print(f"  TCP Bridge Test Results: {passed}/{total} PASSED")
