@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T06:10:00"
+last_session: "2026-02-16T06:32:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 5 소셜 심화 완료! 90/90 ALL PASS (S051). 친구/차단/파티찾기 8핸들러(MsgType 410-422). 다음: TASK 9 내구도(462-467) → TASK 6 전장(430-435)."
+current_status: "TASK 9 내구도/수리/리롤 완료! 95/95 ALL PASS (S052). 내구도(피격-0.1/사망-1.0)+수리(tier*cost)+리롤(5000g+재감정서)+랜덤옵션 핸들러6+헬퍼5(MsgType 462-467). 다음: TASK 6 전장(430-435)."
 
 # ── 완료된 작업 ──
 completed:
@@ -103,6 +103,9 @@ completed:
   - id: S051
     desc: "C031 응답: TASK 5 소셜 심화 완료. MsgType 410-422. 핸들러8(FRIEND_REQUEST/ACCEPT/REJECT/LIST+BLOCK/BLOCK_LIST+PARTY_FINDER_LIST/CREATE)+친구max100+차단max100+파티찾기5카테고리. 90/90 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s051.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S051_c031_response_task5_social.md"]
+  - id: S052
+    desc: "C032 응답: TASK 9 내구도/수리/리롤 완료. MsgType 462-467. 핸들러6+헬퍼5(REPAIR_REQ/REROLL_REQ/DURABILITY_QUERY/NOTIFY+take_hit/death)+인벤토리기반+랜덤옵션5타입+tier계산. 95/95 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s052.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S052_c032_response_task9_durability.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -175,33 +178,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 9: 장비 내구도/수리 + 랜덤옵션 (GDD rules/items.yaml)
-  # 장비 장착/해제는 구현됨. 내구도/수리/리롤은 미구현.
-  # MsgType: 462-467
+  # TASK 9: 완료! (S052) — 내구도/수리/리롤 95/95 PASS
+  # durability_sub01~04 모두 완료
   # ============================================================
-  - id: "durability_sub01"
-    desc: "내구도 감소 로직 — 피격 시 -0.1, 사망 시 전 장비 -1.0. durability≤0이면 50% 스탯 감소(broken 상태). STAT_TAKE_DMG(93) 핸들러에 추가."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "durability_sub02"
-    desc: "REPAIR_REQ(462)→REPAIR_RESULT(463) 핸들러 — 장비 수리. repair_cost = equipment_tier * (100 - current_durability) * 5. 전체 수리 옵션."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "durability_sub03"
-    desc: "REROLL_REQ(464)→REROLL_RESULT(465) 핸들러 — 랜덤 옵션 재설정. cost:5000골드 + Reappraisal 아이템. 옵션 잠금(1줄, 10000골드)."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "durability_sub04"
-    desc: "내구도/수리/리롤 테스트 3개 — 내구도 감소/broken 확인, 수리 비용, 리롤."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 10: 보조 화폐 시스템 (GDD rules/economy.yaml currencies)
@@ -569,6 +548,8 @@ recent_decisions:
   - "OneDrive tcp_bridge.py 잘림 이슈 발견/수정: _patch_s050.py에 git 원본 복구 로직 추가"
   - "TASK 5 완료: 소셜심화(410-422) 90/90 PASS. _patch_s051.py. 핸들러8개(FRIEND_REQUEST/ACCEPT/REJECT/LIST+BLOCK/BLOCK_LIST+PARTY_FINDER_LIST/CREATE). FRIEND_MAX=100, BLOCK_MAX=100, PARTY_FINDER_CATEGORIES 5종."
   - "클라 TASK 8 각인/초월 완료 확인: EngravingManager+EngravingUI+TranscendUI, 95 PASS."
+  - "클라 TASK 5 소셜 완료 확인: FriendManager+BlockManager+PartyFinderManager+FriendUI+BlockUI+PartyFinderUI, 101 PASS."
+  - "TASK 9 완료: 내구도/수리/리롤(462-467) 95/95 PASS. _patch_s052.py. 인벤토리기반 내구도(피격-0.1/사망-1.0)+수리(tier*dur_lost*5)+리롤(5000g+재감정서,1줄잠금10000g)+랜덤옵션5타입5풀."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -605,6 +586,7 @@ processed_messages:
   - "C029"
   - "C030"
   - "C031"
+  - "C032"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -620,4 +602,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python test_tcp_bridge.py
