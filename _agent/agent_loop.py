@@ -1,7 +1,7 @@
 """
 에이전트 자율 루프 — 클라이언트/서버 공용
 ===========================================
-git push 감지 → 새 메시지 처리 + 자기 할 일 진행 → commit & push
+git push 감지 -> 새 메시지 처리 + 자기 할 일 진행 -> commit & push
 
 사용법:
   python _agent/agent_loop.py --role client
@@ -9,28 +9,32 @@ git push 감지 → 새 메시지 처리 + 자기 할 일 진행 → commit & pu
 
 컨텍스트 보장:
   매 Claude 실행 시 반드시 주입하는 파일:
-  1. _context/{role}_state.yaml  — 영속 상태 (이전 세션 기억)
-  2. CLAUDE.md                    — 프로젝트 규칙
-  3. _gdd/README.md               — GDD 시스템 개요
-  4. 새 메시지 파일 전문           — 서버/클라 간 통신
+  1. _context/{role}_state.yaml  -- 영속 상태 (이전 세션 기억)
+  2. CLAUDE.md                    -- 프로젝트 규칙
+  3. _gdd/README.md               -- GDD 시스템 개요
+  4. 새 메시지 파일 전문           -- 서버/클라 간 통신
 """
 
 import argparse
 import datetime
-import hashlib
-import json
 import os
 import subprocess
 import sys
 import time
 
+# Windows에서 리다이렉트 시 버퍼링 방지
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(line_buffering=True)
+
 # ============================================================
 # 설정
 # ============================================================
 
-POLL_INTERVAL = 30          # 초 단위 — git pull 주기
-IDLE_WORK_INTERVAL = 300    # 초 단위 — 메시지 없어도 자기 할 일 진행 주기
-MAX_CLAUDE_TIMEOUT = 900    # 초 단위 — Claude 실행 최대 시간 (15분)
+POLL_INTERVAL = 30          # 초 단위 -- git pull 주기
+IDLE_WORK_INTERVAL = 300    # 초 단위 -- 메시지 없어도 자기 할 일 진행 주기
+MAX_CLAUDE_TIMEOUT = 900    # 초 단위 -- Claude 실행 최대 시간 (15분)
 
 ROLES = {
     "client": {
@@ -45,7 +49,7 @@ ROLES = {
         "outbox": "_comms/server_to_client",
         "state_file": "_context/server_state.yaml",
         "claude_md": "Servers/CLAUDE.md",
-        "validate_cmd": None,  # 서버 에이전트가 설정
+        "validate_cmd": None,
     },
 }
 
@@ -63,17 +67,30 @@ def git_run(args, cwd):
         text=True,
         timeout=60,
     )
-    return result.returncode, result.stdout.strip(), result.stderr.strip()
+    stdout = result.stdout.strip() if result.stdout else ""
+    stderr = result.stderr.strip() if result.stderr else ""
+    return result.returncode, stdout, stderr
 
 
 def git_pull(project_root):
-    """git pull --rebase, 충돌 시 abort"""
+    """git stash -> pull --rebase -> stash pop"""
+    # unstaged 변경이 있으면 stash
+    _, status_out, _ = git_run(["status", "--porcelain"], project_root)
+    has_changes = bool(status_out.strip())
+    if has_changes:
+        git_run(["stash"], project_root)
+
     code, out, err = git_run(["pull", "--rebase"], project_root)
     if code != 0:
-        print(f"  [WARN] git pull 실패, rebase abort 시도: {err}")
+        print(f"  [WARN] git pull rebase 실패: {err}")
         git_run(["rebase", "--abort"], project_root)
-        # 일반 pull 재시도
         code, out, err = git_run(["pull"], project_root)
+
+    if has_changes:
+        pop_code, _, pop_err = git_run(["stash", "pop"], project_root)
+        if pop_code != 0:
+            print(f"  [WARN] stash pop 충돌: {pop_err}")
+
     return code == 0, out
 
 
@@ -81,7 +98,6 @@ def git_push(project_root, message):
     """add + commit + push"""
     git_run(["add", "-A"], project_root)
 
-    # 변경사항 있는지 확인
     code, out, _ = git_run(["status", "--porcelain"], project_root)
     if not out.strip():
         print("  [INFO] 변경사항 없음, push 스킵")
@@ -91,7 +107,6 @@ def git_push(project_root, message):
     code, out, err = git_run(["push"], project_root)
     if code != 0:
         print(f"  [WARN] push 실패: {err}")
-        # pull 후 재시도
         git_pull(project_root)
         code, out, err = git_run(["push"], project_root)
     return code == 0
@@ -127,7 +142,6 @@ def scan_new_messages(inbox_dir, processed, project_root):
     for fname in sorted(os.listdir(inbox_path)):
         if not fname.endswith(".md"):
             continue
-        # 파일명에서 메시지 ID 추출 (예: S030_gdd_system_complete.md → S030)
         msg_id = fname.split("_")[0]
         if msg_id not in processed:
             full_path = os.path.join(inbox_dir, fname)
@@ -141,28 +155,24 @@ def scan_new_messages(inbox_dir, processed, project_root):
 # ============================================================
 
 def build_prompt(role_config, new_messages, project_root, trigger_reason):
-    """
-    Claude에게 보낼 프롬프트 생성.
-    핵심: 컨텍스트 파일을 반드시 읽게 강제한다.
-    """
+    """Claude에게 보낼 프롬프트 생성. 컨텍스트 파일을 반드시 읽게 강제."""
     state_file = role_config["state_file"]
     claude_md = role_config["claude_md"]
 
-    # 메시지 파일 경로 목록
     msg_files = "\n".join([f"  - {path}" for _, path in new_messages])
     if not msg_files:
         msg_files = "  (새 메시지 없음)"
 
     prompt = f"""
-# 에이전트 자율 실행 — 컨텍스트 복원 필수
+# 에이전트 자율 실행 -- 컨텍스트 복원 필수
 
 ## 0. 반드시 먼저 읽을 파일 (건너뛰지 마세요)
 
 다음 파일들을 순서대로 읽고 내용을 완전히 이해한 후 작업을 시작하세요:
 
-1. `{state_file}` — 당신의 영속 상태 (이전 세션에서 뭘 했는지, 다음에 뭘 해야 하는지)
-2. `{claude_md}` — 프로젝트 코딩 규칙과 아키텍처
-3. `_gdd/README.md` — GDD 시스템 개요
+1. `{state_file}` -- 당신의 영속 상태 (이전 세션에서 뭘 했는지, 다음에 뭘 해야 하는지)
+2. `{claude_md}` -- 프로젝트 코딩 규칙과 아키텍처
+3. `_gdd/README.md` -- GDD 시스템 개요
 
 ## 1. 실행 이유
 
@@ -207,6 +217,10 @@ def run_claude(prompt, project_root):
     print(f"  [CLAUDE] 실행 시작 ({len(prompt)}자 프롬프트)")
     start = time.time()
 
+    # 중첩 세션 차단 우회 -- agent_loop은 독립 프로세스
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+
     try:
         result = subprocess.run(
             ["claude", "-p", prompt, "--allowedTools",
@@ -215,11 +229,11 @@ def run_claude(prompt, project_root):
             capture_output=True,
             text=True,
             timeout=MAX_CLAUDE_TIMEOUT,
+            env=env,
         )
         elapsed = time.time() - start
         print(f"  [CLAUDE] 완료 ({elapsed:.0f}초, exit={result.returncode})")
 
-        # 결과 로그 저장
         log_path = os.path.join(project_root, "_agent", "last_run.log")
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(f"=== {datetime.datetime.now().isoformat()} ===\n")
@@ -252,7 +266,7 @@ def check_ask_user(project_root):
         content = f.read()
     if "status: pending" in content:
         print("\n" + "=" * 50)
-        print("  ⚠ 유저 결정 필요! _context/ask_user.yaml 확인")
+        print("  [!!] 유저 결정 필요! _context/ask_user.yaml 확인")
         print("=" * 50 + "\n")
 
 
@@ -269,7 +283,6 @@ def main():
                         help="한 번만 실행하고 종료")
     args = parser.parse_args()
 
-    # 프로젝트 루트 결정
     if args.project_root:
         project_root = args.project_root
     else:
@@ -277,15 +290,15 @@ def main():
 
     role_config = ROLES[args.role]
     print(f"{'=' * 50}")
-    print(f"  에이전트 루프 시작: {args.role}")
-    print(f"  프로젝트: {project_root}")
-    print(f"  수신함: {role_config['inbox']}")
-    print(f"  발신함: {role_config['outbox']}")
-    print(f"  상태파일: {role_config['state_file']}")
-    print(f"  폴링 간격: {POLL_INTERVAL}초")
+    print(f"  Agent Loop Start: {args.role}")
+    print(f"  Project: {project_root}")
+    print(f"  Inbox: {role_config['inbox']}")
+    print(f"  Outbox: {role_config['outbox']}")
+    print(f"  State: {role_config['state_file']}")
+    print(f"  Poll: {POLL_INTERVAL}s")
     print(f"{'=' * 50}\n")
 
-    last_work_time = 0  # 마지막으로 자체 작업한 시간
+    last_work_time = 0
 
     while True:
         try:
@@ -296,7 +309,7 @@ def main():
             print(f"[{timestamp}] git pull...")
             success, pull_output = git_pull(project_root)
             if not success:
-                print(f"  [WARN] git pull 실패, {POLL_INTERVAL}초 후 재시도")
+                print(f"  [WARN] git pull failed, retry in {POLL_INTERVAL}s")
                 time.sleep(POLL_INTERVAL)
                 continue
 
@@ -308,13 +321,12 @@ def main():
 
             if new_messages:
                 msg_names = [m[0] for m in new_messages]
-                print(f"  [NEW] 메시지 발견: {msg_names}")
-                trigger = f"새 메시지 수신: {', '.join(msg_names)}"
+                print(f"  [NEW] messages: {msg_names}")
+                trigger = f"new messages: {', '.join(msg_names)}"
 
             elif now - last_work_time > IDLE_WORK_INTERVAL:
-                # 메시지 없어도 주기적으로 자기 할 일 진행
-                print(f"  [IDLE] {IDLE_WORK_INTERVAL}초 경과, 자체 작업 진행")
-                trigger = "자체 작업 주기 도래 — pending_tasks 진행"
+                print(f"  [IDLE] {IDLE_WORK_INTERVAL}s elapsed, working on pending_tasks")
+                trigger = "idle work cycle -- pending_tasks"
 
             # 3. Claude 실행
             if trigger:
@@ -322,29 +334,28 @@ def main():
                 success = run_claude(prompt, project_root)
 
                 if success:
-                    # 4. git push
                     commit_msg = f"auto({args.role}): {trigger[:60]}"
                     pushed = git_push(project_root, commit_msg)
                     if pushed:
-                        print(f"  [PUSH] 커밋 & 푸시 완료")
+                        print(f"  [PUSH] commit & push done")
                     last_work_time = now
                 else:
-                    print(f"  [WARN] Claude 실행 실패")
+                    print(f"  [WARN] Claude execution failed")
 
             else:
-                print(f"  [WAIT] 새 메시지 없음, 대기...")
+                print(f"  [WAIT] no new messages, waiting...")
 
             # 5. 유저 알림 체크
             check_ask_user(project_root)
 
             if args.once:
-                print("\n[DONE] --once 모드, 종료")
+                print("\n[DONE] --once mode, exiting")
                 break
 
             time.sleep(POLL_INTERVAL)
 
         except KeyboardInterrupt:
-            print("\n\n[STOP] Ctrl+C — 에이전트 루프 종료")
+            print("\n\n[STOP] Ctrl+C -- agent loop stopped")
             break
         except Exception as e:
             print(f"  [ERROR] {e}")

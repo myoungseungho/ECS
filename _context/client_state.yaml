@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T21:00:00"
+last_session: "2026-02-14T22:30:00"
 
 # ── 현재 상태 ──
-current_status: "Agent Loop 시스템 구축 완료, 서버에 C017 전달, 서버 응답 대기 중"
+current_status: "카메라 쿼터뷰 전환 + HUD ui.yaml 리뉴얼 완료, C018 전달"
 
 # ── 완료된 작업 ──
 completed:
@@ -37,20 +37,21 @@ completed:
   - id: C017
     desc: "Agent Loop 자율 시스템 구축 + 서버 세팅 가이드"
     files: ["_agent/agent_loop.py", "_agent/README.md", "_context/server_state_template.yaml", "_context/ask_user.yaml", "_comms/client_to_server/C017_agent_loop_system_ready.md"]
+  - id: A7
+    desc: "카메라 TPS→쿼터뷰 전환 (대표님 지시, camera.yaml 기반)"
+    files: ["Assets/Scripts/Entity/LocalPlayer.cs"]
+  - id: A8
+    desc: "HUD ui.yaml 기반 리뉴얼 + 크로스헤어 제거"
+    files: ["Assets/Scripts/UI/HUDManager.cs", "Assets/Editor/ProjectSetup.cs", "Assets/Scripts/UI/KeybindGuideUI.cs"]
+  - id: C018
+    desc: "S031 응답 — 카메라 전환 + HUD 리뉴얼 완료 보고"
+    files: ["_comms/client_to_server/C018_s031_response_camera_converted_hud_renewed.md"]
 
 # ── 대기 중 (서버 응답 필요) ──
-blocked:
-  - reason: "카메라 방향 확정 필요 (TPS 숄더캠 vs 쿼터뷰)"
-    waiting_for: "server response to C016"
-  - reason: "GDD 교차 불일치 8건 수정 필요"
-    waiting_for: "server response to C016"
+blocked: []
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
-  - id: "ui_renewal"
-    desc: "ui.yaml 기반 HUD 리뉴얼 — 현재 임시 배치를 GDD 스펙 px/앵커로"
-    priority: P1
-    blocked: false
   - id: "animator_setup"
     desc: "animation.yaml 기반 Animator 재설정 — 콤보/대시/피격 상태 추가"
     priority: P1
@@ -62,22 +63,56 @@ pending_tasks:
   - id: "art_lighting"
     desc: "art_style.yaml 기반 URP 라이팅/포스트프로세싱"
     priority: P1
+    blocked: false
+  - id: "phase2_tcp"
+    desc: "Phase 2 TCP 브릿지 연동 테스트 (서버 준비 후)"
+    priority: P0
     blocked: true
-    blocked_reason: "카메라 방향 확정 후"
+    blocked_reason: "서버 에이전트가 TCP 브릿지 테스트 준비 완료해야"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
-  - "대표님이 GTA TPS 숄더캠 직접 요청 → 구현 완료 (camera.yaml과 충돌)"
-  - "GDD 교차 검증 결과 85/100점, 교차 불일치 8건 발견"
-  - "에이전트 파이프라인 Game Development ECS 구조 제안"
+  - "대표님 직접 지시: 카메라 탑다운 쿼터뷰 확정 (로아 스타일)"
+  - "TPS 숄더캠 제거, camera.yaml 기반 쿼터뷰 구현"
+  - "GDD 크로스파일 불일치 8건 서버에서 수정 완료"
+  - "엔티티 파이프라인 제안 보류 (현재 YAML 구조 유지)"
   - "모든 코드는 validate_all.py --skip-unity 통과 필수"
   - "Agent Loop 시스템으로 자율 소통 체계 구축 완료"
+  - "GDD 권위(Authority) 기준 정립 (flow.yaml=키바인딩, ui.yaml=UI, 등)"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
+  - "S001"
+  - "S002"
+  - "S003"
+  - "S004"
+  - "S005"
+  - "S006"
+  - "S007"
+  - "S008"
+  - "S009"
+  - "S010"
+  - "S011"
+  - "S012"
+  - "S013"
+  - "S014"
+  - "S015"
+  - "S016"
+  - "S017"
+  - "S018"
+  - "S019"
+  - "S020"
+  - "S021"
+  - "S022"
+  - "S023"
+  - "S024"
+  - "S025"
+  - "S026"
+  - "S027"
   - "S028"
   - "S029"
   - "S030"
+  - "S031"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

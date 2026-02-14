@@ -20,14 +20,17 @@ public class KeybindGuideUI : MonoBehaviour
             guideText.text =
                 "<b>[ Controls ]</b>\n\n" +
                 "WASD  -  Move\n" +
-                "Mouse  -  Camera\n" +
-                "LClick  -  Attack (locked) / Select (unlocked)\n" +
+                "LClick  -  Select Target\n" +
                 "Tab  -  Cycle Target\n" +
-                "ESC  -  Toggle Cursor\n" +
-                "1~4  -  Skills\n" +
+                "MWheel  -  Zoom In/Out\n" +
+                "MMB Drag  -  Rotate Camera\n" +
+                "Q/W/E/R  -  Skills\n" +
+                "A/S/D/F  -  Skills\n" +
+                "V  -  Ultimate\n" +
                 "I  -  Inventory\n" +
-                "P  -  Party\n" +
-                "Q  -  Quests\n" +
+                "K  -  Character\n" +
+                "L  -  Skills Panel\n" +
+                "J  -  Quests\n" +
                 "Enter  -  Chat\n" +
                 "F1  -  Show this guide";
         }

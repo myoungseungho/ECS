@@ -1,0 +1,12 @@
+==================================================
+  Agent Loop Start: client
+  Project: C:\Users\명승호\Desktop\ECS
+  Inbox: _comms/server_to_client
+  Outbox: _comms/client_to_server
+  State: _context/client_state.yaml
+  Poll: 30s
+==================================================
+
+[22:24:20] git pull...
+  [NEW] messages: ['S031']
+  [CLAUDE] 실행 시작 (1077자 프롬프트)

@@ -8,14 +8,17 @@ public class LocalPlayer : MonoBehaviour
     [SerializeField] private float sendInterval = 0.1f;
     [SerializeField] private float rotationSpeed = 10f;
 
-    [Header("TPS Camera")]
-    [SerializeField] private float shoulderOffsetX = 0.5f;
-    [SerializeField] private float pivotHeight = 1.8f;
-    [SerializeField] private float cameraDistance = 3f;
-    [SerializeField] private float mouseSensitivity = 2f;
-    [SerializeField] private float pitchMin = -30f;
-    [SerializeField] private float pitchMax = 60f;
-    [SerializeField] private float cameraCollisionRadius = 0.2f;
+    [Header("Quarter View Camera")]
+    [SerializeField] private float cameraHeight = 15f;
+    [SerializeField] private float cameraBack = 10f;
+    [SerializeField] private float cameraFOV = 50f;
+    [SerializeField] private float cameraRotateSpeed = 120f;
+    [SerializeField] private float cameraDamping = 5f;
+    [SerializeField] private float zoomSpeed = 3f;
+    [SerializeField] private float zoomMin = 8f;
+    [SerializeField] private float zoomMax = 25f;
+    [SerializeField] private float zoomSmoothSpeed = 8f;
+    [SerializeField] private float cameraCollisionMinDist = 2f;
 
     [Header("Combat")]
     [SerializeField] private float attackCooldown = 1.0f;
@@ -30,8 +33,9 @@ public class LocalPlayer : MonoBehaviour
 
     // Camera
     private float _yaw;
-    private float _pitch = 10f;
-    private bool _cursorLocked = true;
+    private float _currentZoom = 15f;
+    private float _targetZoom = 15f;
+    private Vector3 _cameraVelocity;
 
     // Targeting
     private ulong _currentTarget;
@@ -45,8 +49,15 @@ public class LocalPlayer : MonoBehaviour
         _animator = GetComponentInChildren<Animator>();
         _clientStartTime = Time.realtimeSinceStartup;
 
-        _yaw = transform.eulerAngles.y;
-        SetCursorLock(true);
+        _yaw = 0f;
+        _currentZoom = cameraHeight;
+        _targetZoom = cameraHeight;
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        if (_mainCamera != null)
+            _mainCamera.fieldOfView = cameraFOV;
 
         CreateTargetHighlight();
 
@@ -77,8 +88,8 @@ public class LocalPlayer : MonoBehaviour
             NetworkManager.Instance.State != NetworkManager.ConnectionState.InGame)
             return;
 
-        HandleCursorToggle();
-        HandleMouseLook();
+        HandleCameraRotation();
+        HandleCameraZoom();
         HandleMovement();
         HandleTargeting();
         HandleAttack();
@@ -86,30 +97,28 @@ public class LocalPlayer : MonoBehaviour
         UpdateTargetHighlight();
     }
 
-    // ━━━ Cursor Lock ━━━
+    // ━━━ Camera Rotation (Middle Mouse Drag) ━━━
 
-    private void HandleCursorToggle()
+    private void HandleCameraRotation()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
-            SetCursorLock(!_cursorLocked);
+        if (Input.GetMouseButton(2))
+        {
+            float deltaX = Input.GetAxis("Mouse X");
+            _yaw += deltaX * cameraRotateSpeed * Time.deltaTime;
+        }
     }
 
-    private void SetCursorLock(bool locked)
+    // ━━━ Camera Zoom (Scroll Wheel) ━━━
+
+    private void HandleCameraZoom()
     {
-        _cursorLocked = locked;
-        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible = !locked;
-    }
-
-    // ━━━ Mouse Look ━━━
-
-    private void HandleMouseLook()
-    {
-        if (!_cursorLocked) return;
-
-        _yaw += Input.GetAxis("Mouse X") * mouseSensitivity;
-        _pitch -= Input.GetAxis("Mouse Y") * mouseSensitivity;
-        _pitch = Mathf.Clamp(_pitch, pitchMin, pitchMax);
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Abs(scroll) > 0.01f)
+        {
+            _targetZoom -= scroll * zoomSpeed * 10f;
+            _targetZoom = Mathf.Clamp(_targetZoom, zoomMin, zoomMax);
+        }
+        _currentZoom = Mathf.Lerp(_currentZoom, _targetZoom, Time.deltaTime * zoomSmoothSpeed);
     }
 
     // ━━━ Movement (Camera-relative WASD) ━━━
@@ -145,7 +154,7 @@ public class LocalPlayer : MonoBehaviour
         }
     }
 
-    // ━━━ Targeting ━━━
+    // ━━━ Targeting (Left Click) ━━━
 
     private void HandleTargeting()
     {
@@ -155,7 +164,7 @@ public class LocalPlayer : MonoBehaviour
             return;
         }
 
-        if (!_cursorLocked && Input.GetMouseButtonDown(0))
+        if (Input.GetMouseButtonDown(0))
         {
             var ray = _mainCamera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out var hit, 100f))
@@ -209,7 +218,6 @@ public class LocalPlayer : MonoBehaviour
 
     private void HandleAttack()
     {
-        if (!_cursorLocked) return;
         if (!Input.GetMouseButtonDown(0)) return;
         if (_currentTarget == 0) return;
         if (Time.time - _lastAttackTime < attackCooldown) return;
@@ -233,33 +241,37 @@ public class LocalPlayer : MonoBehaviour
             CombatManager.Instance.Attack(_currentTarget);
     }
 
-    // ━━━ TPS Camera ━━━
+    // ━━━ Quarter View Camera ━━━
 
     private void UpdateCamera()
     {
         if (_mainCamera == null) return;
 
-        Vector3 lookTarget = transform.position + Vector3.up * 1.5f;
-        Quaternion rotation = Quaternion.Euler(_pitch, _yaw, 0f);
-        Vector3 right = Quaternion.Euler(0f, _yaw, 0f) * Vector3.right;
+        float zoomRatio = _currentZoom / cameraHeight;
+        float height = cameraHeight * zoomRatio;
+        float back = cameraBack * zoomRatio;
 
-        Vector3 pivot = transform.position + Vector3.up * pivotHeight;
-        Vector3 back = rotation * Vector3.back;
-        Vector3 desiredPos = pivot + back * cameraDistance + right * shoulderOffsetX;
+        Quaternion rotation = Quaternion.Euler(0, _yaw, 0);
+        Vector3 offset = rotation * new Vector3(0f, height, -back);
 
-        // Camera collision
-        Vector3 origin = pivot + right * shoulderOffsetX;
+        Vector3 lookTarget = transform.position + Vector3.up * 1f;
+        Vector3 desiredPos = transform.position + offset;
+
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
         Vector3 toCamera = desiredPos - origin;
         float maxDist = toCamera.magnitude;
 
         if (maxDist > 0.01f &&
-            Physics.SphereCast(origin, cameraCollisionRadius, toCamera.normalized, out var hit, maxDist))
+            Physics.Raycast(origin, toCamera.normalized, out var hit, maxDist))
         {
-            float safeDist = Mathf.Max(hit.distance - 0.1f, 0.3f);
+            float safeDist = Mathf.Max(hit.distance - 0.5f, cameraCollisionMinDist);
             desiredPos = origin + toCamera.normalized * safeDist;
         }
 
-        _mainCamera.transform.position = desiredPos;
+        _mainCamera.transform.position = Vector3.SmoothDamp(
+            _mainCamera.transform.position, desiredPos, ref _cameraVelocity,
+            1f / cameraDamping);
+
         _mainCamera.transform.LookAt(lookTarget);
     }
 

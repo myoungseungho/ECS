@@ -538,26 +538,70 @@ public static class ProjectSetup
 
     private static void CreateUICanvas(Scene scene)
     {
-        // Canvas
-        var canvasGo = new GameObject("Canvas");
+        // Canvas (ui.yaml global 스펙: 1920x1080 기준)
+        var canvasGo = new GameObject("Canvas_HUD");
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGo.AddComponent<CanvasScaler>();
+        canvas.sortingOrder = 0;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 0.5f;
         canvasGo.AddComponent<GraphicRaycaster>();
 
-        // --- HUD Panel (좌상단) ---
+        // --- HUD Panel (좌상단, ui.yaml player_info 스펙) ---
         var hudGo = new GameObject("HUDPanel");
         hudGo.transform.SetParent(canvasGo.transform, false);
+        var hudRT = hudGo.AddComponent<RectTransform>();
+        hudRT.anchorMin = new Vector2(0, 1);
+        hudRT.anchorMax = new Vector2(0, 1);
+        hudRT.pivot = new Vector2(0, 1);
+        hudRT.anchoredPosition = new Vector2(20, -20);
+        hudRT.sizeDelta = new Vector2(300, 100);
+        var hudBg = hudGo.AddComponent<Image>();
+        hudBg.color = new Color(0, 0, 0, 0.53f); // #00000088
+
         var hudManager = hudGo.AddComponent<HUDManager>();
 
-        var levelGo = CreateUIText(hudGo.transform, "LevelText", "Lv. 1",
-            new Vector2(10, -10), new Vector2(120, 30), TextAnchor.UpperLeft);
+        // Name (좌상단 80, -10)
+        var nameGo = CreateUIText(hudGo.transform, "NameText", "Player",
+            new Vector2(80, -10), new Vector2(150, 20), TextAnchor.MiddleLeft);
+        var nameComp = nameGo.GetComponent<Text>();
+        if (nameComp != null) { nameComp.fontStyle = FontStyle.Bold; nameComp.fontSize = 14; }
+
+        // Level (230, -10)
+        var levelGo = CreateUIText(hudGo.transform, "LevelText", "Lv.1",
+            new Vector2(230, -10), new Vector2(50, 20), TextAnchor.MiddleLeft);
+        var levelComp = levelGo.GetComponent<Text>();
+        if (levelComp != null) { levelComp.fontStyle = FontStyle.Bold; levelComp.fontSize = 14;
+            levelComp.color = new Color(1f, 0.843f, 0f); } // #FFD700
+
+        // HP Bar (80, -35, 200x16) — #E74C3C
         var hpBarGo = CreateUISlider(hudGo.transform, "HPBar",
-            new Vector2(10, -40), new Vector2(200, 20), new Color(0.8f, 0.2f, 0.2f));
+            new Vector2(80, -35), new Vector2(200, 16), new Color(0.906f, 0.298f, 0.235f));
+        // HP Text overlay
+        var hpTextGo = CreateUIText(hpBarGo.transform, "HPText", "100/100",
+            Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter);
+        var hpTextRT = hpTextGo.GetComponent<RectTransform>();
+        hpTextRT.anchorMin = Vector2.zero; hpTextRT.anchorMax = Vector2.one;
+        hpTextRT.sizeDelta = Vector2.zero; hpTextRT.anchoredPosition = Vector2.zero;
+        var hpTextComp = hpTextGo.GetComponent<Text>();
+        if (hpTextComp != null) hpTextComp.fontSize = 10;
+
+        // MP Bar (80, -55, 200x14) — #3498DB
         var mpBarGo = CreateUISlider(hudGo.transform, "MPBar",
-            new Vector2(10, -65), new Vector2(200, 20), new Color(0.2f, 0.4f, 0.9f));
+            new Vector2(80, -55), new Vector2(200, 14), new Color(0.204f, 0.596f, 0.859f));
+        var mpTextGo = CreateUIText(mpBarGo.transform, "MPText", "50/50",
+            Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter);
+        var mpTextRT = mpTextGo.GetComponent<RectTransform>();
+        mpTextRT.anchorMin = Vector2.zero; mpTextRT.anchorMax = Vector2.one;
+        mpTextRT.sizeDelta = Vector2.zero; mpTextRT.anchoredPosition = Vector2.zero;
+        var mpTextComp = mpTextGo.GetComponent<Text>();
+        if (mpTextComp != null) mpTextComp.fontSize = 10;
+
+        // EXP Bar (80, -73, 200x8) — #F1C40F
         var expBarGo = CreateUISlider(hudGo.transform, "EXPBar",
-            new Vector2(10, -90), new Vector2(200, 20), new Color(0.9f, 0.8f, 0.2f));
+            new Vector2(80, -73), new Vector2(200, 8), new Color(0.945f, 0.769f, 0.059f));
 
         // HUDManager SerializedField 연결
         var hudSO = new SerializedObject(hudManager);
@@ -565,23 +609,20 @@ public static class ProjectSetup
         SetSliderRef(hudSO, "mpSlider", mpBarGo);
         SetSliderRef(hudSO, "expSlider", expBarGo);
         SetTextRef(hudSO, "levelText", levelGo);
-        SetTextRef(hudSO, "hpText", CreateUIText(hudGo.transform, "HPText", "100 / 100",
-            new Vector2(215, -40), new Vector2(100, 20), TextAnchor.MiddleLeft));
-        SetTextRef(hudSO, "mpText", CreateUIText(hudGo.transform, "MPText", "50 / 50",
-            new Vector2(215, -65), new Vector2(100, 20), TextAnchor.MiddleLeft));
-        SetTextRef(hudSO, "expText", CreateUIText(hudGo.transform, "EXPText", "0 / 100",
-            new Vector2(215, -90), new Vector2(100, 20), TextAnchor.MiddleLeft));
+        SetTextRef(hudSO, "nameText", nameGo);
+        SetTextRef(hudSO, "hpText", hpTextGo);
+        SetTextRef(hudSO, "mpText", mpTextGo);
         hudSO.ApplyModifiedPropertiesWithoutUndo();
 
-        // --- Target Panel (상단 중앙) ---
+        // --- Target Panel (상단 중앙, ui.yaml target_info: 350x70) ---
         var targetGo = new GameObject("TargetPanel");
         targetGo.transform.SetParent(canvasGo.transform, false);
         var targetRT = targetGo.AddComponent<RectTransform>();
         targetRT.anchorMin = new Vector2(0.5f, 1f);
         targetRT.anchorMax = new Vector2(0.5f, 1f);
         targetRT.pivot = new Vector2(0.5f, 1f);
-        targetRT.anchoredPosition = new Vector2(0, -10);
-        targetRT.sizeDelta = new Vector2(300, 50);
+        targetRT.anchoredPosition = new Vector2(0, -20);
+        targetRT.sizeDelta = new Vector2(350, 70);
 
         var combatUI = targetGo.AddComponent<CombatUI>();
         var targetNameGo = CreateUIText(targetGo.transform, "TargetName", "Target",
@@ -667,15 +708,15 @@ public static class ProjectSetup
         if (rbProp != null) rbProp.objectReferenceValue = respawnBtn;
         deathSO.ApplyModifiedPropertiesWithoutUndo();
 
-        // --- Skill Bar (하단 중앙) ---
+        // --- Skill Bar (하단 중앙, ui.yaml skill_bar: 700x80) ---
         var skillBarGo = new GameObject("SkillBarPanel");
         skillBarGo.transform.SetParent(canvasGo.transform, false);
         var skillBarRT = skillBarGo.AddComponent<RectTransform>();
         skillBarRT.anchorMin = new Vector2(0.5f, 0f);
         skillBarRT.anchorMax = new Vector2(0.5f, 0f);
         skillBarRT.pivot = new Vector2(0.5f, 0f);
-        skillBarRT.anchoredPosition = new Vector2(0, 10);
-        skillBarRT.sizeDelta = new Vector2(400, 60);
+        skillBarRT.anchoredPosition = new Vector2(0, 20);
+        skillBarRT.sizeDelta = new Vector2(700, 80);
 
         var skillBarUI = skillBarGo.AddComponent<SkillBarUI>();
         var slotNameTexts = new Text[4];
@@ -836,15 +877,15 @@ public static class ProjectSetup
         if (leaveBtnProp != null) leaveBtnProp.objectReferenceValue = leaveBtn;
         partySO.ApplyModifiedPropertiesWithoutUndo();
 
-        // --- Buff Icons (우상단) ---
+        // --- Buff Icons (좌상단, player_info 아래, ui.yaml buff_bar: [20, -130]) ---
         var buffPanelGo = new GameObject("BuffPanel");
         buffPanelGo.transform.SetParent(canvasGo.transform, false);
         var buffPanelRT = buffPanelGo.AddComponent<RectTransform>();
-        buffPanelRT.anchorMin = new Vector2(1f, 1f);
-        buffPanelRT.anchorMax = new Vector2(1f, 1f);
-        buffPanelRT.pivot = new Vector2(1f, 1f);
-        buffPanelRT.anchoredPosition = new Vector2(-10, -10);
-        buffPanelRT.sizeDelta = new Vector2(300, 50);
+        buffPanelRT.anchorMin = new Vector2(0f, 1f);
+        buffPanelRT.anchorMax = new Vector2(0f, 1f);
+        buffPanelRT.pivot = new Vector2(0f, 1f);
+        buffPanelRT.anchoredPosition = new Vector2(20, -130);
+        buffPanelRT.sizeDelta = new Vector2(400, 30);
 
         var buffUI = buffPanelGo.AddComponent<BuffUI>();
 
@@ -908,52 +949,6 @@ public static class ProjectSetup
         SetTextRef(questSO, "questCountText", questCountGo);
         questSO.ApplyModifiedPropertiesWithoutUndo();
 
-        // --- Crosshair (화면 중앙) ---
-        var crosshairGo = new GameObject("Crosshair");
-        crosshairGo.transform.SetParent(canvasGo.transform, false);
-        var crosshairRT = crosshairGo.AddComponent<RectTransform>();
-        crosshairRT.anchorMin = new Vector2(0.5f, 0.5f);
-        crosshairRT.anchorMax = new Vector2(0.5f, 0.5f);
-        crosshairRT.pivot = new Vector2(0.5f, 0.5f);
-        crosshairRT.anchoredPosition = Vector2.zero;
-        crosshairRT.sizeDelta = new Vector2(20, 20);
-
-        // Horizontal bar
-        var chHGo = new GameObject("H");
-        chHGo.transform.SetParent(crosshairGo.transform, false);
-        var chHRT = chHGo.AddComponent<RectTransform>();
-        chHRT.anchorMin = new Vector2(0.5f, 0.5f);
-        chHRT.anchorMax = new Vector2(0.5f, 0.5f);
-        chHRT.pivot = new Vector2(0.5f, 0.5f);
-        chHRT.anchoredPosition = Vector2.zero;
-        chHRT.sizeDelta = new Vector2(20, 2);
-        var chHImg = chHGo.AddComponent<Image>();
-        chHImg.color = Color.white;
-
-        // Vertical bar
-        var chVGo = new GameObject("V");
-        chVGo.transform.SetParent(crosshairGo.transform, false);
-        var chVRT = chVGo.AddComponent<RectTransform>();
-        chVRT.anchorMin = new Vector2(0.5f, 0.5f);
-        chVRT.anchorMax = new Vector2(0.5f, 0.5f);
-        chVRT.pivot = new Vector2(0.5f, 0.5f);
-        chVRT.anchoredPosition = Vector2.zero;
-        chVRT.sizeDelta = new Vector2(2, 20);
-        var chVImg = chVGo.AddComponent<Image>();
-        chVImg.color = Color.white;
-
-        // Crosshair Image ref for HUDManager (use horizontal bar as main image)
-        var crosshairImage = crosshairGo.AddComponent<Image>();
-        crosshairImage.color = new Color(1, 1, 1, 0); // transparent container
-
-        // Connect crosshair to HUDManager
-        var crosshairProp = hudSO.FindProperty("crosshair");
-        if (crosshairProp != null)
-        {
-            crosshairProp.objectReferenceValue = crosshairImage;
-            hudSO.ApplyModifiedPropertiesWithoutUndo();
-        }
-
         // --- Keybind Guide (화면 중앙 왼쪽) ---
         var guidePanelGo = new GameObject("KeybindGuidePanel");
         guidePanelGo.transform.SetParent(canvasGo.transform, false);
@@ -983,7 +978,7 @@ public static class ProjectSetup
         SetTextRef(guideSO, "guideText", guideTextGo);
         guideSO.ApplyModifiedPropertiesWithoutUndo();
 
-        Debug.Log("  [UI] Canvas + HUD + Target + Death + DamageText + SkillBar + Inventory + Party + Buff + Quest + Crosshair + KeybindGuide 생성 완료");
+        Debug.Log("  [UI] Canvas_HUD + HUD + Target + Death + DamageText + SkillBar + Inventory + Party + Buff + Quest + KeybindGuide 생성 완료");
     }
 
     // ━━━ UI 헬퍼 ━━━
