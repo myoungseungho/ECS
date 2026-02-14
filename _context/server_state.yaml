@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-15T09:30:00"
+last_session: "2026-02-15T10:00:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 2 TCP 실연동 14/14 ALL PASS! Phase 2 공식 완료. Phase 3 진입 대기. 46/46 서버 테스트도 유지."
+current_status: "Phase 3 Guild/Trade/Mail TCP 연동 14/14 ALL PASS! test_phase3_tcp.py 작성. 총 60/60(기존46+Phase3_14). 던전/PvP/레이드 클라 구현 대기."
 
 # ── 완료된 작업 ──
 completed:
@@ -64,11 +64,17 @@ completed:
   - id: S038
     desc: "C020 응답: Phase 2 TCP 실연동 14/14 ALL PASS. test_phase2_tcp.py 11-step 전체 통과. Phase 2 공식 완료."
     files: ["_comms/server_to_client/S038_c020_response_phase2_tcp_test_passed.md"]
+  - id: S039
+    desc: "Hub v2.0 이벤트 기반 시스템 전환 알림"
+    files: ["_comms/server_to_client/S039_hub_v2_upgrade_event_driven.md"]
+  - id: S040
+    desc: "C021 응답: Phase 3 Guild/Trade/Mail TCP 연동 14/14 ALL PASS. test_phase3_tcp.py 작성. 총 60/60."
+    files: ["Servers/BridgeServer/test_phase3_tcp.py", "_comms/server_to_client/S040_c021_response_phase3_guild_trade_mail_test.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked:
-  - reason: "Phase 3 진입 — 클라이언트 Guild/Trade/Mail 매니저 구현 후 연동 테스트 필요"
-    waiting_for: "client Phase 3 work start"
+  - reason: "Phase 3 — 클라이언트 던전/PvP/레이드 매니저 구현 후 연동 테스트 필요"
+    waiting_for: "client Dungeon/PvP/Raid manager implementation"
 
 # ── 다음 할 일 ──
 pending_tasks:
@@ -76,16 +82,11 @@ pending_tasks:
     desc: "클라이언트 새 메시지에 응답 (inbox 스캔 후 자동 처리)"
     priority: P0
     blocked: false
-  - id: "phase3_guild_trade_mail_support"
-    desc: "Phase 3 Guild/Trade/Mail 클라 연동 지원 — 클라가 매니저 구현 후 연동 테스트"
-    priority: P1
-    blocked: true
-    blocked_reason: "클라이언트 T031(Guild/Trade/Mail 매니저) 구현 대기"
   - id: "phase3_dungeon_pvp_raid_support"
-    desc: "Phase 3 던전/PvP/레이드 클라 연동 지원 — 서버에 이미 구현 완료(46/46 PASS)"
+    desc: "Phase 3 던전/PvP/레이드 클라 연동 지원 — 서버에 이미 구현 완료(60/60 PASS). 클라가 DungeonManager/PvPManager/RaidManager 구현 후 연동 테스트"
     priority: P1
     blocked: true
-    blocked_reason: "클라이언트 던전/PvP/레이드 연동 작업 시작 대기"
+    blocked_reason: "클라이언트 던전/PvP/레이드 매니저 구현 대기"
   - id: "entity_pipeline_review"
     desc: "C016 엔티티 파이프라인 제안 상세 검토 (Phase 2 완료됨, 이제 검토 가능)"
     priority: P2
@@ -106,6 +107,7 @@ recent_decisions:
   - "D011: GDD data/ CSV 5종 생성 — 서버/클라 에이전트가 파싱해서 사용"
   - "D012: OneDrive 동기화 문제로 _patch.py 사용 — Edit 도구 변경이 복원되는 이슈 우회"
   - "Phase 2 TCP 실연동 14/14 ALL PASS (2026-02-15) — 역사적인 첫 실연동"
+  - "Phase 3 Guild/Trade/Mail TCP 연동 14/14 ALL PASS (2026-02-15) — 총 60/60"
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -129,6 +131,7 @@ processed_messages:
   - "C018"
   - "C019"
   - "C020"
+  - "C021"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
