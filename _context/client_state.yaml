@@ -1,0 +1,89 @@
+# ============================================================
+# Client Agent 영속 상태 — 세션 간 컨텍스트 유지용
+# agent_loop.py가 Claude 실행 시 이 파일을 강제 주입
+# 매 작업 완료 후 Claude가 이 파일을 업데이트
+# ============================================================
+
+agent: client
+project_root: "C:\\Users\\명승호\\Desktop\\ECS"
+last_session: "2026-02-14T21:00:00"
+
+# ── 현재 상태 ──
+current_status: "Agent Loop 시스템 구축 완료, 서버에 C017 전달, 서버 응답 대기 중"
+
+# ── 완료된 작업 ──
+completed:
+  - id: A1
+    desc: "TPS 숄더캠 (LocalPlayer.cs 전면 리라이트)"
+    files: ["Assets/Scripts/Entity/LocalPlayer.cs"]
+  - id: A2
+    desc: "몬스터 월드 UI (MonsterWorldUI.cs + MonsterManager 연동)"
+    files: ["Assets/Scripts/UI/MonsterWorldUI.cs", "Assets/Scripts/Managers/MonsterManager.cs"]
+  - id: A3
+    desc: "크로스헤어 (HUDManager.cs + ProjectSetup.cs)"
+    files: ["Assets/Scripts/UI/HUDManager.cs", "Assets/Editor/ProjectSetup.cs"]
+  - id: A4
+    desc: "키바인드 가이드 (KeybindGuideUI.cs + ProjectSetup.cs)"
+    files: ["Assets/Scripts/UI/KeybindGuideUI.cs"]
+  - id: A5
+    desc: "자동 퀘스트 수락 (GameBootstrap.cs)"
+    files: ["Assets/Scripts/GameBootstrap.cs"]
+  - id: A6
+    desc: "환경 개선 (포그/앰비언트/바닥색)"
+    files: ["Assets/Editor/ProjectSetup.cs"]
+  - id: C016
+    desc: "GDD 21개 파일 교차 검증 + 에이전트 파이프라인 제안 메시지"
+    files: ["_comms/client_to_server/C016_gdd_review_and_agent_pipeline_proposal.md"]
+  - id: C017
+    desc: "Agent Loop 자율 시스템 구축 + 서버 세팅 가이드"
+    files: ["_agent/agent_loop.py", "_agent/README.md", "_context/server_state_template.yaml", "_context/ask_user.yaml", "_comms/client_to_server/C017_agent_loop_system_ready.md"]
+
+# ── 대기 중 (서버 응답 필요) ──
+blocked:
+  - reason: "카메라 방향 확정 필요 (TPS 숄더캠 vs 쿼터뷰)"
+    waiting_for: "server response to C016"
+  - reason: "GDD 교차 불일치 8건 수정 필요"
+    waiting_for: "server response to C016"
+
+# ── 다음 할 일 (blocked 아닌 것부터) ──
+pending_tasks:
+  - id: "ui_renewal"
+    desc: "ui.yaml 기반 HUD 리뉴얼 — 현재 임시 배치를 GDD 스펙 px/앵커로"
+    priority: P1
+    blocked: false
+  - id: "animator_setup"
+    desc: "animation.yaml 기반 Animator 재설정 — 콤보/대시/피격 상태 추가"
+    priority: P1
+    blocked: false
+  - id: "vfx_hit"
+    desc: "vfx.yaml 기반 타격 이펙트 ParticleSystem"
+    priority: P1
+    blocked: false
+  - id: "art_lighting"
+    desc: "art_style.yaml 기반 URP 라이팅/포스트프로세싱"
+    priority: P1
+    blocked: true
+    blocked_reason: "카메라 방향 확정 후"
+
+# ── 최근 중요 결정 ──
+recent_decisions:
+  - "대표님이 GTA TPS 숄더캠 직접 요청 → 구현 완료 (camera.yaml과 충돌)"
+  - "GDD 교차 검증 결과 85/100점, 교차 불일치 8건 발견"
+  - "에이전트 파이프라인 Game Development ECS 구조 제안"
+  - "모든 코드는 validate_all.py --skip-unity 통과 필수"
+  - "Agent Loop 시스템으로 자율 소통 체계 구축 완료"
+
+# ── 처리된 서버 메시지 ──
+processed_messages:
+  - "S028"
+  - "S029"
+  - "S030"
+
+# ── 핵심 규칙 (매 세션 리마인드) ──
+rules:
+  - "Find/FindObjectOfType 런타임 사용 금지"
+  - "모든 매니저는 싱글톤 패턴 + OnDestroy 이벤트 해제"
+  - "Network 네임스페이스 클래스만 namespace Network 사용"
+  - "작업 후 반드시 python validate_all.py --skip-unity 실행"
+  - "Old Input System API만 사용 (New Input System 아님)"
+  - "UI 스크립트는 UI/ 폴더, 매니저는 Managers/ 폴더"

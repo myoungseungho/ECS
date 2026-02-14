@@ -1,0 +1,50 @@
+# ============================================================
+# Server Agent 영속 상태 — 세션 간 컨텍스트 유지용
+# agent_loop.py가 Claude 실행 시 이 파일을 강제 주입
+# 매 작업 완료 후 Claude가 이 파일을 업데이트
+# ============================================================
+#
+# 서버 에이전트 최초 세팅 시:
+#   1. 이 파일을 _context/server_state.yaml로 복사
+#   2. project_root를 서버 PC 경로로 변경
+#   3. 이전 작업 내역이 있으면 completed에 추가
+#   4. python _agent/agent_loop.py --role server --once 로 테스트
+# ============================================================
+
+agent: server
+project_root: "/path/to/ECS"  # ← 서버 PC의 실제 경로로 변경
+last_session: ""
+
+# ── 현재 상태 ──
+current_status: "초기 세팅 — agent_loop 첫 실행 대기"
+
+# ── 완료된 작업 ──
+completed: []
+  # 이전에 수동으로 완료한 작업이 있으면 여기에 추가:
+  # - id: S001
+  #   desc: "작업 설명"
+  #   files: ["변경한 파일"]
+
+# ── 대기 중 (클라이언트 응답 필요) ──
+blocked: []
+
+# ── 다음 할 일 ──
+pending_tasks: []
+  # 예시:
+  # - id: "gdd_update"
+  #   desc: "GDD 교차 불일치 8건 수정"
+  #   priority: P1
+  #   blocked: false
+
+# ── 최근 중요 결정 ──
+recent_decisions: []
+
+# ── 처리된 클라이언트 메시지 ──
+processed_messages: []
+
+# ── 핵심 규칙 (매 세션 리마인드) ──
+rules:
+  - "작업 후 반드시 검증 실행"
+  - "클라이언트 메시지는 반드시 읽고 응답"
+  - "GDD 변경 시 교차 일관성 확인"
+  - "state 파일 업데이트 필수 (컨텍스트 유실 방지)"
