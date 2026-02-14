@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_s034_npc_enhance_tutorial
+version: session_t031_guild_trade_mail
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -470,6 +470,102 @@ managers:
       - GetQuest(uint) → QuestInfo
       - HasQuest(uint) → bool
 
+  - name: GuildManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "길드 시스템 관리 — 생성, 해산, 초대, 수락, 탈퇴, 추방, 정보 조회"
+    reads: []
+    writes:
+      - _guildInfo (GuildInfoData)
+      - _guildList (GuildListEntry[])
+      - _pendingInvite (GuildInviteData)
+    fires_events:
+      - OnGuildInfoChanged(GuildInfoData)
+      - OnGuildInviteReceived(GuildInviteData)
+      - OnGuildListReceived(GuildListEntry[])
+    subscribes_to:
+      - NetworkManager.OnGuildInfo → 길드 정보 갱신
+      - NetworkManager.OnGuildInvite → 길드 초대 수신
+      - NetworkManager.OnGuildList → 길드 목록 수신
+      - NetworkManager.OnEnterGame → 자동 GUILD_INFO_REQ
+    public_api:
+      - CreateGuild(string)
+      - DisbandGuild()
+      - InviteMember(ulong)
+      - AcceptInvite(uint)
+      - DeclineInvite()
+      - LeaveGuild()
+      - KickMember(ulong)
+      - RequestInfo()
+      - RequestList()
+    computed_properties:
+      - InGuild (bool)
+      - GuildInfo (GuildInfoData)
+      - PendingInvite (GuildInviteData)
+
+  - name: TradeManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "거래 시스템 관리 — 요청, 수락, 거절, 아이템/골드 추가, 확인, 취소"
+    reads: []
+    writes:
+      - _isTrading (bool)
+      - _pendingRequest (TradeRequestData)
+      - _partnerItems (List<TradeAddItemData>)
+    fires_events:
+      - OnTradeRequested(TradeRequestData)
+      - OnPartnerItemAdded(TradeAddItemData)
+      - OnTradeCompleted(TradeResult)
+      - OnTradeCancelled()
+    subscribes_to:
+      - NetworkManager.OnTradeRequest → 거래 요청 수신
+      - NetworkManager.OnTradeAddItem → 상대방 아이템 추가
+      - NetworkManager.OnTradeResult → 거래 결과
+    public_api:
+      - RequestTrade(ulong)
+      - AcceptTrade()
+      - DeclineTrade()
+      - AddItem(byte, ushort)
+      - AddGold(uint)
+      - Confirm()
+      - Cancel()
+    computed_properties:
+      - IsTrading (bool)
+      - PendingRequest (TradeRequestData)
+
+  - name: MailManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "우편 시스템 관리 — 발송, 목록, 읽기, 첨부 수령, 삭제"
+    reads: []
+    writes:
+      - _mails (List<MailListEntry>)
+      - _currentMail (MailReadRespData)
+    fires_events:
+      - OnMailListChanged()
+      - OnMailOpened(MailReadRespData)
+      - OnMailClaimed(MailClaimResultData)
+      - OnMailDeleted(MailDeleteResultData)
+    subscribes_to:
+      - NetworkManager.OnMailList → 우편 목록 수신
+      - NetworkManager.OnMailReadResp → 우편 읽기 결과
+      - NetworkManager.OnMailClaimResult → 첨부 수령 결과
+      - NetworkManager.OnMailDeleteResult → 우편 삭제 결과
+      - NetworkManager.OnEnterGame → 자동 MAIL_LIST_REQ
+    public_api:
+      - SendMail(string, string, string, uint, uint, ushort)
+      - RefreshList()
+      - ReadMail(uint)
+      - ClaimAttachment(uint)
+      - DeleteMail(uint)
+    computed_properties:
+      - Mails (IReadOnlyList<MailListEntry>)
+      - CurrentMail (MailReadRespData)
+      - UnreadCount (int)
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -706,6 +802,36 @@ data_flows:
     to: CharacterSelectUI
     via: "C# events (OnCharacterDataList, OnCharacterCreateResult, OnCharacterDeleteResult)"
     description: "캐릭터 목록/생성/삭제 결과 UI 갱신"
+
+  - from: NetworkManager
+    to: GuildManager
+    via: "C# events (OnGuildInfo, OnGuildInvite, OnGuildList, OnEnterGame)"
+    description: "길드 정보/초대/목록 수신 + 게임 진입 시 자동 GUILD_INFO_REQ"
+
+  - from: GuildManager
+    to: GuildUI
+    via: "C# events (OnGuildInfoChanged, OnGuildInviteReceived, OnGuildListReceived)"
+    description: "길드 패널 갱신 + 초대 팝업"
+
+  - from: NetworkManager
+    to: TradeManager
+    via: "C# events (OnTradeRequest, OnTradeAddItem, OnTradeResult)"
+    description: "거래 요청/아이템 추가/결과 수신"
+
+  - from: TradeManager
+    to: TradeUI
+    via: "C# events (OnTradeRequested, OnPartnerItemAdded, OnTradeCompleted, OnTradeCancelled)"
+    description: "거래 패널 + 요청 팝업 + 아이템 갱신"
+
+  - from: NetworkManager
+    to: MailManager
+    via: "C# events (OnMailList, OnMailReadResp, OnMailClaimResult, OnMailDeleteResult, OnEnterGame)"
+    description: "우편 목록/읽기/수령/삭제 결과 + 게임 진입 시 자동 MAIL_LIST_REQ"
+
+  - from: MailManager
+    to: MailUI
+    via: "C# events (OnMailListChanged, OnMailOpened, OnMailClaimed, OnMailDeleted)"
+    description: "우편 패널 갱신 + 상세보기 + 수령/삭제 결과"
 
   - from: SceneFlowManager
     to: SceneManager (Unity)

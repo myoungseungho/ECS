@@ -109,6 +109,19 @@ namespace Network
         // S034: NPC / 강화
         public event Action<NpcDialogData> OnNpcDialog;
         public event Action<EnhanceResultData> OnEnhanceResult;
+        // T031: 길드
+        public event Action<GuildInfoData> OnGuildInfo;
+        public event Action<GuildInviteData> OnGuildInvite;
+        public event Action<GuildListEntry[]> OnGuildList;
+        // T031: 거래
+        public event Action<TradeRequestData> OnTradeRequest;
+        public event Action<TradeAddItemData> OnTradeAddItem;
+        public event Action<TradeResult> OnTradeResult;
+        // T031: 우편
+        public event Action<MailListEntry[]> OnMailList;
+        public event Action<MailReadRespData> OnMailReadResp;
+        public event Action<MailClaimResultData> OnMailClaimResult;
+        public event Action<MailDeleteResultData> OnMailDeleteResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -484,6 +497,58 @@ namespace Network
         {
             _field?.Send(PacketBuilder.EnhanceReq(slotIndex));
         }
+
+        // ━━━ T031: 길드 API ━━━
+
+        /// <summary>길드 생성</summary>
+        public void CreateGuild(string guildName) { _field?.Send(PacketBuilder.GuildCreate(guildName)); }
+        /// <summary>길드 해산</summary>
+        public void DisbandGuild() { _field?.Send(PacketBuilder.GuildDisband()); }
+        /// <summary>길드 초대</summary>
+        public void InviteToGuild(ulong targetEntity) { _field?.Send(PacketBuilder.GuildInvite(targetEntity)); }
+        /// <summary>길드 초대 수락</summary>
+        public void AcceptGuild(uint guildId) { _field?.Send(PacketBuilder.GuildAccept(guildId)); }
+        /// <summary>길드 탈퇴</summary>
+        public void LeaveGuild() { _field?.Send(PacketBuilder.GuildLeave()); }
+        /// <summary>길드원 추방</summary>
+        public void KickFromGuild(ulong targetEntity) { _field?.Send(PacketBuilder.GuildKick(targetEntity)); }
+        /// <summary>길드 정보 요청</summary>
+        public void RequestGuildInfo() { _field?.Send(PacketBuilder.GuildInfoReq()); }
+        /// <summary>길드 목록 요청</summary>
+        public void RequestGuildList() { _field?.Send(PacketBuilder.GuildListReq()); }
+
+        // ━━━ T031: 거래 API ━━━
+
+        /// <summary>거래 요청</summary>
+        public void RequestTrade(ulong targetEntity) { _field?.Send(PacketBuilder.TradeRequest(targetEntity)); }
+        /// <summary>거래 수락</summary>
+        public void AcceptTrade(ulong requesterEntity) { _field?.Send(PacketBuilder.TradeAccept(requesterEntity)); }
+        /// <summary>거래 거절</summary>
+        public void DeclineTrade() { _field?.Send(PacketBuilder.TradeDecline()); }
+        /// <summary>거래에 아이템 추가</summary>
+        public void TradeAddItem(byte slotIndex, ushort count) { _field?.Send(PacketBuilder.TradeAddItem(slotIndex, count)); }
+        /// <summary>거래에 골드 추가</summary>
+        public void TradeAddGold(uint amount) { _field?.Send(PacketBuilder.TradeAddGold(amount)); }
+        /// <summary>거래 확인</summary>
+        public void ConfirmTrade() { _field?.Send(PacketBuilder.TradeConfirm()); }
+        /// <summary>거래 취소</summary>
+        public void CancelTrade() { _field?.Send(PacketBuilder.TradeCancel()); }
+
+        // ━━━ T031: 우편 API ━━━
+
+        /// <summary>우편 발송</summary>
+        public void SendMail(string recipient, string subject, string body, uint gold = 0, uint itemId = 0, ushort itemCount = 0)
+        {
+            _field?.Send(PacketBuilder.MailSend(recipient, subject, body, gold, itemId, itemCount));
+        }
+        /// <summary>우편 목록 요청</summary>
+        public void RequestMailList() { _field?.Send(PacketBuilder.MailListReq()); }
+        /// <summary>우편 읽기</summary>
+        public void ReadMail(uint mailId) { _field?.Send(PacketBuilder.MailRead(mailId)); }
+        /// <summary>우편 첨부 수령</summary>
+        public void ClaimMail(uint mailId) { _field?.Send(PacketBuilder.MailClaim(mailId)); }
+        /// <summary>우편 삭제</summary>
+        public void DeleteMail(uint mailId) { _field?.Send(PacketBuilder.MailDelete(mailId)); }
 
         /// <summary>연결 끊기</summary>
         public void DisconnectAll()
@@ -1054,6 +1119,92 @@ namespace Network
                     var data = PacketBuilder.ParseEnhanceResult(payload);
                     Debug.Log($"[Net] EnhanceResult: slot={data.SlotIndex}, result={data.Result}, newLevel={data.NewLevel}");
                     OnEnhanceResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ T031: 길드 ━━━
+
+                case MsgType.GUILD_INFO:
+                {
+                    var data = PacketBuilder.ParseGuildInfo(payload);
+                    Debug.Log($"[Net] GuildInfo: result={data.Result}, id={data.GuildId}, name={data.GuildName}, members={data.MemberCount}");
+                    OnGuildInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.GUILD_INVITE:
+                {
+                    var data = PacketBuilder.ParseGuildInvite(payload);
+                    Debug.Log($"[Net] GuildInvite: guildId={data.GuildId}, name={data.GuildName}, inviter={data.InviterEntity}");
+                    OnGuildInvite?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.GUILD_LIST:
+                {
+                    var data = PacketBuilder.ParseGuildList(payload);
+                    Debug.Log($"[Net] GuildList: {data.Length} guilds");
+                    OnGuildList?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ T031: 거래 ━━━
+
+                case MsgType.TRADE_REQUEST:
+                {
+                    var data = PacketBuilder.ParseTradeRequest(payload);
+                    Debug.Log($"[Net] TradeRequest: from={data.RequesterName} ({data.RequesterEntity})");
+                    OnTradeRequest?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.TRADE_ADD_ITEM:
+                {
+                    var data = PacketBuilder.ParseTradeAddItem(payload);
+                    Debug.Log($"[Net] TradeAddItem: slot={data.SlotIndex}, item={data.ItemId}, count={data.Count}");
+                    OnTradeAddItem?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.TRADE_RESULT:
+                {
+                    var data = PacketBuilder.ParseTradeResult(payload);
+                    Debug.Log($"[Net] TradeResult: {data}");
+                    OnTradeResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ T031: 우편 ━━━
+
+                case MsgType.MAIL_LIST:
+                {
+                    var data = PacketBuilder.ParseMailList(payload);
+                    Debug.Log($"[Net] MailList: {data.Length} mails");
+                    OnMailList?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MAIL_READ_RESP:
+                {
+                    var data = PacketBuilder.ParseMailReadResp(payload);
+                    Debug.Log($"[Net] MailRead: result={data.Result}, mailId={data.MailId}");
+                    OnMailReadResp?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MAIL_CLAIM_RESULT:
+                {
+                    var data = PacketBuilder.ParseMailClaimResult(payload);
+                    Debug.Log($"[Net] MailClaim: result={data.Result}, mailId={data.MailId}, gold={data.Gold}");
+                    OnMailClaimResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MAIL_DELETE_RESULT:
+                {
+                    var data = PacketBuilder.ParseMailDeleteResult(payload);
+                    Debug.Log($"[Net] MailDelete: result={data.Result}, mailId={data.MailId}");
+                    OnMailDeleteResult?.Invoke(data);
                     break;
                 }
 

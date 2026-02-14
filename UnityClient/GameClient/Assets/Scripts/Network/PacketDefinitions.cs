@@ -202,6 +202,39 @@ namespace Network
         NPC_INTERACT    = 332,  // C→S: npc_entity_id(4)
         NPC_DIALOG      = 333,  // S→C: npc_id(2) npc_type(1) line_count(1) {speaker_len(1) speaker(N) text_len(2) text(N)}*N quest_count(1) {quest_id(4)}*N
 
+        // 길드 (T031)
+        GUILD_CREATE      = 290,  // C→S: name_len(1) name(N)
+        GUILD_DISBAND     = 291,  // C→S: empty
+        GUILD_INVITE      = 292,  // C→S: target_entity(8) / S→C: guild_id(4) guild_name(32) inviter_entity(8) = 44B
+        GUILD_ACCEPT      = 293,  // C→S: guild_id(4)
+        GUILD_LEAVE       = 294,  // C→S: empty
+        GUILD_KICK        = 295,  // C→S: target_entity(8)
+        GUILD_INFO_REQ    = 296,  // C→S: empty
+        GUILD_INFO        = 297,  // S→C: result(1) guild_id(4) guild_name(32) master_id(8) member_count(1) level(1) = 47B
+        GUILD_LIST_REQ    = 298,  // C→S: empty
+        GUILD_LIST        = 299,  // S→C: count(1) {guild_id(4) guild_name(32) member_count(1) level(1)}*N = 38B/entry
+
+        // 거래 (T031)
+        TRADE_REQUEST     = 300,  // C→S: target_entity(8) / S→C: requester_entity(8) requester_name(32) = 40B
+        TRADE_ACCEPT      = 301,  // C→S: requester_entity(8)
+        TRADE_DECLINE     = 302,  // C→S: empty
+        TRADE_ADD_ITEM    = 303,  // C→S: slot_index(1) count(2) / S→C(broadcast): slot_index(1) item_id(4) count(2) = 7B
+        TRADE_ADD_GOLD    = 304,  // C→S: amount(4)
+        TRADE_CONFIRM     = 305,  // C→S: empty
+        TRADE_CANCEL      = 306,  // C→S: empty
+        TRADE_RESULT      = 307,  // S→C: result(1)
+
+        // 우편 (T031)
+        MAIL_SEND         = 310,  // C→S: recipient_name_len(1) recipient_name(N) subject_len(1) subject(N) body_len(2) body(N) gold(4) item_id(4) item_count(2)
+        MAIL_LIST_REQ     = 311,  // C→S: empty
+        MAIL_LIST         = 312,  // S→C: count(1) {mail_id(4) sender_name(32) subject(64) read(1) has_attachment(1) sent_time(4)}*N = 106B/entry
+        MAIL_READ         = 313,  // C→S: mail_id(4)
+        MAIL_READ_RESP    = 314,  // S→C: result(1) mail_id(4) sender_name(32) subject(64) body_len(2) body(N) gold(4) item_id(4) item_count(2)
+        MAIL_CLAIM        = 315,  // C→S: mail_id(4)
+        MAIL_CLAIM_RESULT = 316,  // S→C: result(1) mail_id(4) gold(4) item_id(4) item_count(2) = 15B
+        MAIL_DELETE       = 317,  // C→S: mail_id(4)
+        MAIL_DELETE_RESULT = 318, // S→C: result(1) mail_id(4) = 5B
+
         // 강화 (S034)
         ENHANCE_REQ     = 340,  // C→S: slot_index(1)
         ENHANCE_RESULT  = 341,  // S→C: slot_index(1) result(1) new_level(1) = 3B
@@ -905,5 +938,140 @@ namespace Network
         public byte SlotIndex;
         public EnhanceResult Result;
         public byte NewLevel;
+    }
+
+    // ━━━ T031: 길드 / 거래 / 우편 ━━━
+
+    /// <summary>길드 결과 코드 (GUILD_INFO result 필드)</summary>
+    public enum GuildResult : byte
+    {
+        SUCCESS           = 0,
+        NOT_IN_GUILD      = 1,
+        ALREADY_IN_GUILD  = 2,
+        GUILD_FULL        = 3,
+        NOT_MASTER        = 4,
+        NAME_EXISTS       = 5,
+        NAME_INVALID      = 6,
+        TARGET_IN_GUILD   = 7,
+    }
+
+    /// <summary>길드 정보 (GUILD_INFO 파싱용)</summary>
+    public class GuildInfoData
+    {
+        public GuildResult Result;
+        public uint GuildId;
+        public string GuildName;
+        public ulong MasterId;
+        public byte MemberCount;
+        public byte Level;
+    }
+
+    /// <summary>길드 초대 데이터 (GUILD_INVITE S→C 파싱용)</summary>
+    public class GuildInviteData
+    {
+        public uint GuildId;
+        public string GuildName;
+        public ulong InviterEntity;
+    }
+
+    /// <summary>길드 목록 항목 (GUILD_LIST 파싱용)</summary>
+    public class GuildListEntry
+    {
+        public uint GuildId;
+        public string GuildName;
+        public byte MemberCount;
+        public byte Level;
+    }
+
+    /// <summary>거래 결과 코드 (TRADE_RESULT result 필드)</summary>
+    public enum TradeResult : byte
+    {
+        SUCCESS           = 0,
+        TARGET_NOT_FOUND  = 1,
+        NOT_SAME_ZONE     = 2,
+        ALREADY_TRADING   = 3,
+        CANCELLED         = 4,
+        VALIDATION_FAILED = 5,
+    }
+
+    /// <summary>거래 요청 데이터 (TRADE_REQUEST S→C 파싱용)</summary>
+    public class TradeRequestData
+    {
+        public ulong RequesterEntity;
+        public string RequesterName;
+    }
+
+    /// <summary>거래 아이템 추가 알림 (TRADE_ADD_ITEM S→C 파싱용)</summary>
+    public class TradeAddItemData
+    {
+        public byte SlotIndex;
+        public uint ItemId;
+        public ushort Count;
+    }
+
+    /// <summary>우편 목록 항목 (MAIL_LIST 파싱용)</summary>
+    public class MailListEntry
+    {
+        public uint MailId;
+        public string SenderName;
+        public string Subject;
+        public bool IsRead;
+        public bool HasAttachment;
+        public uint SentTime;
+    }
+
+    /// <summary>우편 읽기 결과 코드</summary>
+    public enum MailReadResult : byte
+    {
+        SUCCESS    = 0,
+        NOT_FOUND  = 1,
+    }
+
+    /// <summary>우편 읽기 응답 (MAIL_READ_RESP 파싱용)</summary>
+    public class MailReadRespData
+    {
+        public MailReadResult Result;
+        public uint MailId;
+        public string SenderName;
+        public string Subject;
+        public string Body;
+        public uint Gold;
+        public uint ItemId;
+        public ushort ItemCount;
+    }
+
+    /// <summary>우편 수령 결과 코드</summary>
+    public enum MailClaimResult : byte
+    {
+        SUCCESS         = 0,
+        NOT_FOUND       = 1,
+        ALREADY_CLAIMED = 2,
+        NO_ATTACHMENT   = 3,
+        INVENTORY_FULL  = 4,
+    }
+
+    /// <summary>우편 수령 결과 (MAIL_CLAIM_RESULT 파싱용)</summary>
+    public class MailClaimResultData
+    {
+        public MailClaimResult Result;
+        public uint MailId;
+        public uint Gold;
+        public uint ItemId;
+        public ushort ItemCount;
+    }
+
+    /// <summary>우편 삭제 결과 코드</summary>
+    public enum MailDeleteResult : byte
+    {
+        SUCCESS              = 0,
+        NOT_FOUND            = 1,
+        UNCLAIMED_ATTACHMENT = 2,
+    }
+
+    /// <summary>우편 삭제 결과 (MAIL_DELETE_RESULT 파싱용)</summary>
+    public class MailDeleteResultData
+    {
+        public MailDeleteResult Result;
+        public uint MailId;
     }
 }
