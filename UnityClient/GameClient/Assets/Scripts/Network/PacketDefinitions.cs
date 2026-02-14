@@ -587,13 +587,15 @@ namespace Network
         SELL = 1,
     }
 
-    /// <summary>스킬 레벨업 결과 코드</summary>
+    /// <summary>스킬 레벨업 결과 코드 (SkillComponents.h 기준)</summary>
     public enum SkillLevelUpResult : byte
     {
         SUCCESS         = 0,
-        SKILL_NOT_FOUND = 1,
-        MAX_LEVEL       = 2,
-        NO_SKILL_POINTS = 3,
+        NO_SKILL_POINTS = 1,
+        SKILL_NOT_FOUND = 2,
+        MAX_LEVEL       = 3,
+        LEVEL_TOO_LOW   = 4,
+        SLOTS_FULL      = 5,
     }
 
     /// <summary>스킬 효과 타입 (세션 33)</summary>
