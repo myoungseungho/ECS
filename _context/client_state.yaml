@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T03:30:00"
+last_session: "2026-02-15T01:30:00"
 
 # ── 현재 상태 ──
-current_status: "S041 처리 완료 — 클라이언트 TCP 테스트 36/36 PASS + PacketBuilder T031 중복 제거 (59 PASS / 0 FAIL)"
+current_status: "Hub v2.0 git conflict auto-resolve 적용 + 재시작 완료"
 
 # ── 완료된 작업 ──
 completed:
@@ -105,48 +105,55 @@ completed:
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
   - id: A17
-    desc: "PvP Arena 전용 패킷(350-359) 리라이트 — PvPManager/PvPUI 전면 교체"
-    files:
-      - "Assets/Scripts/Network/PacketDefinitions.cs"
-      - "Assets/Scripts/Network/PacketBuilder.cs"
-      - "Assets/Scripts/Network/NetworkManager.cs"
-      - "Assets/Scripts/Managers/PvPManager.cs"
-      - "Assets/Scripts/UI/PvPUI.cs"
-  - id: A18
-    desc: "Raid Boss 시스템(370-379) 신규 — RaidManager + RaidUI + 패킷 연동"
-    files:
-      - "Assets/Scripts/Network/PacketDefinitions.cs"
-      - "Assets/Scripts/Network/PacketBuilder.cs"
-      - "Assets/Scripts/Network/NetworkManager.cs"
-      - "Assets/Scripts/Managers/RaidManager.cs"
-      - "Assets/Scripts/UI/RaidUI.cs"
-      - "Assets/Editor/ProjectSetup.cs"
-      - "Assets/Editor/SceneValidator.cs"
-      - "Assets/Scripts/interaction-map.yaml"
-  - id: A19
-    desc: "Phase 3 클라이언트 TCP 테스트 36/36 ALL PASS — PvP/Raid 11개 신규 + 기존 25개 수정"
+    desc: "S040 Phase 3 브릿지 연동 테스트 25/25 ALL PASS + MATCH_ENQUEUE 테스트 수정"
     files:
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
-  - id: A20
-    desc: "PacketBuilder.cs T031 중복 제거 — Guild/Trade/Mail 메서드 ~270줄 데드코드 삭제"
-    files:
-      - "Assets/Scripts/Network/PacketBuilder.cs"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
-  - id: "unity_play_integration"
-    desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
-    priority: P1
-    blocked: false
-    blocked_reason: ""
-  - id: "phase4_planning"
-    desc: "Phase 4 계획 — 대표님과 다음 단계 상의"
+  - id: "phase3_raid_ui"
+    desc: "레이드 전용 UI — 레이드 보스 페이즈/기믹 가이드 패널"
     priority: P2
     blocked: false
     blocked_reason: ""
+  - id: "unity_play_integration"
+    desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
+    priority: P2
+    blocked: false
+    blocked_reason: ""
+  - id: "gdd_task2_crafting_ui"
+    desc: "제작/채집 UI — CraftingUI + GatheringUI (서버 TASK 2 MsgType 380-389)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 2 (제작/채집 핸들러) 구현 대기"
+  - id: "gdd_task3_auction_ui"
+    desc: "거래소 UI — AuctionUI (서버 TASK 3 MsgType 390-397)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 3 (거래소 핸들러) 구현 대기"
+  - id: "gdd_task4_daily_quest_ui"
+    desc: "일일/주간 퀘스트 UI — DailyQuestUI + ReputationUI (서버 TASK 4 MsgType 400-405)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 4 (일일/주간 퀘스트 핸들러) 구현 대기"
+  - id: "gdd_task5_social_ui"
+    desc: "소셜 UI — FriendUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 5 (친구/차단/파티찾기 핸들러) 구현 대기"
+  - id: "gdd_task6_pvp_extended_ui"
+    desc: "전장/길드전 UI — BattlegroundUI + GuildWarUI (서버 TASK 6 MsgType 430-435)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 6 (전장/길드전 핸들러) 구현 대기"
+  - id: "gdd_task7_progression_ui"
+    desc: "칭호/도감 UI — TitleUI + CollectionUI + JobChangeUI (서버 TASK 7 MsgType 440-447)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 7 (칭호/도감/2차전직 핸들러) 구현 대기"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -164,14 +171,19 @@ recent_decisions:
   - "SceneFlowManager 선행 구현 — 모든 씬의 기반이므로 어떤 우선순위든 필요"
   - "S033 패킷 연동: SERVER_LIST(320-321), CHARACTER_CRUD(322-327), TUTORIAL(330-331)"
   - "S034 패킷 연동: NPC_INTERACT(332), NPC_DIALOG(333), ENHANCE(340-341)"
+  - "새 매니저 3종: NpcManager, EnhanceManager, TutorialManager"
+  - "새 UI 4종: NpcDialogUI, EnhanceUI, ServerSelectUI, CharacterSelectUI"
   - "S029 패킷 연동: GUILD(290-299), TRADE(300-307), MAIL(310-318)"
+  - "새 매니저 3종: GuildManager, TradeManager, MailManager"
+  - "새 UI 3종: GuildUI(G키), TradeUI, MailUI(M키)"
   - "Phase 2 TCP 브릿지 연동 테스트 20/20 PASS — 역사적 첫 실연동 성공"
-  - "S040 확인: PvP 전용 패킷(350-359)으로 전면 교체, Instance/Match 재활용 폐기"
-  - "Raid Boss 시스템(370-379) 신규 구현 — 3페이즈/6기믹/스태거/인레이지"
-  - "S041: 서버 PvP/Raid TCP 16/16 PASS 확인, 전체 76/76"
-  - "클라이언트 TCP 테스트 36/36 ALL PASS (PvP 8개 + Raid 3개 신규)"
-  - "PacketBuilder.cs T031 중복 ~270줄 제거 — S029 버전만 유지"
-  - "기존 테스트 21-23 수정: INSTANCE_CREATE→INSTANCE_ENTER, MATCH_ENQUEUE 포맷 갱신"
+  - "Phase 3 던전/PvP 매니저 구현 — Instance(170-174)/Match(180-184) 기존 패킷 활용"
+  - "DungeonManager: 던전 타입(Story/Party/Chaos/Raid/Abyss) + 매칭 상태 머신"
+  - "PvPManager: PvP 모드(Arena1v1/3v3/Battleground) + DungeonType 100+로 PvP 구분"
+  - "Hub v2.0 이벤트 기반 시스템 확인 — agent_loop.py에서 hub.py로 전환"
+  - "Phase 3 브릿지 연동 25/25 ALL PASS — 서버 46/46 + 클라 25/25 = 71/71 PASS"
+  - "MATCH_ENQUEUE 테스트: 레벨 부족(status=2)도 유효한 프로토콜 응답으로 수용"
+  - "GDD 심화 태스크 42개 확인 — 서버 구현 순서대로 클라 UI 대응 예정"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -212,7 +224,6 @@ processed_messages:
   - "S038"
   - "S039"
   - "S040"
-  - "S041"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

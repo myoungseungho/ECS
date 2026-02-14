@@ -909,6 +909,7 @@ class BridgeServer:
             MsgType.MATCH_ENQUEUE: self._on_match_enqueue,
             MsgType.MATCH_DEQUEUE: self._on_match_dequeue,
             MsgType.MATCH_ACCEPT: self._on_match_accept,
+            MsgType.INSTANCE_CREATE: self._on_instance_create,
             MsgType.INSTANCE_ENTER: self._on_instance_enter,
             MsgType.INSTANCE_LEAVE: self._on_instance_leave,
             MsgType.PVP_QUEUE_REQ: self._on_pvp_queue_req,
@@ -2796,34 +2797,51 @@ class BridgeServer:
     # ━━━ 던전 매칭 시스템 (P2_S03_S01) ━━━
 
     async def _on_match_enqueue(self, session: PlayerSession, payload: bytes):
-        """MATCH_ENQUEUE: dungeon_id(u8) + difficulty(u8). 매칭 큐에 등록."""
-        if not session.in_game or len(payload) < 2:
+        """MATCH_ENQUEUE: dungeon_id(u8)+difficulty(u8) 또는 dungeon_id(u32). 매칭 큐 등록."""
+        if not session.in_game or len(payload) < 1:
             return
-        dungeon_id = payload[0]
-        difficulty = payload[1]  # 0=normal, 1=hard, 2=hell
+        # 듀얼 포맷 감지: 4바이트 && byte[1]==0 && byte[2]==0 && byte[3]==0 → u32
+        if len(payload) == 4 and payload[2] == 0 and payload[3] == 0:
+            import struct as _st
+            dungeon_id = _st.unpack("<I", payload[:4])[0]
+            difficulty = 0
+            is_client_format = True
+        else:
+            dungeon_id = payload[0]
+            difficulty = payload[1] if len(payload) >= 2 else 0
+            is_client_format = False
         dungeon = next((d for d in DUNGEON_LIST_DATA if d["id"] == dungeon_id), None)
         if not dungeon:
-            # result: 1=INVALID_DUNGEON
-            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 1, 0))
+            if is_client_format:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BI", 1, 0))
+            else:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 1, 0))
             return
         if session.stats.level < dungeon["min_level"]:
-            # result: 2=LEVEL_TOO_LOW
-            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 2, 0))
+            if is_client_format:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BI", 2, 0))
+            else:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 2, 0))
             return
         import time as _time
         queue_key = dungeon_id
         if queue_key not in self.match_queue:
             self.match_queue[queue_key] = {"players": [], "created_at": _time.time(), "difficulty": difficulty}
         queue = self.match_queue[queue_key]
-        # 중복 등록 방지
         if any(p["session"] is session for p in queue["players"]):
-            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 3, len(queue["players"])))
+            if is_client_format:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BI", 3, len(queue["players"])))
+            else:
+                self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 3, len(queue["players"])))
             return
         queue["players"].append({"session": session, "joined_at": _time.time()})
+        session._match_queue_key = queue_key
+        session._match_client_format = is_client_format
         self.log(f"MatchQueue: {session.char_name} joined dungeon={dungeon_id} ({len(queue['players'])}/{dungeon['party_size']})", "GAME")
-        # result: 0=QUEUED, count=현재 인원
-        self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 0, len(queue["players"])))
-        # 파티 모집 완료 확인
+        if is_client_format:
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BI", 0, len(queue["players"])))
+        else:
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 0, len(queue["players"])))
         if len(queue["players"]) >= dungeon["party_size"]:
             await self._match_found(queue_key, dungeon)
 
@@ -2856,17 +2874,27 @@ class BridgeServer:
             self._send(s, MsgType.MATCH_FOUND, struct.pack("<IBB", inst_id, dungeon["id"], instance["difficulty"]))
 
     async def _on_match_dequeue(self, session: PlayerSession, payload: bytes):
-        """MATCH_DEQUEUE: dungeon_id(u8). 매칭 큐에서 이탈."""
-        if not session.in_game or len(payload) < 1:
+        """MATCH_DEQUEUE: dungeon_id(u8) 또는 빈 페이로드. 매칭 큐 이탈."""
+        if not session.in_game:
             return
-        dungeon_id = payload[0]
-        queue = self.match_queue.get(dungeon_id)
-        if queue:
-            queue["players"] = [p for p in queue["players"] if p["session"] is not session]
-            if not queue["players"]:
-                del self.match_queue[dungeon_id]
-        self.log(f"MatchQueue: {session.char_name} left dungeon={dungeon_id}", "GAME")
-        self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 4, 0))  # 4=DEQUEUED
+        if len(payload) >= 1:
+            dungeon_id = payload[0]
+            queue = self.match_queue.get(dungeon_id)
+            if queue:
+                queue["players"] = [p for p in queue["players"] if p["session"] is not session]
+                if not queue["players"]:
+                    del self.match_queue[dungeon_id]
+            self.log(f"MatchQueue: {session.char_name} left dungeon={dungeon_id}", "GAME")
+            self._send(session, MsgType.MATCH_STATUS, struct.pack("<BBB", dungeon_id, 4, 0))  # 4=DEQUEUED
+        else:
+            # 빈 페이로드: 세션이 참여 중인 모든 큐에서 제거
+            removed_key = getattr(session, "_match_queue_key", None)
+            for qk in list(self.match_queue.keys()):
+                queue = self.match_queue[qk]
+                queue["players"] = [p for p in queue["players"] if p["session"] is not session]
+                if not queue["players"]:
+                    del self.match_queue[qk]
+            self.log(f"MatchQueue: {session.char_name} dequeued (all)", "GAME")
 
     async def _on_match_accept(self, session: PlayerSession, payload: bytes):
         """MATCH_ACCEPT: instance_id(u32). 매칭 수락 (현재는 자동 수락)."""
@@ -2888,6 +2916,43 @@ class BridgeServer:
                            instance["boss_hp"], instance["boss_current_hp"])
         buf += struct.pack("<B", len(instance["players"]))
         self._send(session, MsgType.INSTANCE_INFO, buf)
+
+    async def _on_instance_create(self, session: PlayerSession, payload: bytes):
+        """INSTANCE_CREATE: dungeon_type(u32). 즉시 인스턴스 생성 + 입장."""
+        if not session.in_game or len(payload) < 4:
+            return
+        dungeon_type = struct.unpack("<I", payload[:4])[0]
+        # 던전 데이터에서 찾기
+        dungeon = next((d for d in DUNGEON_LIST_DATA if d["id"] == dungeon_type), None)
+        if not dungeon:
+            # 기본 던전 데이터 생성 (클라이언트 테스트용)
+            dungeon = {"id": dungeon_type, "name": f"Dungeon_{dungeon_type}", "type": "party",
+                       "min_level": 1, "stages": 1, "zone_id": 100, "party_size": 4,
+                       "boss_id": 0, "boss_hp": 10000}
+        inst_id = self.next_instance_id
+        self.next_instance_id += 1
+        instance = {
+            "id": inst_id,
+            "dungeon_id": dungeon["id"],
+            "dungeon_name": dungeon["name"],
+            "zone_id": dungeon.get("zone_id", 100),
+            "difficulty": 0,
+            "boss_hp": dungeon.get("boss_hp", 10000),
+            "boss_current_hp": dungeon.get("boss_hp", 10000),
+            "stage": 1,
+            "max_stages": dungeon.get("stages", 1),
+            "players": [session],
+            "active": True,
+        }
+        self.instances[inst_id] = instance
+        session._current_instance_id = inst_id
+        session.zone_id = dungeon.get("zone_id", 100)
+        session.pos.x = 50.0
+        session.pos.y = 0.0
+        session.pos.z = 50.0
+        self.log(f"InstanceCreate: {session.char_name} -> Instance#{inst_id} dungeon={dungeon_type}", "GAME")
+        # INSTANCE_ENTER 응답: result(u8) + instance_id(u32) + dungeon_type(u32)
+        self._send(session, MsgType.INSTANCE_ENTER, struct.pack("<BII", 0, inst_id, dungeon_type))
 
     async def _on_instance_enter(self, session: PlayerSession, payload: bytes):
         """INSTANCE_ENTER: instance_id(u32). 던전 인스턴스 입장."""
@@ -2911,26 +2976,47 @@ class BridgeServer:
         await self._send_instance_info(session, instance)
 
     async def _on_instance_leave(self, session: PlayerSession, payload: bytes):
-        """INSTANCE_LEAVE: instance_id(u32). 던전 퇴장."""
-        if not session.in_game or len(payload) < 4:
+        """INSTANCE_LEAVE: instance_id(u32) 또는 빈 페이로드. 던전 퇴장."""
+        if not session.in_game:
             return
-        inst_id = struct.unpack("<I", payload[:4])[0]
+        if len(payload) >= 4:
+            inst_id = struct.unpack("<I", payload[:4])[0]
+            is_client_format = False
+        else:
+            # 빈 페이로드: 세션의 현재 인스턴스 찾기
+            inst_id = getattr(session, "_current_instance_id", None)
+            if inst_id is None:
+                # 인스턴스에 있는지 스캔
+                for iid, inst in self.instances.items():
+                    if inst.get("active") and session in inst.get("players", []):
+                        inst_id = iid
+                        break
+            if inst_id is None:
+                self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<B", 1))  # 1=NOT_FOUND
+                return
+            is_client_format = True
         instance = self.instances.get(inst_id)
         if not instance:
-            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 1))
+            if is_client_format:
+                self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<B", 1))
+            else:
+                self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 1))
             return
         if session in instance["players"]:
             instance["players"].remove(session)
         if not instance["players"]:
             instance["active"] = False
             self.log(f"Instance #{inst_id} closed (no players left)", "GAME")
-        # 마을로 복귀
         session.zone_id = 10
         session.pos.x = 150.0
         session.pos.y = 0.0
         session.pos.z = 150.0
-        self.log(f"InstanceLeave: {session.char_name} ← Instance#{inst_id}", "GAME")
-        self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 0))  # 0=OK
+        session._current_instance_id = None
+        self.log(f"InstanceLeave: {session.char_name} <- Instance#{inst_id}", "GAME")
+        if is_client_format:
+            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<B", 0))  # 0=OK
+        else:
+            self._send(session, MsgType.INSTANCE_LEAVE_RESULT, struct.pack("<IB", inst_id, 0))  # 0=OK
 
     # ━━━ PvP 아레나 시스템 (P3_S01_S01) ━━━
 
