@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_s034_npc_enhance_tutorial
+version: session_s029_guild_trade_mail
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -430,6 +430,91 @@ managers:
       - CurrentStep (byte)
       - IsComplete (bool)
 
+  - name: GuildManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "문파(길드) 시스템 관리 — 생성/해산/초대/수락/탈퇴/추방/정보/목록"
+    reads: []
+    writes:
+      - InGuild (bool)
+      - GuildId (uint)
+      - GuildName (string)
+      - LeaderId (ulong)
+      - Members (GuildMemberInfo[])
+    fires_events:
+      - OnGuildInfoUpdated(GuildInfoData)
+      - OnGuildListReceived(GuildListEntry[])
+      - OnGuildLeft()
+    subscribes_to:
+      - NetworkManager.OnGuildInfo → 문파 정보 갱신
+      - NetworkManager.OnGuildList → 문파 목록 수신
+    public_api:
+      - CreateGuild(string)
+      - DisbandGuild()
+      - InviteMember(ulong)
+      - AcceptInvite()
+      - LeaveGuild()
+      - KickMember(ulong)
+      - RequestGuildInfo()
+      - RequestGuildList()
+    computed_properties:
+      - IsLeader (bool)
+
+  - name: TradeManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "거래 시스템 관리 — 요청/수락/거절/아이템·골드 추가/확정/취소"
+    reads: []
+    writes:
+      - IsTrading (bool)
+      - TradePartner (ulong)
+    fires_events:
+      - OnTradeCompleted(TradeResultData)
+      - OnTradeStarted()
+      - OnTradeCancelled()
+    subscribes_to:
+      - NetworkManager.OnTradeResult → 거래 결과
+    public_api:
+      - RequestTrade(ulong)
+      - AcceptTrade()
+      - DeclineTrade()
+      - AddItem(byte)
+      - AddGold(uint)
+      - ConfirmTrade()
+      - CancelTrade()
+
+  - name: MailManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "우편 시스템 관리 — 발송/목록/읽기/수령/삭제"
+    reads: []
+    writes:
+      - _mails (List<MailListEntry>)
+      - IsMailboxOpen (bool)
+    fires_events:
+      - OnMailListChanged()
+      - OnMailOpened(MailReadData)
+      - OnClaimResult(MailClaimResultData)
+      - OnDeleteResult(MailDeleteResultData)
+    subscribes_to:
+      - NetworkManager.OnMailList → 우편 목록 갱신
+      - NetworkManager.OnMailRead → 우편 내용 수신
+      - NetworkManager.OnMailClaimResult → 수령 결과
+      - NetworkManager.OnMailDeleteResult → 삭제 결과
+    public_api:
+      - SendMail(string, string, string, uint, uint, ushort)
+      - OpenMailbox()
+      - CloseMailbox()
+      - ReadMail(uint)
+      - ClaimMail(uint)
+      - DeleteMail(uint)
+      - RefreshMailbox()
+    computed_properties:
+      - Mails (IReadOnlyList<MailListEntry>)
+
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -721,6 +806,36 @@ data_flows:
     to: RemotePlayer
     via: "SetTargetPosition() 직접 호출"
     description: "서버 위치 → 보간 타겟 설정"
+
+  - from: NetworkManager
+    to: GuildManager
+    via: "C# events (OnGuildInfo, OnGuildList)"
+    description: "문파 정보/목록 수신"
+
+  - from: GuildManager
+    to: GuildUI
+    via: "C# events (OnGuildInfoUpdated, OnGuildListReceived, OnGuildLeft)"
+    description: "문파 UI 갱신 (G키 토글)"
+
+  - from: NetworkManager
+    to: TradeManager
+    via: "C# event (OnTradeResult)"
+    description: "거래 결과 수신"
+
+  - from: TradeManager
+    to: TradeUI
+    via: "C# events (OnTradeStarted, OnTradeCancelled, OnTradeCompleted)"
+    description: "거래 UI 패널 표시/숨김"
+
+  - from: NetworkManager
+    to: MailManager
+    via: "C# events (OnMailList, OnMailRead, OnMailClaimResult, OnMailDeleteResult)"
+    description: "우편 목록/내용/수령/삭제 결과 수신"
+
+  - from: MailManager
+    to: MailUI
+    via: "C# events (OnMailListChanged, OnMailOpened, OnClaimResult, OnDeleteResult)"
+    description: "우편함 UI 갱신 (M키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

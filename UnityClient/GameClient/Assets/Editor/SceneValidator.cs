@@ -145,6 +145,9 @@ public static class SceneValidator
         Check("GameScene: NpcManager 존재", objectNames.Contains("NpcManager"));
         Check("GameScene: EnhanceManager 존재", objectNames.Contains("EnhanceManager"));
         Check("GameScene: TutorialManager 존재", objectNames.Contains("TutorialManager"));
+        Check("GameScene: GuildManager 존재", objectNames.Contains("GuildManager"));
+        Check("GameScene: TradeManager 존재", objectNames.Contains("TradeManager"));
+        Check("GameScene: MailManager 존재", objectNames.Contains("MailManager"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인

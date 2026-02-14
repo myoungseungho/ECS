@@ -205,6 +205,39 @@ namespace Network
         // 강화 (S034)
         ENHANCE_REQ     = 340,  // C→S: slot_index(1)
         ENHANCE_RESULT  = 341,  // S→C: slot_index(1) result(1) new_level(1) = 3B
+
+        // 문파 Guild (S029)
+        GUILD_CREATE       = 290,  // C→S: name_len(1) name(N) (최대 16B)
+        GUILD_DISBAND      = 291,  // C→S: empty (파장만 가능)
+        GUILD_INVITE       = 292,  // C→S: target_entity(8u64)
+        GUILD_ACCEPT       = 293,  // C→S: empty
+        GUILD_LEAVE        = 294,  // C→S: empty (파장은 불가→해산)
+        GUILD_KICK         = 295,  // C→S: target_entity(8u64) (파장만 가능)
+        GUILD_INFO_REQ     = 296,  // C→S: empty
+        GUILD_INFO         = 297,  // S→C: guild_id(4) name(16) leader(8) count(1) {entity(8) rank(1)}*N
+        GUILD_LIST_REQ     = 298,  // C→S: empty
+        GUILD_LIST         = 299,  // S→C: count(1) {guild_id(4) name(16) member_count(1) leader_name(16)}*N = 37B/entry
+
+        // 거래 Trade (S029)
+        TRADE_REQUEST      = 300,  // C→S: target_entity(8u64)
+        TRADE_ACCEPT       = 301,  // C→S: empty
+        TRADE_DECLINE      = 302,  // C→S: empty
+        TRADE_ADD_ITEM     = 303,  // C→S: slot_index(1)
+        TRADE_ADD_GOLD     = 304,  // C→S: amount(4u32)
+        TRADE_CONFIRM      = 305,  // C→S: empty
+        TRADE_CANCEL       = 306,  // C→S: empty
+        TRADE_RESULT       = 307,  // S→C: result(1) = 1B
+
+        // 우편 Mail (S029)
+        MAIL_SEND          = 310,  // C→S: recipient_len(1) recipient(N) title_len(1) title(N) body_len(2) body(N) gold(4) item_id(4) item_count(2)
+        MAIL_LIST_REQ      = 311,  // C→S: empty
+        MAIL_LIST          = 312,  // S→C: count(1) {mail_id(4) sender(16) title(32) read(1) has_attachment(1) timestamp(4)}*N = 58B/entry
+        MAIL_READ          = 313,  // C→S: mail_id(4)
+        MAIL_READ_RESP     = 314,  // S→C: mail_id(4) sender(16) title(32) body_len(2) body(N) gold(4) item_id(4) item_count(2)
+        MAIL_CLAIM         = 315,  // C→S: mail_id(4)
+        MAIL_CLAIM_RESULT  = 316,  // S→C: result(1) mail_id(4) = 5B
+        MAIL_DELETE        = 317,  // C→S: mail_id(4)
+        MAIL_DELETE_RESULT = 318,  // S→C: result(1) mail_id(4) = 5B
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -905,5 +938,105 @@ namespace Network
         public byte SlotIndex;
         public EnhanceResult Result;
         public byte NewLevel;
+    }
+
+    // ━━━ S029: 문파 / 거래 / 우편 ━━━
+
+    /// <summary>문파 멤버 정보 (GUILD_INFO 파싱용)</summary>
+    public class GuildMemberInfo
+    {
+        public ulong EntityId;
+        public byte Rank;       // 0=파장, 1=부파장, 2=일반
+    }
+
+    /// <summary>문파 정보 (GUILD_INFO 파싱용)</summary>
+    public class GuildInfoData
+    {
+        public uint GuildId;
+        public string Name;
+        public ulong LeaderId;
+        public GuildMemberInfo[] Members;
+    }
+
+    /// <summary>문파 목록 항목 (GUILD_LIST 파싱용)</summary>
+    public class GuildListEntry
+    {
+        public uint GuildId;
+        public string Name;
+        public byte MemberCount;
+        public string LeaderName;
+    }
+
+    /// <summary>거래 결과 코드</summary>
+    public enum TradeResult : byte
+    {
+        SUCCESS          = 0,
+        TARGET_NOT_FOUND = 1,
+        TARGET_BUSY      = 2,
+        DECLINED         = 3,
+        CANCELLED        = 4,
+        INVENTORY_FULL   = 5,
+        INVALID_ITEM     = 6,
+        NOT_ENOUGH_GOLD  = 7,
+    }
+
+    /// <summary>거래 결과 데이터 (TRADE_RESULT 파싱용)</summary>
+    public class TradeResultData
+    {
+        public TradeResult Result;
+    }
+
+    /// <summary>우편 목록 항목 (MAIL_LIST 파싱용)</summary>
+    public class MailListEntry
+    {
+        public uint MailId;
+        public string Sender;
+        public string Title;
+        public bool IsRead;
+        public bool HasAttachment;
+        public uint Timestamp;
+    }
+
+    /// <summary>우편 내용 (MAIL_READ_RESP 파싱용)</summary>
+    public class MailReadData
+    {
+        public uint MailId;
+        public string Sender;
+        public string Title;
+        public string Body;
+        public uint Gold;
+        public uint ItemId;
+        public ushort ItemCount;
+    }
+
+    /// <summary>우편 수령 결과</summary>
+    public enum MailClaimResult : byte
+    {
+        SUCCESS            = 0,
+        MAIL_NOT_FOUND     = 1,
+        ALREADY_CLAIMED    = 2,
+        INVENTORY_FULL     = 3,
+    }
+
+    /// <summary>우편 수령 결과 데이터 (MAIL_CLAIM_RESULT 파싱용)</summary>
+    public class MailClaimResultData
+    {
+        public MailClaimResult Result;
+        public uint MailId;
+    }
+
+    /// <summary>우편 삭제 결과</summary>
+    public enum MailDeleteResult : byte
+    {
+        SUCCESS           = 0,
+        MAIL_NOT_FOUND    = 1,
+        HAS_UNCLAIMED     = 2,
+    }
+
+    /// <summary>우편 삭제 결과 데이터 (MAIL_DELETE_RESULT 파싱용)</summary>
+    public class MailDeleteResultData
+    {
+        public MailDeleteResult Result;
+        public uint MailId;
     }
 }

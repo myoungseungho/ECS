@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T23:55:00"
+last_session: "2026-02-15T00:05:00"
 
 # ── 현재 상태 ──
-current_status: "S033/S034 처리 완료 — 서버선택/캐릭터CRUD/튜토리얼/NPC대화/강화 패킷+매니저+UI 구현 (47 PASS / 0 FAIL)"
+current_status: "S029 처리 완료 — 문파/거래/우편 3대 시스템 패킷+매니저+UI 구현 (53 PASS / 0 FAIL)"
 
 # ── 완료된 작업 ──
 completed:
@@ -74,6 +74,21 @@ completed:
       - "Assets/Editor/ProjectSetup.cs"
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
+  - id: A14
+    desc: "S029 문파/거래/우편 패킷 연동 — Guild(290-299)/Trade(300-307)/Mail(310-318)"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/GuildManager.cs"
+      - "Assets/Scripts/Managers/TradeManager.cs"
+      - "Assets/Scripts/Managers/MailManager.cs"
+      - "Assets/Scripts/UI/GuildUI.cs"
+      - "Assets/Scripts/UI/TradeUI.cs"
+      - "Assets/Scripts/UI/MailUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -104,6 +119,9 @@ recent_decisions:
   - "S034 패킷 연동: NPC_INTERACT(332), NPC_DIALOG(333), ENHANCE(340-341)"
   - "새 매니저 3종: NpcManager, EnhanceManager, TutorialManager"
   - "새 UI 4종: NpcDialogUI, EnhanceUI, ServerSelectUI, CharacterSelectUI"
+  - "S029 패킷 연동: GUILD(290-299), TRADE(300-307), MAIL(310-318)"
+  - "새 매니저 3종: GuildManager, TradeManager, MailManager"
+  - "새 UI 3종: GuildUI(G키), TradeUI, MailUI(M키)"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:

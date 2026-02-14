@@ -587,6 +587,9 @@ public static class ProjectSetup
         var npcManagerGo = CreateManagerObject("NpcManager", typeof(NpcManager));
         var enhanceManagerGo = CreateManagerObject("EnhanceManager", typeof(EnhanceManager));
         var tutorialManagerGo = CreateManagerObject("TutorialManager", typeof(TutorialManager));
+        var guildManagerGo = CreateManagerObject("GuildManager", typeof(GuildManager));
+        var tradeManagerGo = CreateManagerObject("TradeManager", typeof(TradeManager));
+        var mailManagerGo = CreateManagerObject("MailManager", typeof(MailManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

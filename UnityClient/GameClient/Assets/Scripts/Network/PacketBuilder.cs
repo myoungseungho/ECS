@@ -1197,5 +1197,271 @@ namespace Network
             d.NewLevel = payload[2];
             return d;
         }
+
+        // ━━━ S029: 문파 (Guild) ━━━
+
+        /// <summary>GUILD_CREATE 빌드: name_len(1) name(N)</summary>
+        public static byte[] GuildCreate(string guildName)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(guildName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.GUILD_CREATE, payload);
+        }
+
+        /// <summary>GUILD_DISBAND 빌드: empty</summary>
+        public static byte[] GuildDisband()
+        {
+            return Build(MsgType.GUILD_DISBAND);
+        }
+
+        /// <summary>GUILD_INVITE 빌드: target_entity(8)</summary>
+        public static byte[] GuildInvite(ulong targetEntity)
+        {
+            return Build(MsgType.GUILD_INVITE, BitConverter.GetBytes(targetEntity));
+        }
+
+        /// <summary>GUILD_ACCEPT 빌드: empty</summary>
+        public static byte[] GuildAccept()
+        {
+            return Build(MsgType.GUILD_ACCEPT);
+        }
+
+        /// <summary>GUILD_LEAVE 빌드: empty</summary>
+        public static byte[] GuildLeave()
+        {
+            return Build(MsgType.GUILD_LEAVE);
+        }
+
+        /// <summary>GUILD_KICK 빌드: target_entity(8)</summary>
+        public static byte[] GuildKick(ulong targetEntity)
+        {
+            return Build(MsgType.GUILD_KICK, BitConverter.GetBytes(targetEntity));
+        }
+
+        /// <summary>GUILD_INFO_REQ 빌드: empty</summary>
+        public static byte[] GuildInfoReq()
+        {
+            return Build(MsgType.GUILD_INFO_REQ);
+        }
+
+        /// <summary>GUILD_LIST_REQ 빌드: empty</summary>
+        public static byte[] GuildListReq()
+        {
+            return Build(MsgType.GUILD_LIST_REQ);
+        }
+
+        /// <summary>GUILD_INFO 파싱: guild_id(4) name(16) leader(8) count(1) {entity(8) rank(1)}*N</summary>
+        public static GuildInfoData ParseGuildInfo(byte[] payload)
+        {
+            var d = new GuildInfoData();
+            int off = 0;
+            d.GuildId = BitConverter.ToUInt32(payload, off); off += 4;
+            int nameEnd = off;
+            while (nameEnd < off + 16 && payload[nameEnd] != 0) nameEnd++;
+            d.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+            off += 16;
+            d.LeaderId = BitConverter.ToUInt64(payload, off); off += 8;
+            byte count = payload[off]; off += 1;
+            d.Members = new GuildMemberInfo[count];
+            for (int i = 0; i < count; i++)
+            {
+                var m = new GuildMemberInfo();
+                m.EntityId = BitConverter.ToUInt64(payload, off); off += 8;
+                m.Rank = payload[off]; off += 1;
+                d.Members[i] = m;
+            }
+            return d;
+        }
+
+        /// <summary>GUILD_LIST 파싱: count(1) {guild_id(4) name(16) member_count(1) leader_name(16)}*N = 37B/entry</summary>
+        public static GuildListEntry[] ParseGuildList(byte[] payload)
+        {
+            byte count = payload[0];
+            var guilds = new GuildListEntry[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var g = new GuildListEntry();
+                g.GuildId = BitConverter.ToUInt32(payload, off); off += 4;
+                int nameEnd = off;
+                while (nameEnd < off + 16 && payload[nameEnd] != 0) nameEnd++;
+                g.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 16;
+                g.MemberCount = payload[off]; off += 1;
+                int leaderEnd = off;
+                while (leaderEnd < off + 16 && payload[leaderEnd] != 0) leaderEnd++;
+                g.LeaderName = Encoding.UTF8.GetString(payload, off, leaderEnd - off);
+                off += 16;
+                guilds[i] = g;
+            }
+            return guilds;
+        }
+
+        // ━━━ S029: 거래 (Trade) ━━━
+
+        /// <summary>TRADE_REQUEST 빌드: target_entity(8)</summary>
+        public static byte[] TradeRequest(ulong targetEntity)
+        {
+            return Build(MsgType.TRADE_REQUEST, BitConverter.GetBytes(targetEntity));
+        }
+
+        /// <summary>TRADE_ACCEPT 빌드: empty</summary>
+        public static byte[] TradeAccept()
+        {
+            return Build(MsgType.TRADE_ACCEPT);
+        }
+
+        /// <summary>TRADE_DECLINE 빌드: empty</summary>
+        public static byte[] TradeDecline()
+        {
+            return Build(MsgType.TRADE_DECLINE);
+        }
+
+        /// <summary>TRADE_ADD_ITEM 빌드: slot_index(1)</summary>
+        public static byte[] TradeAddItem(byte slotIndex)
+        {
+            return Build(MsgType.TRADE_ADD_ITEM, new byte[] { slotIndex });
+        }
+
+        /// <summary>TRADE_ADD_GOLD 빌드: amount(4u32)</summary>
+        public static byte[] TradeAddGold(uint amount)
+        {
+            return Build(MsgType.TRADE_ADD_GOLD, BitConverter.GetBytes(amount));
+        }
+
+        /// <summary>TRADE_CONFIRM 빌드: empty</summary>
+        public static byte[] TradeConfirm()
+        {
+            return Build(MsgType.TRADE_CONFIRM);
+        }
+
+        /// <summary>TRADE_CANCEL 빌드: empty</summary>
+        public static byte[] TradeCancel()
+        {
+            return Build(MsgType.TRADE_CANCEL);
+        }
+
+        /// <summary>TRADE_RESULT 파싱: result(1) = 1B</summary>
+        public static TradeResultData ParseTradeResult(byte[] payload)
+        {
+            var d = new TradeResultData();
+            d.Result = (TradeResult)payload[0];
+            return d;
+        }
+
+        // ━━━ S029: 우편 (Mail) ━━━
+
+        /// <summary>MAIL_SEND 빌드: recipient_len(1) recipient(N) title_len(1) title(N) body_len(2) body(N) gold(4) item_id(4) item_count(2)</summary>
+        public static byte[] MailSend(string recipient, string title, string body, uint gold, uint itemId, ushort itemCount)
+        {
+            byte[] recipBytes = Encoding.UTF8.GetBytes(recipient);
+            byte[] titleBytes = Encoding.UTF8.GetBytes(title);
+            byte[] bodyBytes = Encoding.UTF8.GetBytes(body);
+            byte[] payload = new byte[1 + recipBytes.Length + 1 + titleBytes.Length + 2 + bodyBytes.Length + 4 + 4 + 2];
+            int off = 0;
+            payload[off] = (byte)recipBytes.Length; off += 1;
+            Buffer.BlockCopy(recipBytes, 0, payload, off, recipBytes.Length); off += recipBytes.Length;
+            payload[off] = (byte)titleBytes.Length; off += 1;
+            Buffer.BlockCopy(titleBytes, 0, payload, off, titleBytes.Length); off += titleBytes.Length;
+            BitConverter.GetBytes((ushort)bodyBytes.Length).CopyTo(payload, off); off += 2;
+            Buffer.BlockCopy(bodyBytes, 0, payload, off, bodyBytes.Length); off += bodyBytes.Length;
+            BitConverter.GetBytes(gold).CopyTo(payload, off); off += 4;
+            BitConverter.GetBytes(itemId).CopyTo(payload, off); off += 4;
+            BitConverter.GetBytes(itemCount).CopyTo(payload, off);
+            return Build(MsgType.MAIL_SEND, payload);
+        }
+
+        /// <summary>MAIL_LIST_REQ 빌드: empty</summary>
+        public static byte[] MailListReq()
+        {
+            return Build(MsgType.MAIL_LIST_REQ);
+        }
+
+        /// <summary>MAIL_READ 빌드: mail_id(4)</summary>
+        public static byte[] MailRead(uint mailId)
+        {
+            return Build(MsgType.MAIL_READ, BitConverter.GetBytes(mailId));
+        }
+
+        /// <summary>MAIL_CLAIM 빌드: mail_id(4)</summary>
+        public static byte[] MailClaim(uint mailId)
+        {
+            return Build(MsgType.MAIL_CLAIM, BitConverter.GetBytes(mailId));
+        }
+
+        /// <summary>MAIL_DELETE 빌드: mail_id(4)</summary>
+        public static byte[] MailDelete(uint mailId)
+        {
+            return Build(MsgType.MAIL_DELETE, BitConverter.GetBytes(mailId));
+        }
+
+        /// <summary>MAIL_LIST 파싱: count(1) {mail_id(4) sender(16) title(32) read(1) has_attachment(1) timestamp(4)}*N = 58B/entry</summary>
+        public static MailListEntry[] ParseMailList(byte[] payload)
+        {
+            byte count = payload[0];
+            var mails = new MailListEntry[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var m = new MailListEntry();
+                m.MailId = BitConverter.ToUInt32(payload, off); off += 4;
+                int senderEnd = off;
+                while (senderEnd < off + 16 && payload[senderEnd] != 0) senderEnd++;
+                m.Sender = Encoding.UTF8.GetString(payload, off, senderEnd - off);
+                off += 16;
+                int titleEnd = off;
+                while (titleEnd < off + 32 && payload[titleEnd] != 0) titleEnd++;
+                m.Title = Encoding.UTF8.GetString(payload, off, titleEnd - off);
+                off += 32;
+                m.IsRead = payload[off] != 0; off += 1;
+                m.HasAttachment = payload[off] != 0; off += 1;
+                m.Timestamp = BitConverter.ToUInt32(payload, off); off += 4;
+                mails[i] = m;
+            }
+            return mails;
+        }
+
+        /// <summary>MAIL_READ_RESP 파싱: mail_id(4) sender(16) title(32) body_len(2) body(N) gold(4) item_id(4) item_count(2)</summary>
+        public static MailReadData ParseMailReadResp(byte[] payload)
+        {
+            var d = new MailReadData();
+            int off = 0;
+            d.MailId = BitConverter.ToUInt32(payload, off); off += 4;
+            int senderEnd = off;
+            while (senderEnd < off + 16 && payload[senderEnd] != 0) senderEnd++;
+            d.Sender = Encoding.UTF8.GetString(payload, off, senderEnd - off);
+            off += 16;
+            int titleEnd = off;
+            while (titleEnd < off + 32 && payload[titleEnd] != 0) titleEnd++;
+            d.Title = Encoding.UTF8.GetString(payload, off, titleEnd - off);
+            off += 32;
+            ushort bodyLen = BitConverter.ToUInt16(payload, off); off += 2;
+            d.Body = Encoding.UTF8.GetString(payload, off, bodyLen); off += bodyLen;
+            d.Gold = BitConverter.ToUInt32(payload, off); off += 4;
+            d.ItemId = BitConverter.ToUInt32(payload, off); off += 4;
+            d.ItemCount = BitConverter.ToUInt16(payload, off);
+            return d;
+        }
+
+        /// <summary>MAIL_CLAIM_RESULT 파싱: result(1) mail_id(4) = 5B</summary>
+        public static MailClaimResultData ParseMailClaimResult(byte[] payload)
+        {
+            var d = new MailClaimResultData();
+            d.Result = (MailClaimResult)payload[0];
+            d.MailId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        /// <summary>MAIL_DELETE_RESULT 파싱: result(1) mail_id(4) = 5B</summary>
+        public static MailDeleteResultData ParseMailDeleteResult(byte[] payload)
+        {
+            var d = new MailDeleteResultData();
+            d.Result = (MailDeleteResult)payload[0];
+            d.MailId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
     }
 }
