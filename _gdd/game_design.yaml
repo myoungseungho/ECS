@@ -188,7 +188,7 @@ phases:
           detail: |
             새 MsgType: SERVER_LIST_REQ(320), SERVER_LIST(321)
             응답: server_count(u8) + [name(32B) + status(u8) + population(u16)] * N
-          status: todo
+          status: done
           priority: P1
 
     # ----------------------------------------------------------
@@ -268,7 +268,7 @@ phases:
             CHARACTER_CREATE(324) → CHARACTER_CREATE_RESULT(325)
             CHARACTER_DELETE(326) → CHARACTER_DELETE_RESULT(327)
             캐릭터 데이터: name(16B) + class(u8) + level(u16) + zone_id(u32)
-          status: todo
+          status: done
           priority: P0
 
 # ============================================================
@@ -365,7 +365,7 @@ phases:
             TUTORIAL_STEP_COMPLETE(330): step_id(u8)
             TUTORIAL_REWARD(331): step_id(u8) + reward_type(u8) + amount(u32)
             서버에서 튜토리얼 진행 상태 저장 (재접속 시 복원)
-          status: todo
+          status: done
           priority: P1
 
     # ----------------------------------------------------------

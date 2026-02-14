@@ -221,6 +221,22 @@ class MsgType(IntEnum):
     MAIL_DELETE = 317
     MAIL_DELETE_RESULT = 318
 
+    # Server Selection
+    SERVER_LIST_REQ = 320
+    SERVER_LIST = 321
+
+    # Character CRUD
+    CHARACTER_LIST_REQ = 322
+    CHARACTER_LIST = 323
+    CHARACTER_CREATE = 324
+    CHARACTER_CREATE_RESULT = 325
+    CHARACTER_DELETE = 326
+    CHARACTER_DELETE_RESULT = 327
+
+    # Tutorial
+    TUTORIAL_STEP_COMPLETE = 330
+    TUTORIAL_REWARD = 331
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -328,6 +344,7 @@ class PlayerSession:
     trade_items: List[dict] = field(default_factory=list)  # items offered
     trade_gold: int = 0
     trade_confirmed: bool = False
+    tutorial_steps: Set[int] = field(default_factory=set)  # completed step IDs
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -431,6 +448,22 @@ ZONE_BOUNDS = {
     3: {"min_x": 0, "max_x": 3000, "min_z": 0, "max_z": 3000},
 }
 
+# 서버 리스트 (서버 선택 화면용)
+SERVER_LIST_DATA = [
+    {"name": "크로노스", "status": 1, "population": 120},   # status: 0=OFF, 1=NORMAL, 2=BUSY, 3=FULL
+    {"name": "아르카나", "status": 1, "population": 85},
+    {"name": "엘리시움", "status": 2, "population": 350},
+]
+
+# 튜토리얼 스텝 보상
+TUTORIAL_REWARDS = {
+    1: {"reward_type": 0, "amount": 100},     # step 1: 골드 100
+    2: {"reward_type": 1, "amount": 101},     # step 2: item_id 101 x1
+    3: {"reward_type": 0, "amount": 200},     # step 3: 골드 200
+    4: {"reward_type": 2, "amount": 50},      # step 4: 경험치 50
+    5: {"reward_type": 0, "amount": 500},     # step 5: 골드 500
+}
+
 # 이동 상수
 MOVEMENT = {
     "base_speed": 200.0,
@@ -461,6 +494,8 @@ class BridgeServer:
         self.trades: Dict[int, dict] = {}  # entity_id -> trade session
         self.mails: Dict[int, List[dict]] = {}  # account_id -> mail list
         self.next_mail_id = 1
+        self.characters: Dict[int, List[dict]] = {}  # account_id -> character list
+        self.next_char_id = 1
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -650,6 +685,11 @@ class BridgeServer:
             MsgType.MAIL_READ: self._on_mail_read,
             MsgType.MAIL_CLAIM: self._on_mail_claim,
             MsgType.MAIL_DELETE: self._on_mail_delete,
+            MsgType.SERVER_LIST_REQ: self._on_server_list_req,
+            MsgType.CHARACTER_LIST_REQ: self._on_character_list_req,
+            MsgType.CHARACTER_CREATE: self._on_character_create,
+            MsgType.CHARACTER_DELETE: self._on_character_delete,
+            MsgType.TUTORIAL_STEP_COMPLETE: self._on_tutorial_step_complete,
         }
 
         handler = handlers.get(msg_type)
@@ -2333,6 +2373,110 @@ class BridgeServer:
         # Delete mail
         self.mails[account_id].remove(mail)
         self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 0, mail_id))
+
+    # ━━━ 핸들러: 서버 선택 ━━━
+
+    async def _on_server_list_req(self, session: PlayerSession, payload: bytes):
+        count = len(SERVER_LIST_DATA)
+        buf = struct.pack('<B', count)
+        for srv in SERVER_LIST_DATA:
+            name_bytes = srv["name"].encode('utf-8')[:32].ljust(32, b'\x00')
+            buf += name_bytes
+            buf += struct.pack('<BH', srv["status"], srv["population"])
+        self._send(session, MsgType.SERVER_LIST, buf)
+        self.log(f"ServerList: sent {count} servers", "GAME")
+
+    # ━━━ 핸들러: 캐릭터 CRUD ━━━
+
+    async def _on_character_list_req(self, session: PlayerSession, payload: bytes):
+        if not session.logged_in:
+            self._send(session, MsgType.CHARACTER_LIST, struct.pack('<B', 0))
+            return
+        chars = self.characters.get(session.account_id, [])
+        buf = struct.pack('<B', len(chars))
+        for ch in chars:
+            name_bytes = ch["name"].encode('utf-8')[:16].ljust(16, b'\x00')
+            buf += name_bytes
+            buf += struct.pack('<BHI', ch["class"], ch["level"], ch["zone_id"])
+        self._send(session, MsgType.CHARACTER_LIST, buf)
+        self.log(f"CharacterList: {len(chars)} chars for account {session.account_id}", "GAME")
+
+    async def _on_character_create(self, session: PlayerSession, payload: bytes):
+        if not session.logged_in:
+            self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 1, 0))
+            return
+        if len(payload) < 2:
+            self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 3, 0))
+            return
+        name_len = payload[0]
+        if len(payload) < 1 + name_len + 1:
+            self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 3, 0))
+            return
+        char_name = payload[1:1+name_len].decode('utf-8', errors='replace')
+        char_class = payload[1+name_len]
+        if len(char_name) < 2 or len(char_name) > 8:
+            self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 3, 0))
+            return
+        if char_class not in (1, 2, 3):
+            self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 1, 0))
+            return
+        for acct_chars in self.characters.values():
+            for ch in acct_chars:
+                if ch["name"] == char_name:
+                    self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 2, 0))
+                    return
+        char_id = self.next_char_id
+        self.next_char_id += 1
+        new_char = {"id": char_id, "name": char_name, "class": char_class, "level": 1, "zone_id": 1}
+        if session.account_id not in self.characters:
+            self.characters[session.account_id] = []
+        self.characters[session.account_id].append(new_char)
+        self.log(f"CharCreate: {char_name} class={char_class} (account={session.account_id})", "GAME")
+        self._send(session, MsgType.CHARACTER_CREATE_RESULT, struct.pack('<BI', 0, char_id))
+
+    async def _on_character_delete(self, session: PlayerSession, payload: bytes):
+        if not session.logged_in:
+            self._send(session, MsgType.CHARACTER_DELETE_RESULT, struct.pack('<BI', 2, 0))
+            return
+        if len(payload) < 4:
+            self._send(session, MsgType.CHARACTER_DELETE_RESULT, struct.pack('<BI', 1, 0))
+            return
+        char_id = struct.unpack('<I', payload[:4])[0]
+        chars = self.characters.get(session.account_id, [])
+        target = next((ch for ch in chars if ch["id"] == char_id), None)
+        if not target:
+            self._send(session, MsgType.CHARACTER_DELETE_RESULT, struct.pack('<BI', 1, char_id))
+            return
+        chars.remove(target)
+        self.log(f"CharDelete: {target['name']} id={char_id} (account={session.account_id})", "GAME")
+        self._send(session, MsgType.CHARACTER_DELETE_RESULT, struct.pack('<BI', 0, char_id))
+
+    # ━━━ 핸들러: 튜토리얼 ━━━
+
+    async def _on_tutorial_step_complete(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 1:
+            return
+        step_id = payload[0]
+        if step_id in session.tutorial_steps:
+            return
+        reward = TUTORIAL_REWARDS.get(step_id)
+        if not reward:
+            return
+        session.tutorial_steps.add(step_id)
+        reward_type = reward["reward_type"]
+        amount = reward["amount"]
+        if reward_type == 0:
+            session.gold += amount
+        elif reward_type == 1:
+            for slot in session.inventory:
+                if slot.item_id == 0:
+                    slot.item_id = amount
+                    slot.count = 1
+                    break
+        elif reward_type == 2:
+            session.stats.add_exp(amount)
+        self.log(f"Tutorial: step {step_id} complete, reward_type={reward_type} amount={amount} ({session.char_name})", "GAME")
+        self._send(session, MsgType.TUTORIAL_REWARD, struct.pack('<BBI', step_id, reward_type, amount))
 
     # ━━━ 몬스터 시스템 ━━━
 

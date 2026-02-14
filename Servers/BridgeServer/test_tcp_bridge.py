@@ -589,6 +589,90 @@ async def run_tests(port: int):
 
     await test("MULTI: 2클라 접속 → APPEAR 수신", test_multi_client())
 
+
+    # ━━━ 서버 선택 / 캐릭터 CRUD / 튜토리얼 ━━━
+
+    async def test_server_list():
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.SERVER_LIST_REQ)
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.SERVER_LIST, f"Expected SERVER_LIST, got {msg_type}"
+        count = payload[0]
+        assert count == 3, f"Expected 3 servers, got {count}"
+        offset = 1
+        for i in range(count):
+            status, pop = struct.unpack_from('<BH', payload, offset + 32)
+            assert status in (0, 1, 2, 3)
+            offset += 35
+        c.close()
+
+    await test("SERVER_LIST: 서버 목록 조회", test_server_list())
+
+    async def test_character_crud():
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'crudtest' + struct.pack('<B', 2) + b'pw')
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.LOGIN_RESULT
+        await c.send(MsgType.CHARACTER_LIST_REQ)
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.CHARACTER_LIST
+        assert payload[0] == 0, f"Expected 0 chars, got {payload[0]}"
+        name_bytes = "TestHero".encode('utf-8')
+        create_pl = struct.pack('<B', len(name_bytes)) + name_bytes + struct.pack('<B', 1)
+        await c.send(MsgType.CHARACTER_CREATE, create_pl)
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.CHARACTER_CREATE_RESULT
+        assert payload[0] == 0, f"Create fail, result={payload[0]}"
+        char_id = struct.unpack_from('<I', payload, 1)[0]
+        await c.send(MsgType.CHARACTER_LIST_REQ)
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.CHARACTER_LIST
+        assert payload[0] == 1
+        await c.send(MsgType.CHARACTER_CREATE, create_pl)
+        msg_type, payload = await c.recv_packet()
+        assert payload[0] == 2, f"Dup name should be 2, got {payload[0]}"
+        await c.send(MsgType.CHARACTER_DELETE, struct.pack('<I', char_id))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.CHARACTER_DELETE_RESULT
+        assert payload[0] == 0
+        await c.send(MsgType.CHARACTER_LIST_REQ)
+        msg_type, payload = await c.recv_packet()
+        assert payload[0] == 0
+        c.close()
+
+    await test("CHAR_CRUD: 생성/조회/삭제 + 중복검증", test_character_crud())
+
+    async def test_tutorial():
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'tuttest1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        await c.send(MsgType.TUTORIAL_STEP_COMPLETE, struct.pack('<B', 1))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.TUTORIAL_REWARD
+        assert payload[0] == 1
+        assert payload[1] == 0
+        amount = struct.unpack_from('<I', payload, 2)[0]
+        assert amount == 100
+        await c.send(MsgType.TUTORIAL_STEP_COMPLETE, struct.pack('<B', 1))
+        msg_type, _ = await c.recv_packet(timeout=0.5)
+        assert msg_type is None, f"Dup step should be ignored, got {msg_type}"
+        await c.send(MsgType.TUTORIAL_STEP_COMPLETE, struct.pack('<B', 4))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.TUTORIAL_REWARD
+        assert payload[0] == 4
+        assert payload[1] == 2
+        c.close()
+
+    await test("TUTORIAL: 스텝 완료 + 보상 + 중복방지", test_tutorial())
+
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
     print(f"  TCP Bridge Test Results: {passed}/{total} PASSED")

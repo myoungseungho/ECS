@@ -2,15 +2,13 @@
   "meta": {
     "description": "에이전트 간 대화 저널 - 일회성 Claude 인스턴스가 대화 맥락을 즉시 이해하기 위한 단일 진실 원천(Single Source of Truth)",
     "schema_version": 2,
-    "last_updated": "2026-02-14T14:00:00",
+    "last_updated": "2026-02-14T22:55:00",
     "project": "ECS MMORPG Game Server/Client (37 sessions, 388+20 tests, TCP Bridge v1.0, Visual Prototype)"
   },
-
   "next_message_number": {
-    "server": 32,
+    "server": 34,
     "client": 17
   },
-
   "timeline": [
     {
       "id": "S001",
@@ -461,130 +459,370 @@
       "summary": "C016 응답. CEO 카메라 결정: 탑다운 쿼터뷰 확정(숄더캠X). 8건 크로스파일 불일치 전부 수정 완료. 엔티티 파이프라인은 현재 보류(Phase 2 이후 검토). 누락 DB 4건 인지+순차 대응. flow.yaml 8슬롯(QWERASDF)+V궁극기로 확장.",
       "key_content": "CEO 지시: 로아를 완전히 따라하겠다→쿼터뷰 확정. 수정 파일: combat.yaml(3건), ui.yaml(4건), items.yaml(1건), ai_behavior.yaml(1건), flow.yaml(스킬슬롯 확장+궁극기V키). 권위 기준 정리(향후 충돌 방지). 엔티티 파이프라인은 Phase 2 후 검토.",
       "status": "pending"
+    },
+    {
+      "id": "S032",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-14",
+      "type": "data",
+      "summary": "GDD 데이터 DB 5개 CSV 생성 (monsters/skills/items/quests/npcs)"
+    },
+    {
+      "id": "S033",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-14",
+      "type": "impl",
+      "summary": "P1 패킷 3종: SERVER_LIST(320-321)/CHARACTER_CRUD(322-327)/TUTORIAL(330-331). 23/23 PASS."
     }
   ],
-
   "decisions": [
     {
       "id": "D001",
       "date": "2026-02-12",
       "topic": "패킷 프로토콜 정본",
       "decision": "방안 A 채택 - 실서버 코드(PacketComponents.h + SERVER_IMPLEMENTATION_SUMMARY.md)가 정본. packet_protocol_v1.json은 폐기 예정.",
-      "agreed_by": ["server-agent", "client-agent"],
-      "references": ["C001", "S002"]
+      "agreed_by": [
+        "server-agent",
+        "client-agent"
+      ],
+      "references": [
+        "C001",
+        "S002"
+      ]
     },
     {
       "id": "D002",
       "date": "2026-02-12",
       "topic": "Phase 0 선행",
       "decision": "Phase 0(프로토콜 정렬 + 검증 인프라)를 Phase 1 전에 수행. 산출물: protocol.yaml, validate_protocol.py, mock_server.py",
-      "agreed_by": ["server-agent", "client-agent"],
-      "references": ["C001", "S002"]
+      "agreed_by": [
+        "server-agent",
+        "client-agent"
+      ],
+      "references": [
+        "C001",
+        "S002"
+      ]
     },
     {
       "id": "D003",
       "date": "2026-02-12",
       "topic": "protocol.yaml 역할 분담",
       "decision": "서버가 초안 작성 → 클라가 리뷰. validate_protocol.py, mock_server.py는 클라 담당.",
-      "agreed_by": ["server-agent", "client-agent"],
-      "references": ["C001", "S002"]
+      "agreed_by": [
+        "server-agent",
+        "client-agent"
+      ],
+      "references": [
+        "C001",
+        "S002"
+      ]
     },
     {
       "id": "D004",
       "date": "2026-02-12",
       "topic": "영역 분리 원칙",
       "decision": "서버 에이전트는 서버 코드만, 클라 에이전트는 클라 코드만 건드린다. 상대 영역 수정 필요 시 메시지로 요청.",
-      "agreed_by": ["server-agent", "client-agent"],
-      "references": ["S002"]
+      "agreed_by": [
+        "server-agent",
+        "client-agent"
+      ],
+      "references": [
+        "S002"
+      ]
     },
     {
       "id": "D005",
       "date": "2026-02-12",
       "topic": "운영 방식: 인터랙티브 폴링 우선",
       "decision": "양쪽 모두 데몬 대신 인터랙티브 세션에서 5분 폴링. 데몬은 삭제 안 하고 백업용으로 유지. 맥락 유지가 더 중요.",
-      "agreed_by": ["server-agent", "CEO"],
-      "references": ["S004"]
+      "agreed_by": [
+        "server-agent",
+        "CEO"
+      ],
+      "references": [
+        "S004"
+      ]
     },
     {
       "id": "D006",
       "date": "2026-02-12",
       "topic": "protocol.yaml 범위",
       "decision": "세션 1~29 전부(57개 메시지 타입) 한번에 포함. 부분 전달 안 함.",
-      "agreed_by": ["server-agent"],
-      "references": ["S004", "C002"]
+      "agreed_by": [
+        "server-agent"
+      ],
+      "references": [
+        "S004",
+        "C002"
+      ]
     },
     {
       "id": "D007",
       "date": "2026-02-12",
       "topic": "작업 우선 운영 지침",
       "decision": "폴링이 메인이 아니라 '작업'이 메인. 할 일 있으면 바로 작업, 작업 끝나면 1회 폴링, 상대 대기시만 5분 폴링 루프.",
-      "agreed_by": ["CEO"],
-      "references": ["S005"]
+      "agreed_by": [
+        "CEO"
+      ],
+      "references": [
+        "S005"
+      ]
     },
     {
       "id": "D008",
       "date": "2026-02-13",
       "topic": "Phase 1 방안 A 채택",
       "decision": "병렬 작업. 클라=세션14~29 패킷 구현(단독), 서버=콘텐츠 고도화(몬스터AI/던전/퀘스트). 완료 후 Phase 2 실서버 연동.",
-      "agreed_by": ["server-agent", "CEO"],
-      "references": ["C006", "S008"]
+      "agreed_by": [
+        "server-agent",
+        "CEO"
+      ],
+      "references": [
+        "C006",
+        "S008"
+      ]
     },
     {
       "id": "D009",
       "date": "2026-02-14",
       "topic": "카메라 방향: 탑다운 쿼터뷰 확정",
       "decision": "CEO 직접 지시. 로스트아크를 완전히 따라하고 싶으니 TPS 숄더캠 대신 탑다운 쿼터뷰(45도)로 간다. camera.yaml/game_design.yaml은 이미 쿼터뷰 기준. 클라가 TPS→쿼터뷰 전환 필요.",
-      "agreed_by": ["CEO"],
-      "references": ["C016", "S031"]
+      "agreed_by": [
+        "CEO"
+      ],
+      "references": [
+        "C016",
+        "S031"
+      ]
     },
     {
       "id": "D010",
       "date": "2026-02-14",
       "topic": "GDD 크로스파일 권위(Authority) 기준",
       "decision": "충돌 시 전문 파일이 권위: 키바인딩=flow.yaml, PvP=pvp.yaml, 어그로=ai_behavior.yaml, 콤보=animation.yaml, QTE=dungeon.yaml, 아이템=items.yaml, UI=ui.yaml.",
-      "agreed_by": ["server-agent"],
-      "references": ["C016", "S031"]
+      "agreed_by": [
+        "server-agent"
+      ],
+      "references": [
+        "C016",
+        "S031"
+      ]
     }
   ],
-
   "current_sprint": {
     "name": "Phase 1 - Parallel development (Client: sessions 14-29, Server: content enhancement)",
     "started": "2026-02-13",
     "tasks": [
-      {"id": "T001", "task": "protocol.yaml 초안", "assignee": "server", "status": "done"},
-      {"id": "T002", "task": "protocol.yaml 리뷰", "assignee": "client", "status": "done"},
-      {"id": "T003", "task": "validate_protocol.py", "assignee": "client", "status": "done"},
-      {"id": "T004", "task": "mock_server.py", "assignee": "client", "status": "done"},
-      {"id": "T005", "task": "parse_packet_components.py", "assignee": "server", "status": "done"},
-      {"id": "T006", "task": "클라: 세션14~28 네트워크 레이어 (MsgType+Build/Parse+Handler)", "assignee": "client", "status": "done"},
-      {"id": "T007", "task": "클라: 게임 매니저 6종 (Monster/Skill/Inventory/Party/Buff/Quest)", "assignee": "client", "status": "done"},
-      {"id": "T008", "task": "클라: mock_server.py 세션14~28 핸들러", "assignee": "client", "status": "done"},
-      {"id": "T009", "task": "클라: UI 확장 (스킬바/인벤토리/파티/버프/퀘스트)", "assignee": "client", "status": "done"},
-      {"id": "T010", "task": "서버: 몬스터 처치→루트 드롭 연동", "assignee": "server", "status": "done"},
-      {"id": "T011", "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)", "assignee": "server", "status": "done"},
-      {"id": "T012", "task": "서버: 던전 인스턴스 로직 보강 (Session 21)", "assignee": "server", "status": "done"},
-      {"id": "T013", "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)", "assignee": "server", "status": "done", "note": "T011에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 연동"},
-      {"id": "T014", "task": "서버: 채팅 시스템 (Session 30)", "assignee": "server", "status": "done", "note": "야근 #1. ChatComponents.h, 5개 MsgType(240-244), 존/파티/귓속말/시스템. test_session30_chat.py 8개 테스트."},
-      {"id": "T015", "task": "서버: 장비 스탯 반영 (Session 31)", "assignee": "server", "status": "done", "note": "야근 #2. StatsComponent에 equip_atk/def_bonus 추가. 장착→ATK/DEF 반영→STAT_SYNC 자동 전송. test_session31_equipment.py 6개 테스트."},
-      {"id": "T016", "task": "서버: NPC 상점 시스템 (Session 32)", "assignee": "server", "status": "done", "note": "야근 #3. ShopComponents.h, 5개 MsgType(250-254), 3개 NPC 상점(잡화/무기/방어구), CurrencyComponent(gold), 판매가=40%. test_session32_shop.py 7개 테스트."},
-      {"id": "T017", "task": "서버: 스킬 확장 (Session 33)", "assignee": "server", "status": "done", "note": "야근 #4. 21개 스킬(8→21), SkillEffect enum, SkillLevelComponent(레벨1~5), 스킬 포인트 시스템. 3개 MsgType(260-262). SKILL_LIST_RESP 확장. test_session33_skill_expansion.py 8개 테스트."},
-      {"id": "T018", "task": "서버: 보스 메카닉 (Session 34)", "assignee": "server", "status": "done", "note": "야근 #5. BossComponents.h(3종 보스+페이즈+특수공격+인레이지), 5개 MsgType(270-274), MonsterAISystem.h 보스 리스폰 리셋. test_session34_boss.py 7개 테스트."},
-      {"id": "T019", "task": "서버: 이동 검증 Model C (Session 35)", "assignee": "server", "status": "done", "note": "Model C: 클라 예측+서버 검증. POSITION_CORRECTION(15). 속도/존경계/좌표유효성 3단계 검증. movement_rules 공유(base_speed=200). test_session35_movement_validation.py 8개 테스트."},
-      {"id": "T020", "task": "서버: 몬스터 AI 강화 (Session 36)", "assignee": "server", "status": "done", "note": "6상태 FSM(IDLE/PATROL/CHASE/ATTACK/RETURN/DEAD). 어그로 테이블(데미지 기반, max 8). 순찰/추적/귀환/리쉬. MONSTER_MOVE(111)+MONSTER_AGGRO(112). MonsterAISystem.h 전면 재작성. test_session36_monster_ai.py 11개 테스트."},
-      {"id": "T021", "task": "서버: 데이터 드리븐 + 핫리로드 (Session 37)", "assignee": "server", "status": "done", "note": "constexpr→JSON/CSV. GameConfig.h 런타임 캐시. ConfigLoader Reload()/ReloadAll(). ADMIN_RELOAD(280)~ADMIN_CONFIG_RESP(283). data/ 폴더 5개 파일. MonsterAISystem GetAIConfig() 전환. test_session37_data_driven.py 12개 테스트."},
-      {"id": "T022", "task": "서버: TCP 브릿지 서버 구현 (Phase 2 준비)", "assignee": "server", "status": "done", "note": "Servers/BridgeServer/tcp_bridge.py v1.0. Python asyncio TCP 서버. PacketComponents.h 100% 호환. 전체 핸들러(Login/Move/Chat/Shop/Skill/Party/Inventory/Quest/Boss/MonsterAI). 몬스터 9마리 스폰, 3초 AI 틱, 존 이동, 이동 검증. test_tcp_bridge.py 20개 통합 테스트 ALL PASS."},
-      {"id": "T023", "task": "클라: 새 패킷 23개 enum 추가 + 매니저 확장", "assignee": "client", "status": "done", "note": "C011. 37 PASS/0 FAIL. 3매니저 신규(Chat/Shop/Boss)+3UI(ChatUI/ShopUI/BossUI)+2확장(Skill/Monster). 포맷 수정 2건 필요: CHAT_SEND msg_len u16→u8, SHOP_RESULT count u8→i16."},
-      {"id": "T025", "task": "클라: CHAT_SEND msg_len u16→u8 + SHOP_RESULT count u8→i16 수정", "assignee": "client", "status": "done", "note": "C012. PacketBuilder.cs는 이미 맞았음. mock_server.py만 수정: chat msg_len H→B, shop count B→h, build_chat_message/whisper_result 고정 32B 포맷."},
-      {"id": "T024", "task": "양쪽: TCP 브릿지 연동 테스트 (ECHO→LOGIN→CHAT)", "assignee": "both", "status": "todo", "note": "S020 참조. 클라가 mock_server 대신 tcp_bridge.py에 접속. ECHO→LOGIN→ENTER_GAME→MOVE→CHAT 순서."},
-      {"id": "T026", "task": "클라: 비주얼 프로토타입 (FBX 프리팹 + Animator)", "assignee": "client", "status": "done", "note": "C014. ProjectSetup FBX 지원(ConfigureFBXImports+CreateAnimatorControllers+FBX 프리팹). 엔티티 Animator 연동(LocalPlayer/RemotePlayer/MonsterEntity). 사망 애니메이션 2초 딜레이. ConnectionTest DirectConnect 모드."},
-      {"id": "T027", "task": "서버: tcp_bridge LOGIN_RESULT/ENTER_GAME result 반전 수정", "assignee": "server", "status": "done", "note": "S028. LOGIN_RESULT SUCCESS=0/FAIL=1, ENTER_GAME SUCCESS=0/FAIL=1. test_tcp_bridge.py assertion도 수정. C013+C014 합계 6건 전부 완료."},
-      {"id": "T028", "task": "서버: 문파(Guild) 시스템 구현 (Session 38)", "assignee": "server", "status": "done", "note": "S029. MsgType 290-299. 생성/해산/초대/수락/탈퇴/추방/정보/목록. 최대 20명. 8개 테스트."},
-      {"id": "T029", "task": "서버: 거래(Trade) 시스템 구현 (Session 39)", "assignee": "server", "status": "done", "note": "S029. MsgType 300-307. 요청/수락/거절/아이템/골드/확정/취소. 같은존+양쪽확정. 7개 테스트."},
-      {"id": "T030", "task": "서버: 우편(Mail) 시스템 구현 (Session 40)", "assignee": "server", "status": "done", "note": "S029. MsgType 310-318. 발송/목록/읽기/수령/삭제. 50통 제한, 7일 만료. 9개 테스트."},
-      {"id": "T031", "task": "클라: Guild/Trade/Mail enum 추가 + 매니저 3개", "assignee": "client", "status": "todo", "note": "S029 참조. MsgType 290-318. GuildManager+TradeManager+MailManager. Phase 2 이후 작업."}
+      {
+        "id": "T001",
+        "task": "protocol.yaml 초안",
+        "assignee": "server",
+        "status": "done"
+      },
+      {
+        "id": "T002",
+        "task": "protocol.yaml 리뷰",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T003",
+        "task": "validate_protocol.py",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T004",
+        "task": "mock_server.py",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T005",
+        "task": "parse_packet_components.py",
+        "assignee": "server",
+        "status": "done"
+      },
+      {
+        "id": "T006",
+        "task": "클라: 세션14~28 네트워크 레이어 (MsgType+Build/Parse+Handler)",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T007",
+        "task": "클라: 게임 매니저 6종 (Monster/Skill/Inventory/Party/Buff/Quest)",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T008",
+        "task": "클라: mock_server.py 세션14~28 핸들러",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T009",
+        "task": "클라: UI 확장 (스킬바/인벤토리/파티/버프/퀘스트)",
+        "assignee": "client",
+        "status": "done"
+      },
+      {
+        "id": "T010",
+        "task": "서버: 몬스터 처치→루트 드롭 연동",
+        "assignee": "server",
+        "status": "done"
+      },
+      {
+        "id": "T011",
+        "task": "서버: 스킬 사망 처리 보강 (COMBAT_DIED + ENTITY_DIED)",
+        "assignee": "server",
+        "status": "done"
+      },
+      {
+        "id": "T012",
+        "task": "서버: 던전 인스턴스 로직 보강 (Session 21)",
+        "assignee": "server",
+        "status": "done"
+      },
+      {
+        "id": "T013",
+        "task": "서버: 퀘스트 몬스터킬 카운트 연동 (Session 28)",
+        "assignee": "server",
+        "status": "done",
+        "note": "T011에서 ENTITY_DIED 발행 추가 → EventBus 구독으로 연동"
+      },
+      {
+        "id": "T014",
+        "task": "서버: 채팅 시스템 (Session 30)",
+        "assignee": "server",
+        "status": "done",
+        "note": "야근 #1. ChatComponents.h, 5개 MsgType(240-244), 존/파티/귓속말/시스템. test_session30_chat.py 8개 테스트."
+      },
+      {
+        "id": "T015",
+        "task": "서버: 장비 스탯 반영 (Session 31)",
+        "assignee": "server",
+        "status": "done",
+        "note": "야근 #2. StatsComponent에 equip_atk/def_bonus 추가. 장착→ATK/DEF 반영→STAT_SYNC 자동 전송. test_session31_equipment.py 6개 테스트."
+      },
+      {
+        "id": "T016",
+        "task": "서버: NPC 상점 시스템 (Session 32)",
+        "assignee": "server",
+        "status": "done",
+        "note": "야근 #3. ShopComponents.h, 5개 MsgType(250-254), 3개 NPC 상점(잡화/무기/방어구), CurrencyComponent(gold), 판매가=40%. test_session32_shop.py 7개 테스트."
+      },
+      {
+        "id": "T017",
+        "task": "서버: 스킬 확장 (Session 33)",
+        "assignee": "server",
+        "status": "done",
+        "note": "야근 #4. 21개 스킬(8→21), SkillEffect enum, SkillLevelComponent(레벨1~5), 스킬 포인트 시스템. 3개 MsgType(260-262). SKILL_LIST_RESP 확장. test_session33_skill_expansion.py 8개 테스트."
+      },
+      {
+        "id": "T018",
+        "task": "서버: 보스 메카닉 (Session 34)",
+        "assignee": "server",
+        "status": "done",
+        "note": "야근 #5. BossComponents.h(3종 보스+페이즈+특수공격+인레이지), 5개 MsgType(270-274), MonsterAISystem.h 보스 리스폰 리셋. test_session34_boss.py 7개 테스트."
+      },
+      {
+        "id": "T019",
+        "task": "서버: 이동 검증 Model C (Session 35)",
+        "assignee": "server",
+        "status": "done",
+        "note": "Model C: 클라 예측+서버 검증. POSITION_CORRECTION(15). 속도/존경계/좌표유효성 3단계 검증. movement_rules 공유(base_speed=200). test_session35_movement_validation.py 8개 테스트."
+      },
+      {
+        "id": "T020",
+        "task": "서버: 몬스터 AI 강화 (Session 36)",
+        "assignee": "server",
+        "status": "done",
+        "note": "6상태 FSM(IDLE/PATROL/CHASE/ATTACK/RETURN/DEAD). 어그로 테이블(데미지 기반, max 8). 순찰/추적/귀환/리쉬. MONSTER_MOVE(111)+MONSTER_AGGRO(112). MonsterAISystem.h 전면 재작성. test_session36_monster_ai.py 11개 테스트."
+      },
+      {
+        "id": "T021",
+        "task": "서버: 데이터 드리븐 + 핫리로드 (Session 37)",
+        "assignee": "server",
+        "status": "done",
+        "note": "constexpr→JSON/CSV. GameConfig.h 런타임 캐시. ConfigLoader Reload()/ReloadAll(). ADMIN_RELOAD(280)~ADMIN_CONFIG_RESP(283). data/ 폴더 5개 파일. MonsterAISystem GetAIConfig() 전환. test_session37_data_driven.py 12개 테스트."
+      },
+      {
+        "id": "T022",
+        "task": "서버: TCP 브릿지 서버 구현 (Phase 2 준비)",
+        "assignee": "server",
+        "status": "done",
+        "note": "Servers/BridgeServer/tcp_bridge.py v1.0. Python asyncio TCP 서버. PacketComponents.h 100% 호환. 전체 핸들러(Login/Move/Chat/Shop/Skill/Party/Inventory/Quest/Boss/MonsterAI). 몬스터 9마리 스폰, 3초 AI 틱, 존 이동, 이동 검증. test_tcp_bridge.py 20개 통합 테스트 ALL PASS."
+      },
+      {
+        "id": "T023",
+        "task": "클라: 새 패킷 23개 enum 추가 + 매니저 확장",
+        "assignee": "client",
+        "status": "done",
+        "note": "C011. 37 PASS/0 FAIL. 3매니저 신규(Chat/Shop/Boss)+3UI(ChatUI/ShopUI/BossUI)+2확장(Skill/Monster). 포맷 수정 2건 필요: CHAT_SEND msg_len u16→u8, SHOP_RESULT count u8→i16."
+      },
+      {
+        "id": "T025",
+        "task": "클라: CHAT_SEND msg_len u16→u8 + SHOP_RESULT count u8→i16 수정",
+        "assignee": "client",
+        "status": "done",
+        "note": "C012. PacketBuilder.cs는 이미 맞았음. mock_server.py만 수정: chat msg_len H→B, shop count B→h, build_chat_message/whisper_result 고정 32B 포맷."
+      },
+      {
+        "id": "T024",
+        "task": "양쪽: TCP 브릿지 연동 테스트 (ECHO→LOGIN→CHAT)",
+        "assignee": "both",
+        "status": "todo",
+        "note": "S020 참조. 클라가 mock_server 대신 tcp_bridge.py에 접속. ECHO→LOGIN→ENTER_GAME→MOVE→CHAT 순서."
+      },
+      {
+        "id": "T026",
+        "task": "클라: 비주얼 프로토타입 (FBX 프리팹 + Animator)",
+        "assignee": "client",
+        "status": "done",
+        "note": "C014. ProjectSetup FBX 지원(ConfigureFBXImports+CreateAnimatorControllers+FBX 프리팹). 엔티티 Animator 연동(LocalPlayer/RemotePlayer/MonsterEntity). 사망 애니메이션 2초 딜레이. ConnectionTest DirectConnect 모드."
+      },
+      {
+        "id": "T027",
+        "task": "서버: tcp_bridge LOGIN_RESULT/ENTER_GAME result 반전 수정",
+        "assignee": "server",
+        "status": "done",
+        "note": "S028. LOGIN_RESULT SUCCESS=0/FAIL=1, ENTER_GAME SUCCESS=0/FAIL=1. test_tcp_bridge.py assertion도 수정. C013+C014 합계 6건 전부 완료."
+      },
+      {
+        "id": "T028",
+        "task": "서버: 문파(Guild) 시스템 구현 (Session 38)",
+        "assignee": "server",
+        "status": "done",
+        "note": "S029. MsgType 290-299. 생성/해산/초대/수락/탈퇴/추방/정보/목록. 최대 20명. 8개 테스트."
+      },
+      {
+        "id": "T029",
+        "task": "서버: 거래(Trade) 시스템 구현 (Session 39)",
+        "assignee": "server",
+        "status": "done",
+        "note": "S029. MsgType 300-307. 요청/수락/거절/아이템/골드/확정/취소. 같은존+양쪽확정. 7개 테스트."
+      },
+      {
+        "id": "T030",
+        "task": "서버: 우편(Mail) 시스템 구현 (Session 40)",
+        "assignee": "server",
+        "status": "done",
+        "note": "S029. MsgType 310-318. 발송/목록/읽기/수령/삭제. 50통 제한, 7일 만료. 9개 테스트."
+      },
+      {
+        "id": "T031",
+        "task": "클라: Guild/Trade/Mail enum 추가 + 매니저 3개",
+        "assignee": "client",
+        "status": "todo",
+        "note": "S029 참조. MsgType 290-318. GuildManager+TradeManager+MailManager. Phase 2 이후 작업."
+      }
     ]
   },
-
   "agent_states": {
     "server": {
       "last_sent": "S031",
@@ -599,7 +837,6 @@
       "capabilities": "세션 1~28 전체 패킷(168 PASS), 15 매니저(37 PASS), mock_server 확장, UI 8종, FBX 비주얼 프리팹, Animator Controller, Phase 2 DirectConnect 테스트 준비 완료."
     }
   },
-
   "system_rules": {
     "polling_interval": "5분",
     "territory": "서버=서버코드, 클라=클라코드",
