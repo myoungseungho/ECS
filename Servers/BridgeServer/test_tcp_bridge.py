@@ -76,6 +76,20 @@ class TestClient:
             timeout = 0.2  # 첫 패킷 후 더 짧은 타임아웃
         return packets
 
+    async def recv_expect(self, expected: int, timeout: float = 3.0) -> tuple:
+        """특정 MsgType 패킷이 올 때까지 대기. 다른 패킷은 무시."""
+        deadline = time.time() + timeout
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None, None
+            msg_type, payload = await self.recv_packet(timeout=remaining)
+            if msg_type is None:
+                return None, None
+            if msg_type == expected:
+                return msg_type, payload
+            # skip non-matching packets (monster spawns, moves, etc.)
+
     def close(self):
         if self.writer:
             self.writer.close()
@@ -332,14 +346,14 @@ async def run_tests(port: int):
 
         # 아이템 추가
         await c.send(MsgType.ITEM_ADD, struct.pack('<IH', 201, 1))
-        msg_type, resp = await c.recv_packet()
+        msg_type, resp = await c.recv_expect(MsgType.ITEM_ADD_RESULT)
         assert msg_type == MsgType.ITEM_ADD_RESULT, f"Expected ITEM_ADD_RESULT, got {msg_type}"
         result = resp[0]
         assert result == 1, f"Item add should succeed"
 
         # 인벤 조회
         await c.send(MsgType.INVENTORY_REQ)
-        msg_type, resp = await c.recv_packet()
+        msg_type, resp = await c.recv_expect(MsgType.INVENTORY_RESP)
         assert msg_type == MsgType.INVENTORY_RESP, f"Expected INVENTORY_RESP, got {msg_type}"
         count = resp[0]
         assert count >= 1, f"Should have at least 1 item"

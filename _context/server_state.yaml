@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-15T08:47:00"
+last_session: "2026-02-15T08:54:00"
 
 # ── 현재 상태 ──
-current_status: "idle cycle: 새 클라 메시지 없음, 리그레션 46/46 PASS. GDD 서버 태스크 전부 done — 클라 테스트/새 메시지 대기 중."
+current_status: "idle cycle: 새 클라 메시지 없음. 인벤토리 테스트 #10 리그레션 수정(recv_expect 추가) — 46/46 PASS. 클라 테스트/새 메시지 대기 중."
 
 # ── 완료된 작업 ──
 completed:
@@ -55,6 +55,9 @@ completed:
   - id: S036
     desc: "GDD P3 서버 태스크 2건: PvP 아레나(P3_S01_S01, 1v1/3v3 매칭+스탯정규화+ELO+승패판정, MsgType 350-359)+레이드 보스 기믹(P3_S02_S01, 3페이즈+기믹6종+enrage+클리어보상, MsgType 370-379). 46/46 PASS."
     files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch_s036.py"]
+  - id: S037
+    desc: "인벤토리 테스트 #10 리그레션 수정 — TestClient.recv_expect() 추가로 몬스터 스폰 패킷 간섭 해결. 46/46 PASS."
+    files: ["Servers/BridgeServer/_patch_s037.py"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked:
@@ -128,4 +131,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python test_tcp_bridge.py
