@@ -2839,5 +2839,104 @@ namespace Network
 
             return d;
         }
+
+        // ━━━ S050: 각인/초월 (TASK 8 Enhancement) ━━━
+
+        /// <summary>ENGRAVING_LIST_REQ 빌더: empty</summary>
+        public static byte[] EngravingListReq()
+        {
+            return Build(MsgType.ENGRAVING_LIST_REQ);
+        }
+
+        /// <summary>ENGRAVING_EQUIP 빌더: action(1) + name_len(1) + name(str)</summary>
+        public static byte[] EngravingEquip(byte action, string name)
+        {
+            byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
+            byte[] payload = new byte[2 + nameBytes.Length];
+            payload[0] = action;
+            payload[1] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 2, nameBytes.Length);
+            return Build(MsgType.ENGRAVING_EQUIP, payload);
+        }
+
+        /// <summary>TRANSCEND_REQ 빌더: slot_len(1) + slot(str)</summary>
+        public static byte[] TranscendReq(string slot)
+        {
+            byte[] slotBytes = System.Text.Encoding.UTF8.GetBytes(slot);
+            byte[] payload = new byte[1 + slotBytes.Length];
+            payload[0] = (byte)slotBytes.Length;
+            if (slotBytes.Length > 0)
+                Buffer.BlockCopy(slotBytes, 0, payload, 1, slotBytes.Length);
+            return Build(MsgType.TRANSCEND_REQ, payload);
+        }
+
+        /// <summary>ENGRAVING_LIST 파싱: count(1) + [name_len(1)+name+name_kr_len(1)+name_kr+points(1)+active_level(1)+is_active(1)+effect_key_len(1)+effect_key+effect_value(2)] * N</summary>
+        public static EngravingListData ParseEngravingList(byte[] payload)
+        {
+            var d = new EngravingListData();
+            int off = 0;
+
+            byte count = payload[off]; off += 1;
+            d.Engravings = new EngravingInfo[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var e = new EngravingInfo();
+
+                byte nameLen = payload[off]; off += 1;
+                e.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+                byte nameKrLen = payload[off]; off += 1;
+                e.NameKr = System.Text.Encoding.UTF8.GetString(payload, off, nameKrLen); off += nameKrLen;
+
+                e.Points = payload[off]; off += 1;
+                e.ActiveLevel = payload[off]; off += 1;
+                e.IsActive = payload[off] != 0; off += 1;
+
+                byte effectKeyLen = payload[off]; off += 1;
+                e.EffectKey = System.Text.Encoding.UTF8.GetString(payload, off, effectKeyLen); off += effectKeyLen;
+
+                e.EffectValue = BitConverter.ToUInt16(payload, off); off += 2;
+
+                d.Engravings[i] = e;
+            }
+
+            return d;
+        }
+
+        /// <summary>ENGRAVING_RESULT 파싱: result(1) + name_len(1) + name(str) + active_count(1)</summary>
+        public static EngravingResultData ParseEngravingResult(byte[] payload)
+        {
+            var d = new EngravingResultData();
+            int off = 0;
+
+            d.Result = (EngravingResult)payload[off]; off += 1;
+
+            byte nameLen = payload[off]; off += 1;
+            d.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+            d.ActiveCount = payload[off]; off += 1;
+
+            return d;
+        }
+
+        /// <summary>TRANSCEND_RESULT 파싱: result(1) + slot_len(1) + slot(str) + new_level(1) + gold_cost(4) + success(1)</summary>
+        public static TranscendResultData ParseTranscendResult(byte[] payload)
+        {
+            var d = new TranscendResultData();
+            int off = 0;
+
+            d.Result = (TranscendResult)payload[off]; off += 1;
+
+            byte slotLen = payload[off]; off += 1;
+            d.Slot = System.Text.Encoding.UTF8.GetString(payload, off, slotLen); off += slotLen;
+
+            d.NewLevel = payload[off]; off += 1;
+            d.GoldCost = BitConverter.ToUInt32(payload, off); off += 4;
+            d.Success = payload[off] != 0; off += 1;
+
+            return d;
+        }
     }
 }

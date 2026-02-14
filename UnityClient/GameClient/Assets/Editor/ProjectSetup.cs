@@ -611,6 +611,8 @@ public static class ProjectSetup
         var titleManagerGo = CreateManagerObject("TitleManager", typeof(TitleManager));
         var collectionManagerGo = CreateManagerObject("CollectionManager", typeof(CollectionManager));
         var jobChangeUIGo = CreateManagerObject("JobChangeUI", typeof(JobChangeUI));
+        var engravingManagerGo = CreateManagerObject("EngravingManager", typeof(EngravingManager));
+        var transcendUIGo = CreateManagerObject("TranscendUI", typeof(TranscendUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

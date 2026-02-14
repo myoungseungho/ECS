@@ -195,6 +195,10 @@ namespace Network
         public event Action<TitleEquipResultData> OnTitleEquipResult;
         public event Action<CollectionInfoData> OnCollectionInfo;
         public event Action<JobChangeResultData> OnJobChangeResult;
+        // S050: 각인/초월
+        public event Action<EngravingListData> OnEngravingList;
+        public event Action<EngravingResultData> OnEngravingResult;
+        public event Action<TranscendResultData> OnTranscendResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1013,6 +1017,26 @@ namespace Network
         public void RequestJobChange(string jobName)
         {
             _field?.Send(PacketBuilder.JobChangeReq(jobName));
+        }
+
+        // ━━━ S050: 각인/초월 API ━━━
+
+        /// <summary>각인 목록 요청</summary>
+        public void RequestEngravingList()
+        {
+            _field?.Send(PacketBuilder.EngravingListReq());
+        }
+
+        /// <summary>각인 활성화/비활성화 (action: 0=activate, 1=deactivate)</summary>
+        public void EquipEngraving(byte action, string name)
+        {
+            _field?.Send(PacketBuilder.EngravingEquip(action, name));
+        }
+
+        /// <summary>장비 초월 요청</summary>
+        public void RequestTranscend(string slot)
+        {
+            _field?.Send(PacketBuilder.TranscendReq(slot));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2193,6 +2217,30 @@ namespace Network
                     var data = PacketBuilder.ParseJobChangeResult(payload);
                     Debug.Log($"[Net] JobChange: result={data.Result}, job={data.JobName}, bonuses={data.Bonuses.Length}, skills={data.NewSkills.Length}");
                     OnJobChangeResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S050: 각인/초월 (TASK 8 Enhancement) ━━━
+
+                case MsgType.ENGRAVING_LIST:
+                {
+                    var data = PacketBuilder.ParseEngravingList(payload);
+                    Debug.Log($"[Net] EngravingList: count={data.Engravings.Length}");
+                    OnEngravingList?.Invoke(data);
+                    break;
+                }
+                case MsgType.ENGRAVING_RESULT:
+                {
+                    var data = PacketBuilder.ParseEngravingResult(payload);
+                    Debug.Log($"[Net] EngravingResult: result={data.Result}, name={data.Name}, activeCount={data.ActiveCount}");
+                    OnEngravingResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.TRANSCEND_RESULT:
+                {
+                    var data = PacketBuilder.ParseTranscendResult(payload);
+                    Debug.Log($"[Net] TranscendResult: result={data.Result}, slot={data.Slot}, level={data.NewLevel}, cost={data.GoldCost}, success={data.Success}");
+                    OnTranscendResult?.Invoke(data);
                     break;
                 }
 

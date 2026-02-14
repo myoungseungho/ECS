@@ -291,6 +291,14 @@ namespace Network
         GEM_FUSE           = 452,  // C→S: gem_type(1) gem_tier(1)
         GEM_FUSE_RESULT    = 453,  // S→C: status(1) gem_type(1) new_tier(1) = 3B
 
+        // ━━━ S050: 각인/초월 (TASK 8 Enhancement, MsgType 454-459) ━━━
+        ENGRAVING_LIST_REQ = 454,  // C→S: empty
+        ENGRAVING_LIST     = 455,  // S→C: count(1) + [name_len(1)+name(str)+name_kr_len(1)+name_kr(str)+points(1)+active_level(1)+is_active(1)+effect_key_len(1)+effect_key(str)+effect_value(2)] * N
+        ENGRAVING_EQUIP    = 456,  // C→S: action(1) + name_len(1) + name(str) — action: 0=activate, 1=deactivate
+        ENGRAVING_RESULT   = 457,  // S→C: result(1) + name_len(1) + name(str) + active_count(1)
+        TRANSCEND_REQ      = 458,  // C→S: slot_len(1) + slot(str)
+        TRANSCEND_RESULT   = 459,  // S→C: result(1) + slot_len(1) + slot(str) + new_level(1) + gold_cost(4) + success(1)
+
         // ━━━ S042: Phase 5 — 캐시샵/배틀패스/이벤트 (TASK 11, MsgType 474-489) ━━━
         CASH_SHOP_LIST_REQ      = 474,  // C→S: category(1)
         CASH_SHOP_LIST          = 475,  // S→C: count(1) {item_id(4) name(32) category(1) price(4) currency(1)}*N = 42B/entry
@@ -2184,5 +2192,63 @@ namespace Network
         public string JobName;
         public JobChangeBonusEntry[] Bonuses;
         public ushort[] NewSkills;
+    }
+
+    // ━━━ S050: 각인/초월 (TASK 8 Enhancement) ━━━
+
+    /// <summary>각인 정보 (ENGRAVING_LIST 파싱용)</summary>
+    public class EngravingInfo
+    {
+        public string Name;
+        public string NameKr;
+        public byte Points;
+        public byte ActiveLevel;
+        public bool IsActive;
+        public string EffectKey;
+        public ushort EffectValue;
+    }
+
+    /// <summary>각인 목록 데이터 (ENGRAVING_LIST 파싱용)</summary>
+    public class EngravingListData
+    {
+        public EngravingInfo[] Engravings;
+    }
+
+    /// <summary>각인 결과 코드</summary>
+    public enum EngravingResult : byte
+    {
+        SUCCESS            = 0,
+        NOT_ENOUGH_POINTS  = 1,
+        MAX_ACTIVE         = 2,
+        NOT_ACTIVE         = 3,
+        INVALID            = 4,
+    }
+
+    /// <summary>각인 변경 결과 데이터 (ENGRAVING_RESULT 파싱용)</summary>
+    public class EngravingResultData
+    {
+        public EngravingResult Result;
+        public string Name;
+        public byte ActiveCount;
+    }
+
+    /// <summary>초월 결과 코드</summary>
+    public enum TranscendResult : byte
+    {
+        SUCCESS          = 0,
+        ENHANCE_TOO_LOW  = 1,
+        MAX_TRANSCEND    = 2,
+        NOT_ENOUGH_GOLD  = 3,
+        FAILED           = 4,
+    }
+
+    /// <summary>초월 결과 데이터 (TRANSCEND_RESULT 파싱용)</summary>
+    public class TranscendResultData
+    {
+        public TranscendResult Result;
+        public string Slot;
+        public byte NewLevel;
+        public uint GoldCost;
+        public bool Success;
     }
 }
