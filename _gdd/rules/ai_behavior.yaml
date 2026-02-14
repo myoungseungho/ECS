@@ -290,7 +290,7 @@ monster_ai:
         failure: "boss_double_damage_attack"
 
       typing_qte:
-        key_count: 6
+        key_count: 4
         time_limit: 5.0
         success: "damage_reduction_50"
         failure: "unavoidable_damage"

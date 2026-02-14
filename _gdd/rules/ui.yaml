@@ -354,9 +354,9 @@ hud:
         type: "HorizontalLayoutGroup"
         spacing: 4
         children:
-          - { name: "Btn_Character", icon: "ui_icon_character", keybind: "C", tooltip: "캐릭터 정보" }
+          - { name: "Btn_Character", icon: "ui_icon_character", keybind: "K", tooltip: "캐릭터 정보" }
           - { name: "Btn_Inventory", icon: "ui_icon_inventory", keybind: "I", tooltip: "인벤토리" }
-          - { name: "Btn_Skill", icon: "ui_icon_skill", keybind: "K", tooltip: "스킬" }
+          - { name: "Btn_Skill", icon: "ui_icon_skill", keybind: "L", tooltip: "스킬" }
           - { name: "Btn_Quest", icon: "ui_icon_quest", keybind: "J", tooltip: "퀘스트" }
           - { name: "Btn_Map", icon: "ui_icon_map", keybind: "M", tooltip: "지도" }
           - { name: "Btn_Guild", icon: "ui_icon_guild", keybind: "G", tooltip: "길드" }
@@ -658,7 +658,7 @@ inventory_panel:
 # 3. 캐릭터 정보 UI
 # ──────────────────────────────────────────────────────────
 character_panel:
-  toggle_key: "C"
+  toggle_key: "K"
   anchor: "center_left"
   position: [50, 0]
   size: [380, 550]
@@ -695,7 +695,7 @@ character_panel:
             - { name: "Slot_Earring",   position: [140, -355],  size: [48,48], slot: "earring" }
             # 하단
             - { name: "Slot_Belt",      position: [-45, -355],  size: [48,48], slot: "belt" }
-            - { name: "Slot_Artifact",  position: [45, -355],   size: [48,48], slot: "artifact" }
+            - { name: "Slot_Bracelet",  position: [45, -355],   size: [48,48], slot: "bracelet" }
 
         # 스탯 패널
         - name: "Panel_Stats"
@@ -726,7 +726,7 @@ character_panel:
 # 4. 스킬 UI
 # ──────────────────────────────────────────────────────────
 skill_panel:
-  toggle_key: "K"
+  toggle_key: "L"
   anchor: "center"
   size: [700, 500]
 

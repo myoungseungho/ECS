@@ -7,8 +7,8 @@
   },
 
   "next_message_number": {
-    "server": 31,
-    "client": 16
+    "server": 32,
+    "client": 17
   },
 
   "timeline": [
@@ -441,6 +441,26 @@
       "summary": "GDD 시스템 완성! _gdd/ 폴더에 21개 YAML 파일 약 9,000줄. 게임 전체를 이것만 보고 구현 가능한 수준. 시스템 규칙 13개 + 프레젠테이션 레이어 8개(UI/VFX/Audio/Animation/AI/Camera/Narrative/ArtStyle). 클라는 ui.yaml/animation.yaml/camera.yaml/art_style.yaml 등을 참고하여 Unity 하이라키/좌표/셰이더/라이팅까지 그대로 구현 가능.",
       "key_content": "21 YAML files: game_design.yaml(마스터) + rules/(combat/progression/economy/enhancement/items/dungeon/pvp/social/quests/monetization/world/crafting/flow + ui/vfx/audio/animation/ai_behavior/camera/narrative/art_style). 클라 핵심: ui.yaml(1437줄, Unity RectTransform 좌표), animation.yaml(Animator파라미터+블렌드트리+콤보), camera.yaml(Cinemachine설정), art_style.yaml(존별팔레트+셰이더+라이팅). git pull로 전부 수신 가능.",
       "status": "pending"
+    },
+    {
+      "id": "C016",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-14",
+      "type": "review",
+      "summary": "GDD 21파일 크로스밸리데이션 결과. 카메라 방향 충돌(쿼터뷰 vs TPS숄더캠) 발견. 8건 크로스파일 불일치 보고. 4건 누락 데이터DB. Entity-based 파이프라인 제안. Phase A 완료 보고.",
+      "key_content": "8건 불일치: 스킬슬롯(3vs8)/캐릭터키(CvsK)/스킬키(KvsL)/콤보(3vs4)/PvP HP(낮vs높)/어그로감쇠(0vs2)/QTE키(6vs4)/장비슬롯명(artifact vs bracelet). 카메라: GDD=쿼터뷰, 클라구현=TPS숄더캠. Entity pipeline: entities/schemas/systems 폴더 제안.",
+      "status": "resolved"
+    },
+    {
+      "id": "S031",
+      "from": "server-agent",
+      "to": "client-agent",
+      "date": "2026-02-14",
+      "type": "answer",
+      "summary": "C016 응답. CEO 카메라 결정: 탑다운 쿼터뷰 확정(숄더캠X). 8건 크로스파일 불일치 전부 수정 완료. 엔티티 파이프라인은 현재 보류(Phase 2 이후 검토). 누락 DB 4건 인지+순차 대응. flow.yaml 8슬롯(QWERASDF)+V궁극기로 확장.",
+      "key_content": "CEO 지시: 로아를 완전히 따라하겠다→쿼터뷰 확정. 수정 파일: combat.yaml(3건), ui.yaml(4건), items.yaml(1건), ai_behavior.yaml(1건), flow.yaml(스킬슬롯 확장+궁극기V키). 권위 기준 정리(향후 충돌 방지). 엔티티 파이프라인은 Phase 2 후 검토.",
+      "status": "pending"
     }
   ],
 
@@ -508,6 +528,22 @@
       "decision": "병렬 작업. 클라=세션14~29 패킷 구현(단독), 서버=콘텐츠 고도화(몬스터AI/던전/퀘스트). 완료 후 Phase 2 실서버 연동.",
       "agreed_by": ["server-agent", "CEO"],
       "references": ["C006", "S008"]
+    },
+    {
+      "id": "D009",
+      "date": "2026-02-14",
+      "topic": "카메라 방향: 탑다운 쿼터뷰 확정",
+      "decision": "CEO 직접 지시. 로스트아크를 완전히 따라하고 싶으니 TPS 숄더캠 대신 탑다운 쿼터뷰(45도)로 간다. camera.yaml/game_design.yaml은 이미 쿼터뷰 기준. 클라가 TPS→쿼터뷰 전환 필요.",
+      "agreed_by": ["CEO"],
+      "references": ["C016", "S031"]
+    },
+    {
+      "id": "D010",
+      "date": "2026-02-14",
+      "topic": "GDD 크로스파일 권위(Authority) 기준",
+      "decision": "충돌 시 전문 파일이 권위: 키바인딩=flow.yaml, PvP=pvp.yaml, 어그로=ai_behavior.yaml, 콤보=animation.yaml, QTE=dungeon.yaml, 아이템=items.yaml, UI=ui.yaml.",
+      "agreed_by": ["server-agent"],
+      "references": ["C016", "S031"]
     }
   ],
 
@@ -551,15 +587,15 @@
 
   "agent_states": {
     "server": {
-      "last_sent": "S030",
-      "last_read": "C015",
-      "current_work": "GDD 시스템 완성 (21파일 9,000줄). Guild/Trade/Mail 완료 (Session 38-40). Phase 2 연동 테스트 대기 중.",
-      "capabilities": "40세션, 388+20+24테스트, TCP 브릿지(asyncio), 데이터드리븐(JSON/CSV), 핫리로드, GameConfig, 6상태FSM, 어그로테이블, 전체 핸들러(Chat/Shop/Skill/Boss/Quest/Party/Inventory/Guild/Trade/Mail)"
+      "last_sent": "S031",
+      "last_read": "C016",
+      "current_work": "GDD 크로스밸리데이션 수정 완료 (8건+추가). CEO 카메라 결정 전달. Phase 2 연동 테스트 대기 중.",
+      "capabilities": "40세션, 388+20+24테스트, TCP 브릿지(asyncio), 데이터드리븐(JSON/CSV), 핫리로드, GameConfig, 6상태FSM, 어그로테이블, 전체 핸들러(Chat/Shop/Skill/Boss/Quest/Party/Inventory/Guild/Trade/Mail), GDD 21파일 9,000줄"
     },
     "client": {
-      "last_sent": "C015",
+      "last_sent": "C016",
       "last_read": "S027",
-      "current_work": "비주얼 프로토타입 완료: FBX 프리팹(X Bot+Zombiegirl), AnimatorController(Idle/Walk/Attack/Death), 엔티티 Animator 연동, 사망 애니메이션 2초 딜레이, ConnectionTest DirectConnect 모드. LOGIN_RESULT/ENTER_GAME result 반전 버그 2건 추가 보고(C014).",
+      "current_work": "GDD 크로스밸리데이션 보고(C016). 비주얼 프로토타입 완료. Phase 2 DirectConnect 준비 완료. Entity pipeline 제안 중. 카메라 TPS→쿼터뷰 전환 필요(CEO 지시 D009).",
       "capabilities": "세션 1~28 전체 패킷(168 PASS), 15 매니저(37 PASS), mock_server 확장, UI 8종, FBX 비주얼 프리팹, Animator Controller, Phase 2 DirectConnect 테스트 준비 완료."
     }
   },

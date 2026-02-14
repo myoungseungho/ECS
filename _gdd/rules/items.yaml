@@ -17,7 +17,7 @@ rarity:
 
   uncommon:
     name: "고급"
-    color: "#00FF00"      # 초록
+    color: "#1EFF00"      # 초록 (ui.yaml 등급색상과 동일)
     drop_weight: 25
     sell_multiplier: 2.0
     max_enhancement: 10
