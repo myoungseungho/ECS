@@ -37,7 +37,10 @@ from tcp_bridge import (
     DURABILITY_MAX, REPAIR_COST_MULTIPLIER,
     REROLL_GOLD_COST, REROLL_MATERIAL, REROLL_LOCK_COST,
     BG_MODE_CAPTURE_POINT, BG_MODE_PAYLOAD, BG_TEAM_SIZE,
-    BG_WIN_SCORE, GW_CRYSTAL_HP, GW_MIN_PARTICIPANTS
+    BG_WIN_SCORE, GW_CRYSTAL_HP, GW_MIN_PARTICIPANTS,
+    CURRENCY_MAX, TOKEN_SHOP_DUNGEON, TOKEN_SHOP_PVP, TOKEN_SHOP_GUILD,
+    TOKEN_SHOPS, SILVER_SHOP_ITEMS, DUNGEON_TOKEN_REWARDS,
+    PVP_TOKEN_WIN, PVP_TOKEN_LOSS
 )
 
 
@@ -2348,6 +2351,76 @@ async def run_tests(port: int):
         c.close()
 
     await test("GW_QUERY: 길드전 상태 조회 (없음) → NO_WAR", test_gw_query_no_war())
+
+
+    # ━━━ Test: CURRENCY_QUERY — 전체 화폐 조회 ━━━
+    async def test_currency_query():
+        """전체 화폐 조회 → gold/silver/dungeon_token/pvp_token/guild_contribution 반환."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.CURRENCY_QUERY, b'')
+        msg_type, resp = await c.recv_expect(MsgType.CURRENCY_INFO)
+        assert msg_type == MsgType.CURRENCY_INFO, f"Expected CURRENCY_INFO, got {msg_type}"
+        assert len(resp) >= 20, f"Response too short: {len(resp)} bytes"
+        gold, silver, dt, pt, gc = struct.unpack('<I I I I I', resp[:20])
+        assert gold >= 0, f"gold must be >= 0, got {gold}"
+        assert silver >= 0, f"silver must be >= 0, got {silver}"
+        assert dt >= 0, f"dungeon_token must be >= 0, got {dt}"
+        assert pt >= 0, f"pvp_token must be >= 0, got {pt}"
+        assert gc >= 0, f"guild_contribution must be >= 0, got {gc}"
+        c.close()
+
+    await test("CURRENCY_QUERY: 전체 화폐 조회", test_currency_query())
+
+    # ━━━ Test: TOKEN_SHOP_LIST — 토큰 상점 목록 조회 ━━━
+    async def test_token_shop_list():
+        """던전 토큰 상점 목록 조회 → 아이템 4개."""
+        c = await login_and_enter(port)
+        # Query dungeon shop (type=0)
+        await c.send(MsgType.TOKEN_SHOP_LIST, struct.pack('<B', 0))
+        msg_type, resp = await c.recv_expect(MsgType.TOKEN_SHOP)
+        assert msg_type == MsgType.TOKEN_SHOP, f"Expected TOKEN_SHOP, got {msg_type}"
+        shop_type = resp[0]
+        count = resp[1]
+        assert shop_type == 0, f"Expected shop_type=0 (dungeon), got {shop_type}"
+        assert count == len(TOKEN_SHOP_DUNGEON), f"Expected {len(TOKEN_SHOP_DUNGEON)} items, got {count}"
+
+        # Query pvp shop (type=1)
+        await c.send(MsgType.TOKEN_SHOP_LIST, struct.pack('<B', 1))
+        msg_type2, resp2 = await c.recv_expect(MsgType.TOKEN_SHOP)
+        assert msg_type2 == MsgType.TOKEN_SHOP
+        assert resp2[0] == 1  # pvp shop
+        assert resp2[1] == len(TOKEN_SHOP_PVP)
+        c.close()
+
+    await test("TOKEN_SHOP_LIST: 토큰 상점 목록 조회 (던전/PvP)", test_token_shop_list())
+
+    # ━━━ Test: TOKEN_SHOP_BUY — 토큰 구매 (잔액 부족) ━━━
+    async def test_token_shop_buy_insufficient():
+        """토큰 부족 상태에서 구매 → INSUFFICIENT_TOKEN(1)."""
+        c = await login_and_enter(port)
+        # Try to buy dungeon shop item (shop_id=1, epic_weapon_box, 500 dungeon_token)
+        # New character has 0 dungeon_token → should fail
+        await c.send(MsgType.TOKEN_SHOP_BUY, struct.pack('<H B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.TOKEN_SHOP_BUY_RESULT)
+        assert msg_type == MsgType.TOKEN_SHOP_BUY_RESULT, f"Expected TOKEN_SHOP_BUY_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 1, f"Expected INSUFFICIENT_TOKEN(1), got {result}"
+        c.close()
+
+    await test("TOKEN_SHOP_BUY: 토큰 부족 → INSUFFICIENT_TOKEN", test_token_shop_buy_insufficient())
+
+    # ━━━ Test: TOKEN_SHOP_BUY — 잘못된 아이템 ━━━
+    async def test_token_shop_buy_invalid():
+        """존재하지 않는 shop_id → INVALID_ITEM(2)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.TOKEN_SHOP_BUY, struct.pack('<H B', 9999, 1))
+        msg_type, resp = await c.recv_expect(MsgType.TOKEN_SHOP_BUY_RESULT)
+        assert msg_type == MsgType.TOKEN_SHOP_BUY_RESULT
+        result = resp[0]
+        assert result == 2, f"Expected INVALID_ITEM(2), got {result}"
+        c.close()
+
+    await test("TOKEN_SHOP_BUY: 잘못된 아이템 → INVALID_ITEM", test_token_shop_buy_invalid())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

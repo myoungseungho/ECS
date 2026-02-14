@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T06:52:00"
+last_session: "2026-02-16T07:15:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 6 전장/길드전/PvP시즌 완료! 100/100 ALL PASS (S053). 전장2모드(거점점령+수레호위)+길드전(크리스탈파괴)+PvP시즌7티어 핸들러3+헬퍼4(MsgType 430-435). 다음: TASK 10 보조화폐(468-473)."
+current_status: "TASK 10 보조화폐/토큰상점 완료! 104/104 ALL PASS (S054). 화폐5종(gold/silver/dungeon_token/pvp_token/guild_contribution)+토큰상점3종(던전/PvP/길드)+토큰획득훅2개 핸들러3(MsgType 468-473). 다음: TASK 17 비경탐험(540-544)."
 
 # ── 완료된 작업 ──
 completed:
@@ -109,6 +109,9 @@ completed:
   - id: S053
     desc: "C033 응답: TASK 6 전장/길드전/PvP시즌 완료. MsgType 430-435. 핸들러3+헬퍼4(BATTLEGROUND_QUEUE/SCORE/GUILD_WAR_DECLARE+bg_end_match/pvp_tier/soft_reset/season_reset). 전장2모드(거점점령+수레호위)+길드전(크리스탈10000HP)+PvP시즌7티어. 100/100 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s053.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S053_c033_response_task6_battleground.md"]
+  - id: S054
+    desc: "C034 응답: TASK 10 보조화폐/토큰상점 완료. MsgType 468-473. 핸들러3(CURRENCY_QUERY/TOKEN_SHOP_LIST/TOKEN_SHOP_BUY). 화폐5종(gold/silver/dungeon_token/pvp_token/guild_contribution)+토큰상점3종(던전4+PvP4+길드3)+토큰획득훅2(레이드→dt/전장→pt). 104/104 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s054.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S054_c034_response_task10_currency.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -156,39 +159,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 10: 보조 화폐 시스템 (GDD rules/economy.yaml currencies)
-  # 골드만 구현됨. silver/dungeon_token/pvp_token/guild_contribution 미구현.
-  # MsgType: 468-473
+  # TASK 10: 완료! (S054) — 보조화폐/토큰상점 104/104 PASS
+  # currency_sub01~05 모두 완료
   # ============================================================
-  - id: "currency_sub01"
-    desc: "CURRENCY_QUERY(468)→CURRENCY_INFO(469) 핸들러 — 전체 화폐 조회. gold/silver/dungeon_token/pvp_token/guild_contribution 5종."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "currency_sub02"
-    desc: "실버 화폐 연동 — NPC 상점 포션/소모품 은화 전용 구매. SHOP_BUY(252) 핸들러에 silver 결제 분기 추가."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "currency_sub03"
-    desc: "던전/PvP 토큰 — 던전 클리어 시 dungeon_token 지급 + PvP 승리 시 pvp_token 지급. 기존 RAID_CLEAR(377)/PVP_MATCH_END(356) 핸들러에 추가."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "currency_sub04"
-    desc: "TOKEN_SHOP_LIST(470)→TOKEN_SHOP(471) + TOKEN_SHOP_BUY(472)→TOKEN_SHOP_BUY_RESULT(473) — 토큰 상점 (던전/PvP/길드). 토큰으로 전용 장비 교환."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "currency_sub05"
-    desc: "보조 화폐 테스트 4개 — 화폐 조회, 실버 구매, 토큰 획득, 토큰 교환."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 15: 완료! (S046) — 비급&트라이포드 66/66 PASS
@@ -525,6 +498,8 @@ recent_decisions:
   - "TASK 9 완료: 내구도/수리/리롤(462-467) 95/95 PASS. _patch_s052.py. 인벤토리기반 내구도(피격-0.1/사망-1.0)+수리(tier*dur_lost*5)+리롤(5000g+재감정서,1줄잠금10000g)+랜덤옵션5타입5풀."
   - "클라 TASK 9 내구도 완료 확인: DurabilityManager+RepairUI(F10)+RerollUI(F11), 103 PASS."
   - "TASK 6 완료: 전장/길드전/PvP시즌(430-435) 100/100 PASS. _patch_s053.py. 핸들러3(BATTLEGROUND_QUEUE/SCORE/GUILD_WAR_DECLARE)+헬퍼4. 전장2모드(거점점령:3거점win1000+수레호위:2페이즈)+길드전(min10/30분/크리스탈10000HP)+PvP시즌7티어(Bronze~GM/soft_reset). BG_TEAM_SIZE=6."
+  - "클라 TASK 6 전장 완료 확인: BattlegroundManager+GuildWarManager+BattlegroundUI+GuildWarUI(F7/F8키), 107 PASS."
+  - "TASK 10 완료: 보조화폐/토큰상점(468-473) 104/104 PASS. _patch_s054.py. 핸들러3(CURRENCY_QUERY/TOKEN_SHOP_LIST/TOKEN_SHOP_BUY). 화폐5종(gold:999M/silver:99M/dt:99K/pt:99K/gc:99K)+토큰상점3종(던전4+PvP4+길드3아이템)+토큰획득훅(레이드클리어→dt/전장종료→pt)."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -563,6 +538,7 @@ processed_messages:
   - "C031"
   - "C032"
   - "C033"
+  - "C034"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -578,4 +554,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python _patch_s054.py && python test_tcp_bridge.py

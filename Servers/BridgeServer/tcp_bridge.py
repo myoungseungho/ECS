@@ -368,6 +368,14 @@ class MsgType(IntEnum):
     GUILD_WAR_DECLARE = 434
     GUILD_WAR_STATUS = 435
 
+    # Sub-Currency / Token Shop (TASK 10)
+    CURRENCY_QUERY = 468
+    CURRENCY_INFO = 469
+    TOKEN_SHOP_LIST = 470
+    TOKEN_SHOP = 471
+    TOKEN_SHOP_BUY = 472
+    TOKEN_SHOP_BUY_RESULT = 473
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -550,6 +558,11 @@ class PlayerSession:
     pvp_season_rating: int = 1000             # season rating (initial 1000)
     pvp_season_matches: int = 0               # matches played this season
     pvp_season_wins: int = 0                  # wins this season
+    # ---- Sub-Currency (TASK 10) ----
+    silver: int = 5000                       # 실버 (NPC 전용 보조화폐)
+    dungeon_token: int = 0                   # 던전 토큰
+    pvp_token: int = 0                       # PvP 토큰
+    guild_contribution: int = 0              # 길드 기여도
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -1662,6 +1675,64 @@ _BG_ACTIVE_MATCHES = {}  # match_id -> {mode, teams, scores, ...}
 _GW_PENDING = {}   # guild_id_a -> {target_guild_id, timestamp}
 _GW_ACTIVE = {}    # war_id -> {guild_a, guild_b, crystals, scores, ...}
 _GW_NEXT_ID = 1
+
+# ---- Sub-Currency System Data (GDD economy.yaml) ----
+CURRENCY_MAX = {
+    "gold": 999999999,
+    "silver": 99999999,
+    "dungeon_token": 99999,
+    "pvp_token": 99999,
+    "guild_contribution": 99999,
+}
+# Starting silver for new characters
+SILVER_INITIAL = 5000
+# Dungeon clear token rewards by difficulty
+DUNGEON_TOKEN_REWARDS = {
+    "normal": 50,
+    "hard": 100,
+    "hell": 200,
+    "chaos": 30,
+}
+# PvP token rewards
+PVP_TOKEN_WIN = 30
+PVP_TOKEN_LOSS = 10
+# Guild contribution sources
+GUILD_CONTRIB_QUEST = 50       # per guild quest
+GUILD_CONTRIB_DONATE_RATIO = 0.01  # 1% of gold donated
+# Token shop definitions (GDD economy.yaml npc_shops)
+TOKEN_SHOP_DUNGEON = [
+    {"shop_id": 1, "item_id": "epic_weapon_box",  "price": 500, "currency": "dungeon_token", "name": "에픽 무기 상자"},
+    {"shop_id": 2, "item_id": "epic_armor_box",   "price": 400, "currency": "dungeon_token", "name": "에픽 방어구 상자"},
+    {"shop_id": 3, "item_id": "skill_book_rare",  "price": 200, "currency": "dungeon_token", "name": "희귀 스킬서"},
+    {"shop_id": 4, "item_id": "dungeon_potion",   "price": 50,  "currency": "dungeon_token", "name": "던전 특수 물약"},
+]
+TOKEN_SHOP_PVP = [
+    {"shop_id": 11, "item_id": "pvp_weapon",   "price": 1000, "currency": "pvp_token", "name": "투기장 무기"},
+    {"shop_id": 12, "item_id": "pvp_armor",    "price": 800,  "currency": "pvp_token", "name": "투기장 방어구"},
+    {"shop_id": 13, "item_id": "pvp_cosmetic", "price": 500,  "currency": "pvp_token", "name": "투기장 외형"},
+    {"shop_id": 14, "item_id": "pvp_title_mat","price": 300,  "currency": "pvp_token", "name": "칭호 재료"},
+]
+TOKEN_SHOP_GUILD = [
+    {"shop_id": 21, "item_id": "guild_buff_scroll",        "price": 300,  "currency": "guild_contribution", "name": "길드 버프 주문서"},
+    {"shop_id": 22, "item_id": "guild_storage_expansion",  "price": 1000, "currency": "guild_contribution", "name": "길드 창고 확장"},
+    {"shop_id": 23, "item_id": "guild_cosmetic",           "price": 500,  "currency": "guild_contribution", "name": "길드 외형"},
+]
+TOKEN_SHOPS = {
+    "dungeon": TOKEN_SHOP_DUNGEON,
+    "pvp": TOKEN_SHOP_PVP,
+    "guild": TOKEN_SHOP_GUILD,
+}
+# Silver item table for NPC shop (GDD economy.yaml general_store)
+SILVER_SHOP_ITEMS = {
+    "hp_potion_s":    {"price": 50,  "name": "소형 체력 물약"},
+    "hp_potion_m":    {"price": 150, "name": "중형 체력 물약"},
+    "hp_potion_l":    {"price": 500, "name": "대형 체력 물약"},
+    "mp_potion_s":    {"price": 50,  "name": "소형 마나 물약"},
+    "mp_potion_m":    {"price": 150, "name": "중형 마나 물약"},
+    "return_scroll":  {"price": 100, "name": "귀환 주문서"},
+    "repair_kit":     {"price": 200, "name": "수리 키트"},
+    "torch":          {"price": 30,  "name": "횃불"},
+}
 # Equipment type by item_id range for random option pool
 def _get_equip_type_by_id(item_id):
     """Map item_id to equipment type for random option pool lookup."""
@@ -2078,6 +2149,9 @@ class BridgeServer:
             MsgType.BATTLEGROUND_QUEUE: self._on_battleground_queue,
             MsgType.BATTLEGROUND_SCORE: self._on_battleground_score,
             MsgType.GUILD_WAR_DECLARE: self._on_guild_war_declare,
+            MsgType.CURRENCY_QUERY: self._on_currency_query,
+            MsgType.TOKEN_SHOP_LIST: self._on_token_shop_list,
+            MsgType.TOKEN_SHOP_BUY: self._on_token_shop_buy,
         }
 
         handler = handlers.get(msg_type)
@@ -4511,6 +4585,10 @@ class BridgeServer:
         buf = struct.pack("<IIIH", inst_id, rewards["gold"], rewards["exp"], rewards["tokens"])
         for s in instance.get("players", []):
             s.gold += rewards["gold"]
+
+            # ---- Dungeon token reward (TASK 10) ----
+            _dt_reward = DUNGEON_TOKEN_REWARDS.get(diff, 50)
+            s.dungeon_token = min(s.dungeon_token + _dt_reward, CURRENCY_MAX["dungeon_token"])
             s.stats.add_exp(rewards["exp"])
             self._send(s, MsgType.RAID_CLEAR, buf)
         self.log(f"Raid CLEAR! Instance#{inst_id} ({diff}) - rewards: {rewards}", "RAID")
@@ -4539,6 +4617,104 @@ class BridgeServer:
 
 
 
+
+
+    # ---- Sub-Currency / Token Shop (TASK 10: MsgType 468-473) ----
+
+    async def _on_currency_query(self, session, payload: bytes):
+        """CURRENCY_QUERY(468) -> CURRENCY_INFO(469)
+        Request: (empty or u8 currency_type — 0=all, 1=gold, 2=silver, 3=dungeon, 4=pvp, 5=guild)
+        Response: gold(u32) + silver(u32) + dungeon_token(u32) + pvp_token(u32) + guild_contribution(u32)
+        """
+        if not session.in_game:
+            return
+
+        self._send(session, MsgType.CURRENCY_INFO,
+                   struct.pack('<I I I I I',
+                               min(session.gold, CURRENCY_MAX["gold"]),
+                               min(session.silver, CURRENCY_MAX["silver"]),
+                               min(session.dungeon_token, CURRENCY_MAX["dungeon_token"]),
+                               min(session.pvp_token, CURRENCY_MAX["pvp_token"]),
+                               min(session.guild_contribution, CURRENCY_MAX["guild_contribution"])))
+
+    async def _on_token_shop_list(self, session, payload: bytes):
+        """TOKEN_SHOP_LIST(470) -> TOKEN_SHOP(471)
+        Request: shop_type(u8) — 0=dungeon, 1=pvp, 2=guild
+        Response: shop_type(u8) + count(u8) + [shop_id(u16) + price(u32) + currency_type(u8) + name_len(u8) + name(utf8)]
+        """
+        if not session.in_game or len(payload) < 1:
+            return
+
+        shop_type = payload[0]
+        shop_map = {0: "dungeon", 1: "pvp", 2: "guild"}
+        shop_key = shop_map.get(shop_type)
+
+        if shop_key is None or shop_key not in TOKEN_SHOPS:
+            # Invalid shop type — empty response
+            self._send(session, MsgType.TOKEN_SHOP,
+                       struct.pack('<B B', shop_type, 0))
+            return
+
+        items = TOKEN_SHOPS[shop_key]
+        data = struct.pack('<B B', shop_type, len(items))
+        for item in items:
+            currency_type = {"dungeon_token": 0, "pvp_token": 1, "guild_contribution": 2}.get(item["currency"], 0)
+            name_bytes = item["name"].encode('utf-8')[:50]
+            data += struct.pack('<H I B B', item["shop_id"], item["price"], currency_type, len(name_bytes))
+            data += name_bytes
+
+        self._send(session, MsgType.TOKEN_SHOP, data)
+
+    async def _on_token_shop_buy(self, session, payload: bytes):
+        """TOKEN_SHOP_BUY(472) -> TOKEN_SHOP_BUY_RESULT(473)
+        Request: shop_id(u16) + quantity(u8)
+        Response: result(u8) + shop_id(u16) + remaining_currency(u32)
+          result: 0=SUCCESS, 1=INSUFFICIENT_TOKEN, 2=INVALID_ITEM, 3=CURRENCY_AT_MAX, 4=INVENTORY_FULL
+        """
+        if not session.in_game or len(payload) < 3:
+            return
+
+        shop_id = struct.unpack('<H', payload[0:2])[0]
+        quantity = max(1, payload[2])
+
+        # Find item across all shops
+        target_item = None
+        for shop_list in TOKEN_SHOPS.values():
+            for item in shop_list:
+                if item["shop_id"] == shop_id:
+                    target_item = item
+                    break
+            if target_item:
+                break
+
+        def _send_result(result, remaining=0):
+            self._send(session, MsgType.TOKEN_SHOP_BUY_RESULT,
+                       struct.pack('<B H I', result, shop_id, remaining))
+
+        if not target_item:
+            _send_result(2)  # INVALID_ITEM
+            return
+
+        currency_name = target_item["currency"]
+        total_cost = target_item["price"] * quantity
+
+        # Check currency balance
+        current_balance = getattr(session, currency_name, 0)
+        if current_balance < total_cost:
+            _send_result(1, current_balance)  # INSUFFICIENT_TOKEN
+            return
+
+        # Deduct currency
+        new_balance = current_balance - total_cost
+        setattr(session, currency_name, new_balance)
+
+        # Add item to inventory (simplified — add to inventory dict)
+        item_id = target_item["item_id"]
+        if not hasattr(session, 'inventory') or session.inventory is None:
+            session.inventory = {}
+        session.inventory[item_id] = session.inventory.get(item_id, 0) + quantity
+
+        _send_result(0, new_balance)  # SUCCESS
 
     # ---- Battleground / Guild War (TASK 6: MsgType 430-435) ----
 
@@ -4749,6 +4925,12 @@ class BridgeServer:
                         s.pvp_season_rating += 15
                     else:
                         s.pvp_season_rating = max(0, s.pvp_season_rating - 10)
+
+                    # ---- PvP token reward (TASK 10) ----
+                    if won:
+                        s.pvp_token = min(s.pvp_token + PVP_TOKEN_WIN, CURRENCY_MAX["pvp_token"])
+                    else:
+                        s.pvp_token = min(s.pvp_token + PVP_TOKEN_LOSS, CURRENCY_MAX["pvp_token"])
                     s.pvp_season_matches += 1
                     s.bg_match_id = 0
                     s.bg_team = 0
