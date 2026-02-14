@@ -10,3 +10,20 @@
 [22:30:04] git pull...
   [IDLE] 300초 경과, 자체 작업 진행
   [CLAUDE] 실행 시작 (1003자 프롬프트)
+  [CLAUDE] 완료 (596초, exit=0)
+  [ERROR] 'NoneType' object has no attribute 'strip'
+[22:38:19] git pull...
+  [WARN] git pull 실패, rebase abort 시도: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+  [WARN] git pull 실패, 30초 후 재시도
+[22:38:52] git pull...
+  [WARN] git pull 실패, rebase abort 시도: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+  [WARN] git pull 실패, 30초 후 재시도
+[22:39:23] git pull...
+  [WARN] git pull 실패, rebase abort 시도: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+  [WARN] git pull 실패, 30초 후 재시도
+[22:39:54] git pull...
+  [WARN] git pull 실패, rebase abort 시도: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
