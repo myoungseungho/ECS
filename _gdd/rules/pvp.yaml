@@ -1,0 +1,207 @@
+# ============================================================
+# PVP SYSTEM — PvP 완전 정의
+# Reference: Lost Ark / WoW Arena / League of Legends
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. PvP 모드
+# ──────────────────────────────────────────────────────────
+modes:
+  arena_1v1:
+    name: "결투장 (1v1)"
+    party_size: 1
+    map_size: "30x30"
+    time_limit: 180        # 3분
+    overtime: 60            # 연장 1분 (HP 높은 쪽 승)
+    stat_normalization: true
+    ranking: true
+
+  arena_3v3:
+    name: "투기장 (3v3)"
+    party_size: 3
+    map_size: "50x50"
+    time_limit: 300        # 5분
+    overtime: 60
+    stat_normalization: true
+    ranking: true
+    elimination: true      # 1명 죽으면 탈락 (부활 없음)
+
+  battleground:
+    name: "전장 (6v6)"
+    party_size: 6
+    map_size: "200x200"
+    time_limit: 900        # 15분
+    stat_normalization: false  # 장비 스탯 반영
+    ranking: false
+    objectives: ["capture_point", "payload"]
+    respawn: true
+    respawn_timer: 10
+
+  guild_war:
+    name: "길드전"
+    party_size: 20         # 길드 최대 인원
+    map_size: "300x300"
+    time_limit: 1800       # 30분
+    stat_normalization: false
+    ranking: false
+    objectives: ["destroy_crystal"]
+    respawn: true
+    respawn_timer: 15
+
+  open_world_pvp:
+    name: "필드 PvP"
+    enabled_zones: ["pvp_zone_1", "pvp_zone_2"]
+    stat_normalization: false
+    penalties:
+      killer: { karma: -10, wanted_duration: 300 }
+      victim: { exp_loss: 0, item_drop: false }
+    notes: "특정 PvP 존에서만 활성화. 평화 지역에서는 불가."
+
+# ──────────────────────────────────────────────────────────
+# 2. 스탯 정규화 (Arena)
+# ──────────────────────────────────────────────────────────
+normalization:
+  desc: "투기장에서는 장비 스탯 무시, 고정 기본 스탯 사용"
+
+  base_stats:
+    warrior:
+      hp: 12000
+      mp: 3000
+      atk: 350
+      def: 250
+      matk: 100
+      mdef: 200
+      crit_rate: 0.15
+      crit_dmg: 2.0
+      move_speed: 200
+      attack_speed: 1.0
+    archer:
+      hp: 8000
+      mp: 4000
+      atk: 400
+      def: 150
+      matk: 150
+      mdef: 150
+      crit_rate: 0.25
+      crit_dmg: 2.2
+      move_speed: 220
+      attack_speed: 1.1
+    mage:
+      hp: 7000
+      mp: 6000
+      atk: 100
+      def: 120
+      matk: 450
+      mdef: 220
+      crit_rate: 0.15
+      crit_dmg: 2.0
+      move_speed: 200
+      attack_speed: 1.0
+
+  skill_levels: "모든 스킬 최대 레벨로 고정"
+  engravings: "비활성화"
+  gems: "비활성화"
+  enhancement: "비활성화"
+  notes: "순수 실력(조작+판단)으로 승패 결정"
+
+# ──────────────────────────────────────────────────────────
+# 3. 랭킹 시스템
+# ──────────────────────────────────────────────────────────
+ranking:
+  system: "elo"
+
+  initial_rating: 1000
+  k_factor:
+    base: 32
+    high_rating_reduction: true  # 2000+ 에서 K=16
+    placement_boost: true        # 배치전(10판) K=64
+
+  placement_matches: 10    # 배치전 10판
+
+  tiers:
+    - { name: "브론즈", min: 0, max: 999, icon: "rank_bronze.png" }
+    - { name: "실버", min: 1000, max: 1299, icon: "rank_silver.png" }
+    - { name: "골드", min: 1300, max: 1599, icon: "rank_gold.png" }
+    - { name: "플래티넘", min: 1600, max: 1899, icon: "rank_platinum.png" }
+    - { name: "다이아", min: 1900, max: 2199, icon: "rank_diamond.png" }
+    - { name: "마스터", min: 2200, max: 2499, icon: "rank_master.png" }
+    - { name: "그랜드마스터", min: 2500, max: 9999, icon: "rank_grandmaster.png" }
+
+  decay:
+    enabled: true
+    start_tier: "플래티넘"  # 플래 이상만 디케이
+    inactive_days: 7        # 7일 미접속 시
+    decay_amount: 25         # 매일 25점 감소
+    floor: "골드"           # 골드 아래로는 안 떨어짐
+
+  season:
+    duration_weeks: 12       # 3개월
+    reset: "soft"            # 소프트 리셋 (rating = 1000 + (current - 1000) * 0.5)
+    rewards_by_tier:
+      bronze: { pvp_token: 100, title: "브론즈 투사" }
+      silver: { pvp_token: 200, title: "실버 투사" }
+      gold: { pvp_token: 500, title: "골드 투사", cosmetic: "금색 무기 효과" }
+      platinum: { pvp_token: 1000, title: "플래티넘 투사", cosmetic: "플래 날개" }
+      diamond: { pvp_token: 2000, title: "다이아 투사", cosmetic: "다이아 오라" }
+      master: { pvp_token: 3000, title: "마스터", cosmetic: "마스터 왕관" }
+      grandmaster: { pvp_token: 5000, title: "그랜드마스터", cosmetic: "전설 아우라", statue: true }
+
+# ──────────────────────────────────────────────────────────
+# 4. PvP 밸런스 규칙
+# ──────────────────────────────────────────────────────────
+balance:
+  damage_reduction: 0.40      # PvP 데미지 40% 감소
+  healing_reduction: 0.30     # 회복 30% 감소
+  cc_duration_reduction: 0.50 # CC 지속시간 50% 감소
+  potion_disabled: true       # 포션 사용 불가
+  consumable_disabled: true   # 버프 소모품 사용 불가
+
+  # 연속 CC 방지
+  cc_immunity_after_break: 2.0  # CC 해제 후 2초 면역
+  max_cc_chain: 3.0              # 최대 3초 연속 CC
+
+  # 힐러 밸런스
+  healer_in_pvp:
+    healing_cap_per_second: 500  # 초당 최대 회복량
+    self_healing_reduction: 0.5  # 자가 회복 50% 감소
+
+# ──────────────────────────────────────────────────────────
+# 5. 매칭 규칙
+# ──────────────────────────────────────────────────────────
+matchmaking:
+  rating_range:
+    initial: 100           # ±100 이내 매칭
+    expand_per_30s: 50     # 30초마다 ±50 확장
+    max_range: 500         # 최대 ±500
+
+  queue_time:
+    target: 30             # 목표 30초
+    max: 180               # 최대 3분
+    force_match_at: 180    # 3분 시 아무나 매칭
+
+  restrictions:
+    min_level: 20
+    party_rating_diff: 300  # 3v3에서 파티원 간 레이팅 차이 제한
+    recent_opponent: 120    # 최근 대전 상대 2분간 재매칭 방지
+
+# ──────────────────────────────────────────────────────────
+# 6. 전장 규칙
+# ──────────────────────────────────────────────────────────
+battleground_modes:
+  capture_point:
+    name: "거점 점령"
+    points: 3              # 3개 거점
+    capture_time: 10       # 10초 점령
+    contested: "점령 속도 0 (양팀 동시 시)"
+    score_per_second: 1    # 점령 거점당 초당 1점
+    win_score: 1000
+    respawn: 10
+
+  payload:
+    name: "수레 호위"
+    phases: 2              # 공수교대
+    push_speed: 2.0        # 초당 2유닛
+    push_radius: 5.0       # 수레 5유닛 내 아군만 추진
+    checkpoints: 3
+    time_per_phase: 300    # 5분
+    win_condition: "더 멀리 민 팀 승리"

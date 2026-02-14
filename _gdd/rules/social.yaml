@@ -1,0 +1,259 @@
+# ============================================================
+# SOCIAL SYSTEM — 소셜/길드/파티/친구/채팅 완전 정의
+# Reference: Lost Ark / WoW / MapleStory
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 길드 시스템
+# ──────────────────────────────────────────────────────────
+guild:
+  max_members: 50
+  create_cost: 10000       # 골드
+  create_min_level: 20
+
+  # 길드 레벨
+  levels:
+    max: 10
+    exp_source:
+      guild_quest: 500
+      member_donation: "gold * 0.01"  # 기부 골드의 1%
+      dungeon_clear: 200
+      raid_clear: 1000
+    exp_table:
+      1: 0
+      2: 5000
+      3: 15000
+      4: 35000
+      5: 70000
+      6: 120000
+      7: 200000
+      8: 350000
+      9: 600000
+      10: 1000000
+
+    # 레벨별 해금
+    unlocks:
+      1: { max_members: 20 }
+      2: { max_members: 25, guild_shop: true }
+      3: { max_members: 30, guild_buff_1: true }
+      4: { max_members: 35, guild_storage: true }
+      5: { max_members: 40, guild_buff_2: true, guild_emblem: true }
+      6: { max_members: 42 }
+      7: { max_members: 44, guild_war: true }
+      8: { max_members: 46, guild_buff_3: true }
+      9: { max_members: 48 }
+      10: { max_members: 50, all_buffs: true, guild_mount: true }
+
+  # 길드 버프
+  buffs:
+    guild_buff_1: { name: "단결의 힘", effect: { exp_bonus: 0.05 }, cost: 1000, duration: 7200 }
+    guild_buff_2: { name: "수호의 축복", effect: { def: 20 }, cost: 2000, duration: 7200 }
+    guild_buff_3: { name: "전투의 함성", effect: { atk: 20 }, cost: 3000, duration: 7200 }
+
+  # 직급
+  ranks:
+    master:
+      name: "길드장"
+      permissions: ["all"]
+      max: 1
+    officer:
+      name: "부길드장"
+      permissions: ["invite", "kick_member", "guild_notice", "guild_buff", "guild_war"]
+      max: 3
+    elite:
+      name: "정예 단원"
+      permissions: ["invite", "guild_storage_deposit"]
+      max: 10
+    member:
+      name: "단원"
+      permissions: ["guild_storage_deposit"]
+      max: -1  # 무제한
+
+  # 길드 콘텐츠
+  content:
+    guild_quest:
+      desc: "일일/주간 길드 퀘스트"
+      daily: { count: 3, reward: { guild_exp: 200, contribution: 50 } }
+      weekly: { count: 1, reward: { guild_exp: 1000, contribution: 200, gold: 5000 } }
+
+    guild_donation:
+      desc: "골드/재료 기부 → 기여도 획득"
+      gold_to_contribution: 100  # 100골드 = 기여도 1
+      daily_limit: 50000         # 일일 5만 골드까지
+
+    guild_storage:
+      slots: 100
+      deposit: ["officer", "elite", "member"]
+      withdraw: ["master", "officer"]
+      log: true                  # 입출금 로그 기록
+
+    guild_war:
+      desc: "길드 vs 길드 전투"
+      min_participants: 10
+      schedule: "양 길드장 합의 후 예약"
+      reward: { guild_exp: 5000, contribution: 500 }
+
+  # 길드 탈퇴/추방
+  leave:
+    cooldown_to_rejoin: 86400  # 24시간 후 다른 길드 가입 가능
+    master_succession:
+      on_leave: "부길드장 중 가입일 가장 오래된 사람에게 자동 위임"
+      on_inactive: "30일 미접속 시 자동 위임"
+
+# ──────────────────────────────────────────────────────────
+# 2. 파티 시스템
+# ──────────────────────────────────────────────────────────
+party:
+  max_members: 4
+  raid_party: 8
+
+  formation:
+    leader:
+      permissions: ["invite", "kick", "loot_setting", "dungeon_enter", "disband"]
+    member:
+      permissions: ["leave", "ready_check"]
+
+  # 파티 찾기
+  party_finder:
+    categories: ["던전", "레이드", "필드 사냥", "퀘스트", "기타"]
+    listing:
+      title: "자유 입력 (최대 30자)"
+      min_level: "설정 가능"
+      role_required: "탱커/딜러/서포터 지정 가능"
+      auto_accept: false
+    max_listings: 1         # 동시 1개만
+
+  # 루팅 규칙
+  loot_rules:
+    free_for_all:
+      desc: "선착순 줍기"
+      notes: "비추천 (닌자루팅 가능)"
+    round_robin:
+      desc: "순번 돌아가며"
+    master_loot:
+      desc: "파티장이 분배"
+      notes: "레이드에서 주로 사용"
+    personal_loot:
+      desc: "개인 드롭 (각자 따로)"
+      default: true
+      notes: "기본값. 대부분의 던전에서 사용."
+
+  # 파티 버프
+  party_synergy:
+    warrior_in_party: { party_buff: { def: 10 } }
+    archer_in_party:  { party_buff: { crit_rate: 0.03 } }
+    mage_in_party:    { party_buff: { matk: 15, mp_regen: 1.0 } }
+    all_different_classes: { bonus: { all_stats: 5, exp_bonus: 0.10 } }
+
+# ──────────────────────────────────────────────────────────
+# 3. 친구 시스템
+# ──────────────────────────────────────────────────────────
+friends:
+  max_friends: 100
+  request:
+    method: ["이름 검색", "클릭 메뉴", "파티 후 추가"]
+    expire: 72             # 72시간 후 자동 만료
+  features:
+    online_status: true    # 온/오프라인 표시
+    location_share: true   # 현재 위치 공유 (설정 가능)
+    whisper: true          # 귓속말
+    teleport_to: false     # 친구에게 텔레포트 불가 (밸런스)
+    send_gift: true        # 선물 보내기 (우편 시스템)
+
+  # 친밀도
+  affinity:
+    enabled: true
+    gain:
+      party_play: 1        # 같이 파티 1회 = +1
+      dungeon_clear: 3     # 같이 던전 = +3
+      daily_gift: 2        # 일일 선물 = +2
+    max: 100
+    rewards:
+      10: { title: "절친 I" }
+      30: { buff: { exp_bonus: 0.02 } }
+      50: { title: "절친 II", teleport_to: true }
+      100: { title: "소울메이트", cosmetic: "하트 이펙트" }
+
+# ──────────────────────────────────────────────────────────
+# 4. 채팅 시스템
+# ──────────────────────────────────────────────────────────
+chat:
+  channels:
+    zone:
+      name: "지역"
+      color: "#FFFFFF"
+      range: "같은 존 전체"
+      cooldown: 1.0
+    party:
+      name: "파티"
+      color: "#00BFFF"
+      range: "파티원만"
+      cooldown: 0.5
+    guild:
+      name: "길드"
+      color: "#00FF80"
+      range: "길드원만"
+      cooldown: 0.5
+    whisper:
+      name: "귓속말"
+      color: "#FF69B4"
+      range: "1:1"
+      cooldown: 0.5
+    world:
+      name: "전체"
+      color: "#FFD700"
+      range: "서버 전체"
+      cooldown: 30.0
+      cost: { megaphone: 1 }  # 확성기 아이템 필요
+    trade:
+      name: "거래"
+      color: "#FFA500"
+      range: "서버 전체"
+      cooldown: 60.0
+      cost: { gold: 100 }
+
+  # 채팅 필터
+  filter:
+    profanity: true         # 욕설 필터
+    spam_detection:
+      same_message_limit: 3  # 같은 메시지 3회 연속 차단
+      message_per_minute: 20 # 분당 20개 초과 시 채팅 제한
+      punishment: "5분 채팅 금지"
+    max_length: 200          # 최대 200자
+
+  # 이모티콘/스티커
+  emotes:
+    system: ["기쁨", "슬픔", "인사", "댄스", "앉기"]
+    custom_stickers: true    # 스티커팩 (캐시샵)
+
+# ──────────────────────────────────────────────────────────
+# 5. 우편 시스템
+# ──────────────────────────────────────────────────────────
+mail:
+  max_inbox: 50
+  max_sent: 20
+  attachment:
+    gold_limit: 50000
+    item_limit: 5
+    cod: true              # 착불 (Cash on Delivery)
+  expiration: 30           # 30일 후 만료
+  system_mail:
+    expiration: 90         # 시스템 우편 90일
+    types: ["보상", "공지", "이벤트", "경매 정산"]
+
+# ──────────────────────────────────────────────────────────
+# 6. 차단/신고 시스템
+# ──────────────────────────────────────────────────────────
+block_report:
+  block:
+    max_blocked: 100
+    effects: ["채팅 안 보임", "파티 초대 불가", "거래 불가", "우편 불가"]
+  report:
+    categories: ["욕설/비하", "핵/봇", "사기", "버그 악용", "기타"]
+    daily_report_limit: 5
+    auto_punish_threshold: 10  # 10건 누적 시 자동 제재
+    punishment:
+      warning: "경고 (1~3건)"
+      chat_ban: "채팅 금지 24시간 (4~6건)"
+      temp_ban: "접속 차단 7일 (7~9건)"
+      perma_ban: "영구 차단 (10건+)"

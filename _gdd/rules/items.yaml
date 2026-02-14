@@ -1,0 +1,253 @@
+# ============================================================
+# ITEM SYSTEM — 아이템/장비/인벤토리 완전 정의
+# Reference: Lost Ark / Diablo IV / WoW
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 아이템 등급 (Rarity)
+# ──────────────────────────────────────────────────────────
+rarity:
+  common:
+    name: "일반"
+    color: "#FFFFFF"      # 흰색
+    drop_weight: 60       # 드롭 가중치 (높을수록 자주)
+    sell_multiplier: 1.0
+    max_enhancement: 0    # 강화 불가
+    bonus_stats: 0        # 추가 옵션 없음
+
+  uncommon:
+    name: "고급"
+    color: "#00FF00"      # 초록
+    drop_weight: 25
+    sell_multiplier: 2.0
+    max_enhancement: 10
+    bonus_stats: 1        # 랜덤 옵션 1줄
+
+  rare:
+    name: "희귀"
+    color: "#0080FF"      # 파랑
+    drop_weight: 10
+    sell_multiplier: 5.0
+    max_enhancement: 15
+    bonus_stats: 2        # 랜덤 옵션 2줄
+
+  epic:
+    name: "영웅"
+    color: "#A020F0"      # 보라
+    drop_weight: 4
+    sell_multiplier: 15.0
+    max_enhancement: 20
+    bonus_stats: 3        # 랜덤 옵션 3줄
+    set_bonus: true       # 세트 효과 가능
+
+  legendary:
+    name: "전설"
+    color: "#FF8C00"      # 주황
+    drop_weight: 1
+    sell_multiplier: 50.0
+    max_enhancement: 20
+    bonus_stats: 4        # 랜덤 옵션 4줄
+    set_bonus: true
+    unique_effect: true   # 고유 특수 효과
+
+# ──────────────────────────────────────────────────────────
+# 2. 장비 슬롯
+# ──────────────────────────────────────────────────────────
+equipment_slots:
+  weapon:      { name: "무기", equip_limit: 1 }
+  helmet:      { name: "투구", equip_limit: 1 }
+  armor:       { name: "갑옷", equip_limit: 1 }
+  pants:       { name: "하의", equip_limit: 1 }
+  gloves:      { name: "장갑", equip_limit: 1 }
+  boots:       { name: "신발", equip_limit: 1 }
+  shoulder:    { name: "어깨", equip_limit: 1 }
+  necklace:    { name: "목걸이", equip_limit: 1 }
+  earring:     { name: "귀걸이", equip_limit: 2 }  # 양쪽
+  ring:        { name: "반지", equip_limit: 2 }    # 양쪽
+  bracelet:    { name: "팔찌", equip_limit: 1 }
+  belt:        { name: "벨트", equip_limit: 1 }
+
+  total_slots: 14  # 무기1 + 방어구6 + 장신구7
+
+# ──────────────────────────────────────────────────────────
+# 3. 랜덤 옵션 (Random Bonus Stats)
+# ──────────────────────────────────────────────────────────
+random_options:
+  pool:
+    - { stat: "ATK",        range: [5, 50],    weight: 10 }
+    - { stat: "MATK",       range: [5, 50],    weight: 10 }
+    - { stat: "DEF",        range: [3, 30],    weight: 10 }
+    - { stat: "MDEF",       range: [3, 30],    weight: 8 }
+    - { stat: "MAX_HP",     range: [20, 500],  weight: 12 }
+    - { stat: "MAX_MP",     range: [10, 300],  weight: 8 }
+    - { stat: "CRIT_RATE",  range: [0.005, 0.03], weight: 6 }
+    - { stat: "CRIT_DMG",   range: [0.01, 0.05],  weight: 6 }
+    - { stat: "DODGE",      range: [0.003, 0.02], weight: 4 }
+    - { stat: "MOVE_SPEED", range: [3, 20],    weight: 5 }
+    - { stat: "ATK_SPEED",  range: [0.01, 0.05], weight: 5 }
+    - { stat: "CDR",        range: [0.005, 0.03], weight: 5 }
+    - { stat: "LIFE_STEAL", range: [0.005, 0.02], weight: 3 }
+    - { stat: "EXP_BONUS",  range: [0.01, 0.05],  weight: 2 }
+    - { stat: "GOLD_BONUS", range: [0.01, 0.05],  weight: 2 }
+
+  # 옵션 품질 (같은 옵션이라도 수치 차이)
+  quality_tiers:
+    low:    { range_pct: [0.0, 0.33], color: "흰색" }
+    medium: { range_pct: [0.33, 0.66], color: "파랑" }
+    high:   { range_pct: [0.66, 1.0], color: "보라" }
+
+  # 옵션 재설정 (리롤)
+  reroll:
+    cost: { gold: 5000, material: "재감정서" }
+    locks: 1                # 1줄 잠금 가능 (잠긴 옵션 유지)
+    lock_cost: { gold: 10000 }
+
+# ──────────────────────────────────────────────────────────
+# 4. 세트 장비
+# ──────────────────────────────────────────────────────────
+set_bonuses:
+  # 세트 아이템 예시
+  flame_guardian:
+    name: "화염 수호자"
+    tier: "epic"
+    pieces: ["helmet", "armor", "pants", "gloves", "boots"]
+    bonuses:
+      2_set: { def: 30, fire_resist: 0.10 }
+      3_set: { max_hp: 300, fire_damage: 0.05 }
+      5_set: { atk: 50, special: "피격 시 10% 확률로 화염 방벽 (3초간 데미지 30% 감소)" }
+
+  shadow_assassin:
+    name: "그림자 암살자"
+    tier: "epic"
+    pieces: ["helmet", "armor", "pants", "gloves", "boots"]
+    bonuses:
+      2_set: { crit_rate: 0.03 }
+      3_set: { atk: 30, move_speed: 10 }
+      5_set: { crit_dmg: 0.20, special: "치명타 시 2초간 투명화 (5초 쿨)" }
+
+  holy_priest:
+    name: "신성한 사제"
+    tier: "legendary"
+    pieces: ["weapon", "helmet", "armor", "necklace", "ring"]
+    bonuses:
+      2_set: { healing_power: 0.10 }
+      3_set: { max_mp: 200, cdr: 0.05 }
+      5_set: { special: "힐 시 20% 확률로 추가 실드 부여 (HP의 10%)" }
+
+# ──────────────────────────────────────────────────────────
+# 5. 소비 아이템
+# ──────────────────────────────────────────────────────────
+consumables:
+  potions:
+    hp_potion_s:  { name: "HP 포션 (소)", heal: 300, cooldown: 15, stack: 99 }
+    hp_potion_m:  { name: "HP 포션 (중)", heal: 800, cooldown: 15, stack: 99 }
+    hp_potion_l:  { name: "HP 포션 (대)", heal: 2000, cooldown: 15, stack: 99 }
+    mp_potion_s:  { name: "MP 포션 (소)", restore: 200, cooldown: 15, stack: 99 }
+    mp_potion_m:  { name: "MP 포션 (중)", restore: 500, cooldown: 15, stack: 99 }
+    elixir:       { name: "엘릭서", heal: 1000, restore: 500, cooldown: 60, stack: 20 }
+
+  buffs:
+    atk_scroll:   { name: "공격력 주문서", buff: { atk: 30 }, duration: 1800, stack: 20 }
+    def_scroll:   { name: "방어력 주문서", buff: { def: 20 }, duration: 1800, stack: 20 }
+    exp_scroll:   { name: "경험치 주문서", buff: { exp_bonus: 0.5 }, duration: 3600, stack: 10 }
+    crit_potion:  { name: "치명타 물약", buff: { crit_rate: 0.10 }, duration: 1800, stack: 20 }
+
+  utility:
+    return_scroll: { name: "귀환 주문서", effect: "마을로 즉시 귀환", cast_time: 5.0, stack: 99 }
+    repair_kit:    { name: "수리 키트", effect: "장비 내구도 전체 회복", stack: 20 }
+    torch:         { name: "횃불", effect: "던전 시야 확장 (10분)", duration: 600, stack: 50 }
+    megaphone:     { name: "확성기", effect: "전체 채팅 1회", stack: 10 }
+
+  materials:
+    enhance_stone:  { name: "강화석", desc: "장비 강화 재료", stack: 999 }
+    transcend_stone: { name: "초월석", desc: "장비 초월 재료", stack: 99 }
+    gem_rough:      { name: "원석", desc: "보석 합성 기본 재료", stack: 999 }
+    reappraisal:    { name: "재감정서", desc: "장비 랜덤옵션 리롤", stack: 99 }
+
+# ──────────────────────────────────────────────────────────
+# 6. 인벤토리
+# ──────────────────────────────────────────────────────────
+inventory:
+  base_slots: 40          # 기본 40칸
+  max_slots: 100          # 확장 포함 최대 100칸
+  expansion_cost: { premium_crystal: 50, per_expansion: 10 }  # 10칸씩 확장
+
+  sorting:
+    options: ["등급순", "종류순", "최근 획득순", "이름순"]
+    auto_sort_key: "rarity_desc"  # 기본: 등급 높은 순
+
+  stacking:
+    stackable: ["consumable", "material"]
+    max_stack: 999
+    non_stackable: ["equipment"]  # 장비는 스택 불가
+
+  storage:
+    desc: "마을 창고 (캐릭터 간 공유)"
+    base_slots: 50
+    max_slots: 200
+    expansion_cost: { gold: 10000, per_expansion: 10 }
+
+  auto_pickup:
+    enabled: true
+    gold: true             # 골드 자동 줍기
+    materials: true        # 재료 자동 줍기
+    equipment: false       # 장비는 수동 (인벤 관리)
+    range: 5.0             # 5유닛 내 자동
+
+# ──────────────────────────────────────────────────────────
+# 7. 루트 드롭 테이블
+# ──────────────────────────────────────────────────────────
+loot:
+  drop_formula: |
+    base_drop_rate * (1 + LUK_bonus) * (1 + buff_bonus)
+    rarity_roll → rarity table → item pool에서 랜덤 선택
+
+  # 몬스터 등급별 드롭 확률
+  drop_rates_by_monster_tier:
+    normal:
+      equipment_drop: 0.05   # 5% 확률로 장비 드롭
+      material_drop: 0.30    # 30% 확률로 재료
+      gold_drop: 0.80        # 80% 확률로 골드
+      potion_drop: 0.10
+    elite:
+      equipment_drop: 0.30
+      material_drop: 0.60
+      gold_drop: 1.0
+      guaranteed_uncommon: true  # 장비 드롭 시 최소 uncommon
+    boss:
+      equipment_drop: 1.0      # 100% 장비
+      material_drop: 1.0
+      gold_drop: 1.0
+      guaranteed_rare: true
+      epic_chance: 0.20
+    raid_boss:
+      equipment_drop: 1.0
+      guaranteed_epic: true
+      legendary_chance: 0.05
+      bonus_materials: 5
+
+  # 드롭 시 장비 등급 결정
+  rarity_roll:
+    normal_monster: { common: 0.60, uncommon: 0.30, rare: 0.09, epic: 0.01 }
+    elite_monster:  { uncommon: 0.50, rare: 0.35, epic: 0.14, legendary: 0.01 }
+    boss:           { rare: 0.50, epic: 0.40, legendary: 0.10 }
+    raid_boss:      { epic: 0.60, legendary: 0.40 }
+
+  # 개인 루트 (닌자 루팅 방지)
+  personal_loot: true     # 각자에게 개별 드롭
+  party_loot_bonus: 0.1   # 파티 시 드롭률 10% 증가
+
+# ──────────────────────────────────────────────────────────
+# 8. 장비 내구도
+# ──────────────────────────────────────────────────────────
+durability:
+  max: 100
+  decrease_per_hit_taken: 0.1    # 피격당 0.1 감소
+  decrease_per_death: 1.0        # 사망 시 1.0 감소 (전 장비)
+  broken_penalty:                 # 내구도 0 시
+    stat_reduction: 0.5           # 스탯 50% 감소
+    visual: "장비 금 간 이펙트"
+    warning_at: 20                # 20% 이하 시 경고
+  repair:
+    npc_cost: "equipment_tier * (100 - current_durability) * 5"
+    repair_kit: "즉시 100으로 회복"

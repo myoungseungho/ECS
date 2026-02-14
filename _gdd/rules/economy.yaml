@@ -1,0 +1,234 @@
+# ============================================================
+# ECONOMY SYSTEM — 경제 규칙 완전 정의
+# Reference: Lost Ark / MapleStory / WoW
+# ============================================================
+# 핵심 원칙: 골드 유입(Faucet) = 골드 유출(Sink)
+# 인플레이션 통제가 게임 경제의 생명
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 화폐 종류
+# ──────────────────────────────────────────────────────────
+currencies:
+  gold:
+    desc: "기본 화폐. 거래/상점/강화 등 모든 곳에 사용."
+    max: 999999999       # 9억 9천만 상한
+    tradeable: true
+    display: "골드 아이콘 + 콤마 표시 (1,234,567)"
+
+  silver:
+    desc: "보조 화폐. NPC 상점 전용. 거래 불가."
+    max: 99999999
+    tradeable: false
+    notes: "골드 인플레이션 방지용. 소비성 아이템(포션 등) 구매에만 사용."
+
+  premium_crystal:
+    desc: "유료 화폐. 캐시샵 전용."
+    tradeable: false
+    purchase: "현금 결제"
+    exchange_to_gold: false  # 골드 직접 환전 불가
+
+  dungeon_token:
+    desc: "던전 보상 화폐. 던전 상점에서 장비 교환."
+    max: 99999
+    tradeable: false
+    source: "던전 클리어 보상"
+
+  pvp_token:
+    desc: "PvP 보상 화폐."
+    max: 99999
+    tradeable: false
+    source: "투기장 승리 보상"
+
+  guild_contribution:
+    desc: "길드 기여도. 길드 상점에서 사용."
+    max: 99999
+    tradeable: false
+    source: "길드 퀘스트/기부"
+
+# ──────────────────────────────────────────────────────────
+# 2. 골드 유입 (Faucet) — 시스템이 골드를 "생성"하는 경로
+# ──────────────────────────────────────────────────────────
+faucets:
+  monster_drop:
+    desc: "몬스터 처치 시 골드 드롭"
+    formula: "base_gold * (1 + level_factor) * random(0.8, 1.2)"
+    base_by_tier:
+      normal: 5
+      elite: 50
+      mini_boss: 200
+      boss: 1000
+      raid_boss: 5000
+    level_factor: "monster_level * 0.5"
+    daily_cap: 50000        # 일일 몬스터 골드 획득 상한
+
+  quest_reward:
+    desc: "퀘스트 완료 골드"
+    formula: "quest_base_gold"
+    typical_ranges:
+      tutorial: "50~200"
+      main_story: "500~5000"
+      side_quest: "200~2000"
+      daily_quest: "300~1000"
+      weekly_quest: "3000~10000"
+
+  dungeon_reward:
+    desc: "던전 클리어 골드"
+    by_difficulty:
+      normal: 2000
+      hard: 5000
+      hell: 10000
+      chaos: 3000   # 무한 반복형
+    daily_dungeon_limit: 3  # 일일 3회까지만 보상
+
+  npc_sell:
+    desc: "NPC에게 아이템 판매"
+    price_formula: "item_base_price * 0.4"  # 구매가의 40%
+
+  achievement:
+    desc: "업적 달성 보상 (1회성)"
+    notes: "1회성이라 인플레이션 영향 적음"
+
+# ──────────────────────────────────────────────────────────
+# 3. 골드 유출 (Sink) — 시스템이 골드를 "소멸"시키는 경로
+# ──────────────────────────────────────────────────────────
+sinks:
+  npc_shop:
+    desc: "NPC 상점 구매"
+    items: "포션, 소모품, 기본 장비"
+    notes: "기본 소비. 포션 가격이 적정해야 불만 없음."
+
+  enhancement:
+    desc: "장비 강화 비용"
+    notes: "가장 큰 골드 싱크. economy_sink_ratio의 40% 이상 담당."
+    cost_table: "enhancement.yaml 참조"
+
+  repair:
+    desc: "장비 수리 비용"
+    formula: "equipment_tier * durability_lost * 5"
+    notes: "사망 패널티의 일환. 소소하지만 꾸준한 싱크."
+
+  trade_tax:
+    desc: "거래소 수수료"
+    rate: 0.05            # 5% 수수료
+    notes: "가장 효과적인 인플레이션 통제 수단"
+
+  teleport:
+    desc: "텔레포트 비용"
+    formula: "distance * 2"
+    notes: "편의 기능에 소액 골드 소비"
+
+  guild_upgrade:
+    desc: "길드 레벨업/시설 업그레이드"
+    notes: "대량 골드 싱크. 길드 레벨 10까지 누적 수백만 골드."
+
+  skill_respec:
+    desc: "스킬 초기화 비용"
+    formula: "level * 100"
+
+  appearance_change:
+    desc: "외형 변경 비용"
+    cost: 10000
+
+# ──────────────────────────────────────────────────────────
+# 4. 거래 시스템
+# ──────────────────────────────────────────────────────────
+trading:
+  player_to_player:
+    enabled: true
+    tax: 0.0              # 1:1 거래는 수수료 없음
+    min_level: 10          # 레벨 10 이상만 거래 가능
+    daily_limit: 10        # 일일 10회 제한 (RMT 방지)
+    gold_limit_per_trade: 100000  # 1회 최대 10만 골드
+
+  auction_house:
+    enabled: true
+    tax_rate: 0.05         # 5% 수수료 (판매자 부담)
+    listing_fee: 100       # 등록비 100골드 (취소해도 반환 안 됨)
+    max_listings: 20       # 동시 등록 20개
+    listing_duration: 48   # 48시간 후 자동 만료
+    min_price: 1
+    max_price: 99999999
+    price_history: true    # 최근 10건 거래 이력 표시
+    buyout: true           # 즉시 구매 가능
+    bid: true              # 경매 입찰 가능
+
+  mail_attachment:
+    gold_limit: 50000      # 우편 1회 최대 5만 골드
+    item_limit: 5          # 우편 1회 최대 5개 아이템
+    tax: 0.0               # 우편 수수료 없음
+    cod: true              # 착불 가능 (수신자가 골드 지불해야 수령)
+
+# ──────────────────────────────────────────────────────────
+# 5. NPC 상점 가격표
+# ──────────────────────────────────────────────────────────
+npc_shops:
+  general_store:
+    name: "잡화상점"
+    items:
+      - { id: "hp_potion_s", price: 50, currency: "silver", stock: -1 }     # 무한
+      - { id: "hp_potion_m", price: 150, currency: "silver", stock: -1 }
+      - { id: "hp_potion_l", price: 500, currency: "silver", stock: -1 }
+      - { id: "mp_potion_s", price: 50, currency: "silver", stock: -1 }
+      - { id: "mp_potion_m", price: 150, currency: "silver", stock: -1 }
+      - { id: "return_scroll", price: 100, currency: "silver", stock: -1 }
+      - { id: "repair_kit", price: 200, currency: "silver", stock: -1 }
+      - { id: "torch", price: 30, currency: "silver", stock: -1 }
+
+  weapon_shop:
+    name: "무기상점"
+    items:
+      - { id: "iron_sword", price: 500, currency: "gold", stock: -1 }
+      - { id: "iron_bow", price: 500, currency: "gold", stock: -1 }
+      - { id: "wooden_staff", price: 500, currency: "gold", stock: -1 }
+      - { id: "steel_sword", price: 2000, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "steel_bow", price: 2000, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "crystal_staff", price: 2000, currency: "gold", stock: -1, min_level: 10 }
+
+  armor_shop:
+    name: "방어구상점"
+    items:
+      - { id: "leather_armor", price: 400, currency: "gold", stock: -1 }
+      - { id: "leather_boots", price: 200, currency: "gold", stock: -1 }
+      - { id: "iron_armor", price: 1500, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "iron_boots", price: 800, currency: "gold", stock: -1, min_level: 10 }
+
+  dungeon_shop:
+    name: "던전 보상 상점"
+    items:
+      - { id: "epic_weapon_box", price: 500, currency: "dungeon_token" }
+      - { id: "epic_armor_box", price: 400, currency: "dungeon_token" }
+      - { id: "skill_book_rare", price: 200, currency: "dungeon_token" }
+
+  pvp_shop:
+    name: "투기장 상점"
+    items:
+      - { id: "pvp_weapon", price: 1000, currency: "pvp_token" }
+      - { id: "pvp_armor", price: 800, currency: "pvp_token" }
+      - { id: "pvp_cosmetic", price: 500, currency: "pvp_token" }
+
+# ──────────────────────────────────────────────────────────
+# 6. 인플레이션 통제 규칙
+# ──────────────────────────────────────────────────────────
+inflation_control:
+  principles:
+    - "모든 골드 유입에는 대응하는 싱크가 있어야 한다"
+    - "일일 골드 획득 상한을 둔다 (hard cap)"
+    - "거래소 수수료는 절대 0이 되면 안 된다"
+    - "신규 컨텐츠 추가 시 새로운 싱크도 함께 추가"
+
+  daily_caps:
+    monster_gold: 50000
+    dungeon_gold: 30000    # 3회 * 10000
+    quest_gold: 20000
+    total_daily_cap: 100000  # 하루 최대 10만 골드
+
+  weekly_caps:
+    raid_gold: 50000
+    weekly_quest_gold: 30000
+
+  botting_prevention:
+    - "같은 몬스터 연속 100회 처치 시 골드 드롭 0"
+    - "같은 좌표에서 10분 이상 사냥 시 경고"
+    - "거래소 가격 급등 감지 시 관리자 알림"
+    - "신규 캐릭터 거래 제한 (레벨 10까지)"

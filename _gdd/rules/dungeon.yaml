@@ -1,0 +1,302 @@
+# ============================================================
+# DUNGEON & RAID SYSTEM — 던전/레이드 완전 정의
+# Reference: Lost Ark / WoW / FF14
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 던전 종류
+# ──────────────────────────────────────────────────────────
+dungeon_types:
+  story_dungeon:
+    name: "스토리 던전"
+    desc: "메인 퀘스트 라인에 포함된 1인용 던전"
+    party_size: 1
+    difficulty: ["normal"]
+    daily_limit: 0         # 무제한
+    rewards: "고정 (퀘스트 보상)"
+    respawn_on_wipe: true
+    checkpoint: true
+
+  party_dungeon:
+    name: "파티 던전"
+    desc: "4인 파티 던전, 일일 보상 제한"
+    party_size: 4
+    difficulty: ["normal", "hard", "hell"]
+    daily_limit: 3          # 하루 3회까지 보상
+    entry_limit: 0          # 입장 제한 없음 (보상만 3회)
+    matchmaking: true
+    respawn_on_wipe: true
+    checkpoint: true
+
+  chaos_dungeon:
+    name: "카오스 던전"
+    desc: "만렙 일일 골드/재료 파밍 던전 (웨이브형)"
+    party_size: 1
+    difficulty: ["normal"]
+    daily_limit: 2
+    format: "wave"         # 웨이브형 (3스테이지)
+    time_limit: 600        # 10분 제한
+    rewards: "매 웨이브 클리어 시 드롭"
+
+  raid:
+    name: "레이드"
+    desc: "8인 주간 보스 레이드"
+    party_size: 8
+    difficulty: ["normal", "hard"]
+    weekly_limit: 1         # 주 1회 보상
+    matchmaking: true
+    respawn_on_wipe: false  # 전멸 시 처음부터
+    checkpoint: false
+    enrage_timer: true
+
+  abyss_dungeon:
+    name: "어비스 던전"
+    desc: "4인 고난도 던전, 기믹 중심"
+    party_size: 4
+    difficulty: ["normal", "hard"]
+    weekly_limit: 1
+    matchmaking: true
+    respawn_on_wipe: true
+    checkpoint: false       # 체크포인트 없음
+    wipe_count_limit: 3     # 3번 전멸 시 강제 퇴장
+
+# ──────────────────────────────────────────────────────────
+# 2. 던전 구조
+# ──────────────────────────────────────────────────────────
+dungeon_structure:
+  stages:
+    desc: "던전은 N개의 스테이지로 구성"
+    format: |
+      스테이지 1: 잡몹 웨이브 → 미니보스
+      스테이지 2: 퍼즐/함정 구간 → 잡몹
+      스테이지 3: 최종 보스
+
+  stage_types:
+    combat:
+      desc: "전투 스테이지 — 몬스터 처치"
+      clear_condition: "모든 몬스터 처치"
+      monster_count: [5, 10, 20]  # 난이도별
+      wave_count: [1, 2, 3]
+      time_between_waves: 3.0
+
+    puzzle:
+      desc: "퍼즐 스테이지 — 기믹 해결"
+      types: ["switch", "platform", "sequence", "cooperation"]
+      time_limit: 120  # 2분 제한
+      fail_penalty: "damage_all"  # 실패 시 전원 데미지
+
+    boss:
+      desc: "보스 스테이지 — 보스전"
+      phases: [1, 2, 3]    # 보스별 페이즈 수
+      enrage_timer: [180, 300, 600]  # 초
+
+  # 던전 내부 환경
+  environment:
+    lighting: "어두운 분위기 (포인트 라이트 + 횃불)"
+    fog: true
+    ambient_sound: "동굴 울림 / 으스스한 BGM"
+    destructibles: true  # 파괴 가능 오브젝트 (상자, 배럴)
+
+# ──────────────────────────────────────────────────────────
+# 3. 난이도 시스템
+# ──────────────────────────────────────────────────────────
+difficulty:
+  normal:
+    monster_hp_mult: 1.0
+    monster_atk_mult: 1.0
+    reward_mult: 1.0
+    entry_requirement: "추천 레벨 이상"
+    notes: "일반 난이도, 누구나 클리어 가능"
+
+  hard:
+    monster_hp_mult: 2.0
+    monster_atk_mult: 1.5
+    reward_mult: 2.0
+    entry_requirement: "item_level >= normal_reward_tier"
+    extra_mechanics: true   # 추가 기믹 패턴
+    notes: "하드 난이도, 기믹 숙지 필요"
+
+  hell:
+    monster_hp_mult: 4.0
+    monster_atk_mult: 2.5
+    reward_mult: 4.0
+    entry_requirement: "item_level >= hard_reward_tier"
+    extra_mechanics: true
+    instant_kill_patterns: true  # 즉사 패턴 있음
+    notes: "지옥 난이도, 숙련자만 도전"
+
+# ──────────────────────────────────────────────────────────
+# 4. 보스 기믹 패턴
+# ──────────────────────────────────────────────────────────
+boss_mechanics:
+  # 기본 패턴 (모든 보스 공통)
+  common_patterns:
+    enrage:
+      desc: "전투 시간 초과 시 공격력 급증"
+      timer_by_difficulty: { normal: 600, hard: 480, hell: 360 }
+      atk_multiplier: 10.0  # 사실상 전멸
+
+    phase_transition:
+      desc: "HP 기준 페이즈 전환"
+      typical_thresholds: [0.70, 0.30]  # 70%, 30%
+      invincible_during_transition: true
+      transition_animation: 3.0  # 3초간 연출
+
+  # 기믹 유형
+  mechanic_types:
+    safe_zone:
+      desc: "특정 영역에 서 있어야 생존"
+      warning_time: 3.0
+      visual: "빛나는 원 (안전) / 빨간 영역 (위험)"
+      damage_outside: "max_hp * 0.8"  # 밖에 있으면 80% 데미지
+
+    stagger_check:
+      desc: "일정 시간 내 경직 게이지 채워야 함"
+      gauge: 100
+      time_limit: 10.0
+      fail_penalty: "wipe"  # 실패 시 전멸
+      visual: "보스 머리 위 스태거 게이지 바"
+
+    counter_attack:
+      desc: "보스의 특수 공격을 카운터로 막아야 함"
+      window: 1.5          # 카운터 타이밍 1.5초
+      visual: "보스 파란빛 → 카운터 가능"
+      success: "보스 5초간 기절"
+      fail: "전방 큰 데미지"
+
+    typing_mechanic:
+      desc: "화면에 표시된 키를 순서대로 입력"
+      keys: 4              # 4키 입력
+      time_limit: 5.0
+      fail_penalty: "debuff"
+
+    position_swap:
+      desc: "지정된 위치로 이동해야 함 (X자, 시계 등)"
+      patterns: ["clock_positions", "cross", "pairs", "spread"]
+      warning_time: 5.0
+      visual: "각 플레이어 머리 위 번호/마커"
+
+    cooperation:
+      desc: "2명 이상이 동시에 행동해야 함"
+      examples:
+        - "두 스위치 동시에 밟기"
+        - "4방향에서 동시 공격"
+      tolerance: 1.0  # 1초 내 동시
+
+    dps_check:
+      desc: "일정 시간 내 일정 데미지를 넣어야 함"
+      fail_penalty: "wipe"
+      visual: "보스 캐스팅 바 (차면 전멸)"
+
+# ──────────────────────────────────────────────────────────
+# 5. 던전 보상
+# ──────────────────────────────────────────────────────────
+rewards:
+  clear_reward:
+    gold: { normal: 2000, hard: 5000, hell: 10000 }
+    exp: { normal: 5000, hard: 10000, hell: 20000 }
+    dungeon_token: { normal: 50, hard: 100, hell: 200 }
+
+  boss_drop:
+    guaranteed: 1          # 최소 1개 장비 확정
+    bonus_rolls: { normal: 0, hard: 1, hell: 2 }
+    rarity_table: "items.yaml > loot > rarity_roll 참조"
+
+  first_clear_bonus:
+    multiplier: 2.0        # 첫 클리어 보상 2배
+    achievement: true
+    title: true            # 던전별 칭호
+
+  weekly_lockout:
+    desc: "주간 보상은 캐릭터당 1회"
+    applies_to: ["raid", "abyss_dungeon"]
+    reset_day: "wednesday"  # 매주 수요일 06:00 초기화
+    reset_time: "06:00"
+
+# ──────────────────────────────────────────────────────────
+# 6. 던전 매칭 시스템
+# ──────────────────────────────────────────────────────────
+matchmaking:
+  queue:
+    algorithm: "role_based"  # 역할 기반 매칭
+    roles_required:
+      party_dungeon: { tank: 1, dps: 2, support: 1 }
+      raid: { tank: 2, dps: 4, support: 2 }
+    flexible_mode: true      # 역할 부족 시 아무 조합 OK (대기 2분 후)
+
+  wait_time:
+    target: 60               # 목표 대기시간 60초
+    max: 300                 # 최대 5분
+    expand_search_after: 120  # 2분 후 조건 완화
+
+  item_level_check:
+    enabled: true
+    tolerance: 0.1           # 추천 레벨의 ±10%
+
+  kick_vote:
+    enabled: true
+    required_votes: 3        # 4인 중 3명 동의
+    cooldown: 300             # 5분에 1번만
+    reasons: ["AFK", "방해", "봇 의심"]
+
+# ──────────────────────────────────────────────────────────
+# 7. 던전 목록
+# ──────────────────────────────────────────────────────────
+dungeon_list:
+  - id: "goblin_cave"
+    name: "고블린 동굴"
+    type: "party_dungeon"
+    min_level: 15
+    stages: 3
+    boss: "goblin_king"
+    boss_hp: { normal: 30000, hard: 60000, hell: 120000 }
+    boss_mechanics: ["safe_zone", "counter_attack"]
+    environment: "동굴, 횃불 조명, 보물 상자"
+    reward_tier: "rare"
+
+  - id: "frozen_temple"
+    name: "얼어붙은 신전"
+    type: "party_dungeon"
+    min_level: 25
+    stages: 4
+    boss: "ice_queen"
+    boss_hp: { normal: 80000, hard: 160000, hell: 320000 }
+    boss_mechanics: ["safe_zone", "stagger_check", "freeze_mechanic"]
+    environment: "얼음 동굴, 파란 조명, 미끄러운 바닥"
+    reward_tier: "epic"
+
+  - id: "demon_fortress"
+    name: "마왕의 요새"
+    type: "abyss_dungeon"
+    min_level: 40
+    stages: 3
+    boss: "demon_king"
+    boss_hp: { normal: 200000, hard: 500000 }
+    boss_mechanics: ["all"]
+    phases: 3
+    environment: "용암, 붉은 조명, 파괴된 성곽"
+    reward_tier: "legendary"
+
+  - id: "ancient_dragon_raid"
+    name: "고대 용의 둥지"
+    type: "raid"
+    min_level: 50
+    stages: 1  # 보스전만
+    boss: "ancient_dragon"
+    boss_hp: { normal: 2000000, hard: 5000000 }
+    boss_mechanics: ["safe_zone", "stagger_check", "counter_attack", "dps_check", "cooperation", "position_swap"]
+    phases: 3
+    enrage_timer: { normal: 600, hard: 480 }
+    environment: "거대 동굴, 드래곤 둥지, 보물더미"
+    reward_tier: "legendary"
+
+  - id: "chaos_rift"
+    name: "카오스 균열"
+    type: "chaos_dungeon"
+    min_level: 60
+    stages: 3  # 3웨이브
+    format: "wave"
+    wave_monsters: [20, 30, 40]  # 각 웨이브 몬스터 수
+    wave_boss: [false, false, true]  # 3웨이브에 보스
+    time_limit: 600
+    reward: "per_wave"

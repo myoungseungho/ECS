@@ -1,0 +1,317 @@
+# ============================================================
+# WORLD SYSTEM — 월드/맵/존/이동/날씨/시간 완전 정의
+# Reference: Lost Ark / WoW / BDO
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 월드 구조
+# ──────────────────────────────────────────────────────────
+world:
+  name: "아르카디아 대륙"
+  total_zones: 12
+
+  regions:
+    - name: "평화의 땅"
+      desc: "시작 지역"
+      zones:
+        - id: 0
+          name: "튜토리얼 존"
+          size: [500, 500]
+          level_range: [1, 5]
+          pvp: false
+          type: "tutorial"
+          ambient: "peaceful_field"
+          monsters: ["slime", "training_dummy"]
+          npcs: ["tutorial_guide"]
+
+        - id: 10
+          name: "바람의 마을"
+          size: [300, 300]
+          level_range: [1, 60]
+          pvp: false
+          type: "town"
+          ambient: "village"
+          facilities: ["shop", "blacksmith", "inn", "auction", "bank", "guild_hall"]
+          npcs: ["shopkeeper", "blacksmith", "innkeeper", "guild_master", "quest_board"]
+
+        - id: 1
+          name: "초원 평야"
+          size: [1000, 1000]
+          level_range: [5, 15]
+          pvp: false
+          type: "field"
+          ambient: "grass_field"
+          monsters: ["goblin", "wolf", "bear"]
+          sub_areas:
+            - { name: "고블린 야영지", center: [200, 200], radius: 100, monster: "goblin" }
+            - { name: "늑대 숲", center: [600, 400], radius: 150, monster: "wolf" }
+            - { name: "곰 동굴 입구", center: [800, 800], radius: 80, monster: "bear" }
+
+    - name: "모험의 대지"
+      desc: "중반 성장 지역"
+      zones:
+        - id: 2
+          name: "사파이어 해안"
+          size: [1200, 800]
+          level_range: [15, 25]
+          pvp: false
+          type: "field"
+          ambient: "ocean_coast"
+          monsters: ["pirate", "sea_creature", "merman"]
+          dungeon_entrance: "goblin_cave"
+
+        - id: 11
+          name: "항구 도시 아쿠아"
+          size: [400, 400]
+          level_range: [15, 60]
+          pvp: false
+          type: "town"
+          ambient: "port_town"
+          facilities: ["shop", "blacksmith", "dock", "auction", "guild_hall"]
+          special: "대륙 간 이동 항구"
+
+        - id: 3
+          name: "얼어붙은 봉우리"
+          size: [1000, 1000]
+          level_range: [25, 35]
+          pvp: false
+          type: "field"
+          ambient: "snow_mountain"
+          weather: "snow"
+          monsters: ["ice_golem", "yeti", "frost_wolf"]
+          dungeon_entrance: "frozen_temple"
+
+    - name: "전쟁의 땅"
+      desc: "고레벨 + PvP 지역"
+      zones:
+        - id: 4
+          name: "불꽃 사막"
+          size: [1500, 1500]
+          level_range: [35, 45]
+          pvp: true           # PvP 가능 지역
+          type: "field"
+          ambient: "desert"
+          weather: "sandstorm"
+          monsters: ["sand_worm", "scorpion", "desert_bandit"]
+
+        - id: 5
+          name: "화산 지대"
+          size: [800, 800]
+          level_range: [40, 50]
+          pvp: true
+          type: "field"
+          ambient: "volcanic"
+          monsters: ["lava_golem", "fire_drake"]
+          dungeon_entrance: "demon_fortress"
+          hazard: { type: "lava_floor", damage_per_sec: 50 }
+
+        - id: 6
+          name: "마왕의 영지"
+          size: [1000, 1000]
+          level_range: [50, 60]
+          pvp: true
+          type: "field"
+          ambient: "dark_fortress"
+          monsters: ["demon_soldier", "corrupted_knight", "shadow_mage"]
+
+    - name: "고대의 영역"
+      desc: "엔드게임 지역"
+      zones:
+        - id: 7
+          name: "고대 유적"
+          size: [800, 800]
+          level_range: [55, 60]
+          pvp: false
+          type: "field"
+          ambient: "ancient_ruins"
+          monsters: ["stone_guardian", "animated_armor"]
+          dungeon_entrance: "ancient_dragon_raid"
+
+        - id: 8
+          name: "차원의 틈"
+          size: [500, 500]
+          level_range: [60, 60]
+          pvp: false
+          type: "endgame"
+          ambient: "void_rift"
+          monsters: ["void_creature", "chaos_spawn"]
+          dungeon_entrance: "chaos_rift"
+
+        - id: 9
+          name: "PvP 투기장"
+          size: [100, 100]
+          pvp: true
+          type: "arena"
+          ambient: "colosseum"
+
+# ──────────────────────────────────────────────────────────
+# 2. 이동 시스템
+# ──────────────────────────────────────────────────────────
+movement:
+  walking:
+    base_speed: 200
+    sprint_multiplier: 1.5
+    sprint_stamina_cost: 10    # 초당 10 스태미나
+    stamina_max: 100
+    stamina_regen: 20          # 초당 20 (비달리기 시)
+
+  mount:
+    speed_multiplier: 2.0
+    summon_cast_time: 2.0      # 2초 소환
+    dismount_on_damage: true
+    dismount_on_attack: true
+    available_from_level: 20
+
+  teleport:
+    waypoints:
+      desc: "발견한 워프 포인트 간 이동"
+      discovery: "처음 방문 시 자동 등록"
+      cost: { silver: 500 }
+      cast_time: 3.0           # 3초 (피격 시 취소)
+      cooldown: 60
+
+    return_scroll:
+      desc: "마을 즉시 귀환"
+      cast_time: 5.0
+      item_consumed: true
+
+    party_summon:
+      desc: "파티장이 파티원 소환"
+      cooldown: 600            # 10분
+      requirement: "파티장이 안전 지역에 있어야 함"
+
+  zone_transition:
+    method: "포털 (존 경계에 빛나는 게이트)"
+    loading_screen: true
+    loading_screen_tips: true  # 로딩 중 게임 팁 표시
+    seamless: false            # 존 전환 시 로딩 있음
+
+# ──────────────────────────────────────────────────────────
+# 3. 날씨 & 시간 시스템
+# ──────────────────────────────────────────────────────────
+weather:
+  cycle_duration: 3600        # 1시간 = 게임 내 하루
+
+  time_of_day:
+    dawn:    { range: [0.20, 0.30], light_color: "#FFE4B5", intensity: 0.6 }
+    morning: { range: [0.30, 0.45], light_color: "#FFFACD", intensity: 1.0 }
+    noon:    { range: [0.45, 0.55], light_color: "#FFFFFF", intensity: 1.2 }
+    afternoon: { range: [0.55, 0.70], light_color: "#FFF5E1", intensity: 1.0 }
+    evening: { range: [0.70, 0.80], light_color: "#FF8C00", intensity: 0.7 }
+    night:   { range: [0.80, 0.20], light_color: "#191970", intensity: 0.3 }
+
+  effects_at_night:
+    visibility: 0.6           # 시야 40% 감소
+    monster_spawn_bonus: 0.2  # 몬스터 20% 더 스폰
+    special_monsters: true    # 야행성 몬스터 출현
+
+  weather_types:
+    clear:
+      probability: 0.50
+      effects: "없음"
+    rain:
+      probability: 0.20
+      visual: "비 파티클 + 바닥 물웅덩이 반사"
+      effects: { fire_damage: -0.1, lightning_damage: +0.1 }
+      sound: "rain_ambient.wav"
+    snow:
+      probability: 0.10
+      visual: "눈 파티클 + 바닥 흰색 전환"
+      effects: { move_speed: -0.05, ice_damage: +0.1 }
+      zone_specific: ["얼어붙은 봉우리"]
+    fog:
+      probability: 0.10
+      visual: "안개 볼륨 + 시야 감소"
+      effects: { visibility: 0.4, dodge: +0.05 }
+    storm:
+      probability: 0.05
+      visual: "번개 + 강한 비 + 바람"
+      effects: { lightning_damage: +0.2, fire_damage: -0.2, move_speed: -0.1 }
+      sound: "storm_ambient.wav"
+    sandstorm:
+      probability: 0.05
+      visual: "모래 파티클 + 갈색 안개"
+      effects: { visibility: 0.3, accuracy: -0.1, nature_damage: +0.1 }
+      zone_specific: ["불꽃 사막"]
+
+  transition:
+    weather_change_interval: [300, 900]  # 5~15분마다 변경
+    transition_duration: 30              # 30초에 걸쳐 전환
+
+# ──────────────────────────────────────────────────────────
+# 4. 오브젝트 & 상호작용
+# ──────────────────────────────────────────────────────────
+world_objects:
+  destructible:
+    barrel:
+      hp: 10
+      loot: { gold: [1, 10], potion_chance: 0.1 }
+      respawn: 60
+    crate:
+      hp: 20
+      loot: { material_chance: 0.2, gold: [5, 20] }
+      respawn: 120
+    crystal:
+      hp: 50
+      loot: { gem_rough_chance: 0.3, gold: [10, 50] }
+      respawn: 300
+
+  interactable:
+    treasure_chest:
+      desc: "보물 상자 (던전/필드)"
+      open_time: 2.0
+      loot_table: "rarity_roll"
+      respawn: 600
+      trapped_chance: 0.1  # 10% 확률 함정 (데미지)
+    healing_fountain:
+      desc: "회복 분수 (마을)"
+      effect: "HP/MP 전체 회복"
+      cooldown: 60
+    crafting_station:
+      desc: "제작대 (마을)"
+      types: ["weapon", "armor", "potion", "enchant"]
+
+  gathering:
+    herb:
+      desc: "약초 채집"
+      tool_required: false
+      gather_time: 3.0
+      respawn: 120
+      loot: { herb: 1, rare_herb_chance: 0.05 }
+    ore:
+      desc: "광석 채광"
+      tool_required: "pickaxe"
+      gather_time: 5.0
+      respawn: 300
+      loot: { ore: 1, rare_ore_chance: 0.03 }
+    fishing_spot:
+      desc: "낚시터"
+      tool_required: "fishing_rod"
+      minigame: true
+      respawn: 60
+
+# ──────────────────────────────────────────────────────────
+# 5. 미니맵 & 세계지도
+# ──────────────────────────────────────────────────────────
+map:
+  minimap:
+    shape: "circle"
+    size: 200               # 200px
+    position: "top_right"
+    zoom_levels: [1, 2, 3]
+    icons:
+      player: "arrow (green)"
+      party_member: "dot (blue)"
+      npc: "dot (yellow)"
+      quest_giver: "! (gold/white)"
+      monster: "dot (red)"       # 근처만 표시
+      waypoint: "diamond (cyan)"
+      dungeon: "gate (purple)"
+
+  world_map:
+    toggle_key: "M"
+    fog_of_war: true          # 미방문 지역 안개
+    show_zones: true
+    show_level_range: true
+    teleport_from_map: true   # 맵에서 워프 포인트 클릭 → 텔레포트
+    pins: true                # 유저 핀 (최대 5개)

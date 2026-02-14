@@ -1,0 +1,215 @@
+# ============================================================
+# MONETIZATION — 수익화/캐시샵/배틀패스 완전 정의
+# Reference: Lost Ark / Fortnite / Genshin Impact
+# ============================================================
+# 핵심 원칙: Pay-to-Convenience, NOT Pay-to-Win
+# 과금으로 "시간 단축"은 OK, "성능 우위"는 NO
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 캐시샵 카테고리
+# ──────────────────────────────────────────────────────────
+cash_shop:
+  currency:
+    name: "크리스탈"
+    exchange_rate: "1,000원 = 100 크리스탈"
+    minimum_purchase: 1000  # 1,000원 (100 크리스탈)
+    bonus_tiers:
+      5000: 1.05       # 5% 보너스
+      10000: 1.10      # 10% 보너스
+      30000: 1.15      # 15% 보너스
+      50000: 1.20      # 20% 보너스
+
+  categories:
+    # ── 코스메틱 (외형) ──
+    cosmetics:
+      desc: "전투 성능에 영향 없는 순수 외형 아이템"
+      items:
+        character_skin:
+          price_range: [500, 1500]
+          desc: "캐릭터 외형 스킨 (옷, 갑옷 외형)"
+          tradeable: false
+        weapon_skin:
+          price_range: [300, 800]
+          desc: "무기 외형 스킨"
+          tradeable: false
+        aura_effect:
+          price_range: [200, 500]
+          desc: "캐릭터 주변 오라/이펙트"
+          tradeable: false
+        mount:
+          price_range: [500, 2000]
+          desc: "탈 것 (이동속도 동일, 외형만 다름)"
+          notes: "모든 탈것의 이동 속도는 동일. 외형 차이만."
+          tradeable: false
+        pet:
+          price_range: [300, 1000]
+          desc: "펫 (자동 줍기 기능 포함)"
+          notes: "자동 줍기는 편의 기능. 스탯 보너스 없음."
+          tradeable: false
+        emote:
+          price_range: [100, 300]
+          desc: "감정 표현 / 댄스"
+          tradeable: false
+        name_change:
+          price: 300
+          desc: "캐릭터 이름 변경"
+          cooldown: 30  # 30일
+
+    # ── 편의 아이템 ──
+    convenience:
+      desc: "시간 절약/편의성 향상. 성능 차이 없음."
+      items:
+        inventory_expansion:
+          price: 200
+          desc: "인벤토리 10칸 확장"
+          max_purchases: 6
+        storage_expansion:
+          price: 200
+          desc: "창고 10칸 확장"
+          max_purchases: 15
+        exp_boost:
+          price: 100
+          desc: "경험치 50% 증가 (24시간)"
+          notes: "시간 단축이지 성능 차이 아님"
+          tradeable: false
+        auto_potion:
+          price: 150
+          desc: "HP 자동 포션 사용 (30% 이하 시)"
+          duration: "30일"
+          notes: "편의 기능"
+        repair_hammer:
+          price: 50
+          desc: "현장 수리 (NPC 안 가도 됨)"
+          count: 10
+        teleport_ticket:
+          price: 30
+          desc: "즉시 텔레포트 (캐스팅 없음)"
+          count: 10
+
+    # ── 절대 판매 금지 ──
+    banned:
+      - "강화 확률 증가 아이템"
+      - "스탯 증가 아이템 (직접적 전투력 영향)"
+      - "독점 장비 (캐시로만 획득 가능한 장비)"
+      - "PvP 영향 아이템"
+      - "진행 필수 아이템 (이거 없으면 퀘스트 불가 등)"
+
+# ──────────────────────────────────────────────────────────
+# 2. 배틀패스 (시즌 패스)
+# ──────────────────────────────────────────────────────────
+battle_pass:
+  season_duration: 90       # 90일 (3개월)
+  max_level: 50
+  exp_per_level: 1000
+
+  # 경험치 획득
+  exp_sources:
+    daily_quest: 200        # 일퀘 완료 시
+    weekly_quest: 800       # 주퀘 완료 시
+    dungeon_clear: 100      # 던전 1회
+    pvp_win: 50             # PvP 승리
+    login: 50               # 일일 접속
+
+  # 무료 트랙 (모든 유저)
+  free_track:
+    rewards:
+      5:  { gold: 5000 }
+      10: { equipment_box: "rare" }
+      15: { enhance_stone: 50 }
+      20: { gold: 10000 }
+      25: { equipment_box: "rare" }
+      30: { enhance_stone: 100 }
+      35: { gold: 20000 }
+      40: { equipment_box: "epic" }
+      45: { enhance_stone: 200 }
+      50: { title: "시즌 완주자", gold: 50000 }
+
+  # 유료 트랙 (배틀패스 구매자)
+  premium_track:
+    price: 1000             # 1000 크리스탈 (10,000원)
+    rewards:
+      5:  { cosmetic: "시즌 스킨 1", crystal: 50 }
+      10: { mount: "시즌 탈것", crystal: 50 }
+      15: { pet: "시즌 펫", crystal: 50 }
+      20: { cosmetic: "시즌 무기 스킨", crystal: 50 }
+      25: { aura: "시즌 오라", crystal: 50 }
+      30: { cosmetic: "시즌 스킨 2", crystal: 50 }
+      35: { emote: "시즌 댄스", crystal: 50 }
+      40: { cosmetic: "시즌 스킨 3 (전설)", crystal: 100 }
+      45: { cosmetic: "시즌 이펙트", crystal: 100 }
+      50: { title: "시즌 챔피언", cosmetic: "시즌 날개", crystal: 200 }
+    notes: "크리스탈 총 합 = 750 (패스 가격의 75% 환수 가능)"
+
+  # 레벨 건너뛰기
+  level_skip:
+    price_per_level: 50     # 50 크리스탈
+    max_skip: 50            # 전체 건너뛰기 가능
+    notes: "시간이 없는 유저를 위한 옵션"
+
+# ──────────────────────────────────────────────────────────
+# 3. 이벤트 시스템
+# ──────────────────────────────────────────────────────────
+events:
+  types:
+    login_event:
+      name: "출석 이벤트"
+      duration: 14            # 14일
+      rewards_per_day:
+        1: { gold: 1000 }
+        3: { hp_potion_l: 20 }
+        5: { enhance_stone: 30 }
+        7: { equipment_box: "rare" }
+        10: { enhance_stone: 50 }
+        14: { equipment_box: "epic", title: "성실한 모험가" }
+
+    double_exp:
+      name: "경험치 2배 이벤트"
+      duration: 72            # 3일 (주말)
+      effect: { exp_bonus: 1.0 }  # +100%
+
+    boss_rush:
+      name: "보스 러시"
+      duration: 48
+      desc: "모든 보스 리스폰 시간 50% 감소, 드롭률 2배"
+      effects:
+        boss_respawn_mult: 0.5
+        drop_rate_mult: 2.0
+
+    seasonal:
+      name: "시즌 이벤트 (명절/크리스마스 등)"
+      duration: "2~4주"
+      features:
+        - "한정 퀘스트 (시즌 테마)"
+        - "한정 코스메틱"
+        - "한정 던전"
+        - "NPC 외형 변경 (시즌 테마)"
+
+  # 이벤트 알림
+  notification:
+    login_popup: true
+    in_game_banner: true
+    schedule_calendar: true   # 게임 내 달력에 표시
+
+# ──────────────────────────────────────────────────────────
+# 4. VIP / 월정액
+# ──────────────────────────────────────────────────────────
+subscription:
+  name: "모험가의 축복"
+  price: 500                 # 500 크리스탈 / 월 (5,000원)
+  duration: 30               # 30일
+
+  benefits:
+    exp_bonus: 0.10          # 경험치 10% 증가
+    gold_bonus: 0.10         # 골드 획득 10% 증가
+    daily_crystal: 10        # 매일 10 크리스탈 (총 300)
+    repair_discount: 0.50    # 수리 비용 50% 할인
+    teleport_free: 3         # 일일 무료 텔레포트 3회
+    extra_dungeon_entry: 1   # 던전 보상 1회 추가
+    storage_bonus: 20        # 창고 20칸 추가
+    auction_listing_bonus: 10 # 경매장 등록 10개 추가
+
+  notes: |
+    모든 혜택은 "편의/시간 절약" 범주.
+    전투력 직접 증가 없음.
+    크리스탈 총 300 지급 (가격의 60% 환수).

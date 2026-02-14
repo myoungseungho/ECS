@@ -1,0 +1,269 @@
+# ============================================================
+# QUEST SYSTEM — 퀘스트 완전 정의
+# Reference: Lost Ark / WoW / FF14
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 퀘스트 종류
+# ──────────────────────────────────────────────────────────
+quest_types:
+  main_story:
+    name: "메인 스토리"
+    icon: "quest_main.png"
+    color: "#FFD700"           # 금색
+    marker: "!"                # 느낌표 (금색)
+    chain: true                # 연쇄 퀘스트
+    repeatable: false
+    skip: false
+    rewards: "고정 (경험치 + 장비 + 골드 + 스토리 해금)"
+    notes: "게임의 줄기. 반드시 완료해야 다음 지역 해금."
+
+  side_quest:
+    name: "서브 퀘스트"
+    icon: "quest_side.png"
+    color: "#FFFFFF"           # 흰색
+    marker: "!"                # 느낌표 (흰색)
+    chain: false               # 단일 or 2~3개 연쇄
+    repeatable: false
+    skip: true
+    rewards: "경험치 + 골드"
+
+  daily_quest:
+    name: "일일 퀘스트"
+    icon: "quest_daily.png"
+    color: "#00BFFF"           # 파랑
+    marker: "◆"               # 다이아몬드
+    repeatable: true
+    reset: "daily_06:00"       # 매일 06시 초기화
+    max_active: 3              # 동시 3개까지
+    rewards: "경험치 + 골드 + 재료"
+
+  weekly_quest:
+    name: "주간 퀘스트"
+    icon: "quest_weekly.png"
+    color: "#A020F0"           # 보라
+    marker: "◆"
+    repeatable: true
+    reset: "wednesday_06:00"   # 매주 수요일 초기화
+    max_active: 1
+    rewards: "대량 경험치 + 골드 + 던전토큰"
+
+  guild_quest:
+    name: "길드 퀘스트"
+    icon: "quest_guild.png"
+    color: "#00FF80"           # 초록
+    repeatable: true
+    reset: "daily_06:00"
+    max_active: 3
+    shared: true               # 길드원 공동 기여
+    rewards: "길드 경험치 + 기여도"
+
+  achievement_quest:
+    name: "업적"
+    icon: "quest_achievement.png"
+    color: "#FF8C00"           # 주황
+    repeatable: false
+    hidden: true               # 일부는 조건 달성 전까지 숨김
+    rewards: "칭호 + 보석 + 코스메틱"
+
+# ──────────────────────────────────────────────────────────
+# 2. 퀘스트 목표 유형
+# ──────────────────────────────────────────────────────────
+objective_types:
+  kill:
+    desc: "특정 몬스터 N마리 처치"
+    params: [monster_id, count]
+    tracking: "server_side"    # 서버에서 카운트
+    party_share: true          # 파티원 공유 (같은 퀘 시)
+    example: { monster: "slime", count: 10 }
+
+  collect:
+    desc: "특정 아이템 N개 수집 (몬스터 드롭)"
+    params: [item_id, count, drop_rate]
+    tracking: "server_side"
+    party_share: false         # 개인 드롭
+    example: { item: "slime_core", count: 5, drop_rate: 0.3 }
+
+  talk_to:
+    desc: "특정 NPC에게 대화"
+    params: [npc_id]
+    tracking: "client_trigger"
+    example: { npc: "village_elder" }
+
+  escort:
+    desc: "NPC 호위 (A→B 지점)"
+    params: [npc_id, start, end, fail_condition]
+    tracking: "server_side"
+    fail: "NPC HP 0 또는 타임아웃"
+    example: { npc: "merchant", start: [100,0,100], end: [300,0,100], time_limit: 180 }
+
+  deliver:
+    desc: "아이템을 NPC에게 전달"
+    params: [item_id, count, target_npc]
+    tracking: "server_side"
+    example: { item: "herb", count: 10, target: "herbalist" }
+
+  reach_location:
+    desc: "특정 위치에 도달"
+    params: [x, y, z, radius]
+    tracking: "server_side"
+    example: { x: 500, y: 0, z: 500, radius: 10 }
+
+  interact:
+    desc: "특정 오브젝트와 상호작용"
+    params: [object_id, count]
+    tracking: "client_trigger"
+    example: { object: "ancient_altar", count: 1 }
+
+  dungeon_clear:
+    desc: "특정 던전 클리어"
+    params: [dungeon_id, difficulty]
+    tracking: "server_side"
+    example: { dungeon: "goblin_cave", difficulty: "normal" }
+
+  craft:
+    desc: "아이템 제작"
+    params: [item_id, count]
+    tracking: "server_side"
+
+  enhance:
+    desc: "장비 강화"
+    params: [target_level]
+    tracking: "server_side"
+    example: { target_level: 5 }
+
+  pvp_win:
+    desc: "PvP 승리"
+    params: [mode, count]
+    tracking: "server_side"
+    example: { mode: "arena_1v1", count: 3 }
+
+# ──────────────────────────────────────────────────────────
+# 3. 퀘스트 보상 유형
+# ──────────────────────────────────────────────────────────
+reward_types:
+  exp:     { desc: "경험치" }
+  gold:    { desc: "골드" }
+  silver:  { desc: "실버" }
+  item:    { desc: "아이템 (장비/소비/재료)" }
+  equipment_box: { desc: "등급별 장비 상자 (랜덤)" }
+  skill_point: { desc: "스킬 포인트" }
+  title: { desc: "칭호" }
+  unlock: { desc: "시스템 해금 (던전, PvP 등)" }
+  cosmetic: { desc: "코스메틱 (외형)" }
+  reputation: { desc: "평판" }
+
+  # 선택 보상
+  choice_reward:
+    desc: "여러 보상 중 택 1"
+    example:
+      - { type: "equipment", class: "warrior", item: "steel_sword" }
+      - { type: "equipment", class: "archer", item: "steel_bow" }
+      - { type: "equipment", class: "mage", item: "crystal_staff" }
+
+# ──────────────────────────────────────────────────────────
+# 4. NPC 대화 시스템
+# ──────────────────────────────────────────────────────────
+dialog:
+  format:
+    speaker: "NPC 이름"
+    portrait: "NPC 초상화 이미지"
+    lines: "대사 배열 (순서대로 표시)"
+    choices: "선택지 (있으면)"
+
+  # 대화 연출
+  presentation:
+    typing_speed: 30          # 초당 30자
+    click_to_skip: true       # 클릭 시 전체 표시
+    auto_advance: false       # 자동 넘김 OFF (유저가 클릭)
+    portrait_position: "left" # 초상화 왼쪽
+
+  # 선택지
+  choices:
+    max_options: 4
+    effects: ["퀘스트 수락/거절", "다른 대화 분기", "상점 열기", "스탯 확인"]
+    notes: "선택에 따라 스토리 분기는 최소화 (관리 비용). 대부분 수락/거절."
+
+# ──────────────────────────────────────────────────────────
+# 5. 평판 시스템
+# ──────────────────────────────────────────────────────────
+reputation:
+  desc: "NPC 세력별 평판. 평판 올리면 상점 해금, 퀘스트 해금."
+
+  factions:
+    village_guard:
+      name: "마을 수비대"
+      tiers:
+        neutral:   { min: 0,    reward: "기본 상점" }
+        friendly:  { min: 500,  reward: "할인 10%" }
+        honored:   { min: 2000, reward: "특수 퀘스트 해금" }
+        revered:   { min: 5000, reward: "에픽 장비 상점" }
+        exalted:   { min: 10000, reward: "전설 장비 + 칭호 '수비대의 영웅'" }
+
+    merchant_guild:
+      name: "상인 조합"
+      tiers:
+        neutral:   { min: 0,    reward: "기본 거래" }
+        friendly:  { min: 500,  reward: "거래소 수수료 4%" }
+        honored:   { min: 2000, reward: "거래소 수수료 3%" }
+        revered:   { min: 5000, reward: "특수 재료 상점" }
+        exalted:   { min: 10000, reward: "거래소 수수료 2% + 칭호 '대상인'" }
+
+  gain:
+    quest_complete: "퀘스트 보상에 명시된 만큼"
+    daily_quest: 50
+    weekly_quest: 200
+    monster_kill_in_territory: 1  # 해당 세력 영역 몬스터 처치 시
+
+  daily_cap: 500  # 일일 획득 상한 (퀘스트 제외)
+
+# ──────────────────────────────────────────────────────────
+# 6. 메인 스토리 개요
+# ──────────────────────────────────────────────────────────
+main_story_outline:
+  chapter_1:
+    name: "모험의 시작"
+    level_range: "1~10"
+    zone: "튜토리얼 존 → 첫 마을"
+    quests: 15
+    summary: |
+      주인공이 평범한 마을에서 깨어남.
+      마을에 몬스터가 출몰 → 기본 전투 학습.
+      마을 장로의 부탁으로 몬스터 소굴 탐색.
+      소굴 깊은 곳에서 어둠의 기운 발견 → 더 큰 위협의 복선.
+    boss: "고블린 족장"
+
+  chapter_2:
+    name: "어둠의 그림자"
+    level_range: "10~20"
+    zone: "필드 → 고블린 동굴 → 항구 도시"
+    quests: 20
+    summary: |
+      어둠의 기운을 추적하여 숲과 평원을 탐험.
+      각 지역에서 동맹을 만들고, 적을 물리침.
+      항구 도시에서 대륙 너머의 위협을 알게 됨.
+      2차 전직 이벤트 (직업 마스터 NPC).
+    boss: "얼음 여왕"
+
+  chapter_3:
+    name: "전쟁의 서막"
+    level_range: "20~40"
+    zone: "사막 → 화산 → 마왕의 요새"
+    quests: 30
+    summary: |
+      마왕 군단이 대륙을 침공.
+      각 지역을 방어하며 동맹군 규합.
+      길드 시스템과 대규모 전투 참여.
+      마왕의 요새 돌입.
+    boss: "마왕"
+
+  chapter_4:
+    name: "고대의 비밀"
+    level_range: "40~60"
+    zone: "고대 유적 → 용의 둥지 → 차원의 틈"
+    quests: 25
+    summary: |
+      마왕을 쓰러뜨렸지만 진짜 위협은 따로 있었음.
+      고대 유적에서 봉인된 존재를 발견.
+      레이드 콘텐츠로 이어지는 엔드게임 스토리.
+    boss: "고대 용"

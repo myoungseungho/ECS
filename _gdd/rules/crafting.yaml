@@ -1,0 +1,222 @@
+# ============================================================
+# CRAFTING SYSTEM — 제작/채집/생활스킬 완전 정의
+# Reference: Lost Ark / BDO / WoW
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 제작 시스템
+# ──────────────────────────────────────────────────────────
+crafting:
+  unlock_level: 10
+  crafting_stations: ["무기 제작대", "방어구 제작대", "연금술 제작대", "보석 세공대"]
+
+  # 제작 등급
+  proficiency:
+    max_level: 50
+    exp_per_craft: "recipe_difficulty * 10"
+    level_benefits:
+      10: "고급(uncommon) 제작 해금"
+      20: "희귀(rare) 제작 해금"
+      30: "영웅(epic) 제작 해금"
+      40: "대량 제작 (한 번에 5개)"
+      50: "전설(legendary) 제작 해금 + 보너스 옵션 확률 +10%"
+
+  # 레시피 형식
+  recipe_format:
+    id: "string"
+    name: "아이템 이름"
+    category: "weapon / armor / potion / gem / material"
+    proficiency_required: "제작 레벨"
+    materials: [{ item_id: "string", count: "int" }]
+    gold_cost: "int"
+    craft_time: "초 (0이면 즉시)"
+    success_rate: "float (1.0 = 100%)"
+    result: { item_id: "string", count: "int" }
+    bonus_option_chance: "float (추가 랜덤 옵션 확률)"
+
+  # 주요 레시피 예시
+  recipes:
+    # 무기
+    iron_sword:
+      category: "weapon"
+      proficiency_required: 1
+      materials: [{ item: "iron_ore", count: 5 }, { item: "wood", count: 2 }]
+      gold_cost: 200
+      craft_time: 5
+      success_rate: 1.0
+      result: { item: "iron_sword", count: 1 }
+
+    steel_sword:
+      category: "weapon"
+      proficiency_required: 10
+      materials: [{ item: "steel_ingot", count: 3 }, { item: "leather", count: 2 }, { item: "iron_sword", count: 1 }]
+      gold_cost: 1000
+      craft_time: 10
+      success_rate: 0.9
+      result: { item: "steel_sword", count: 1 }
+      bonus_option_chance: 0.2
+
+    # 포션
+    hp_potion_s:
+      category: "potion"
+      proficiency_required: 1
+      materials: [{ item: "herb", count: 3 }]
+      gold_cost: 20
+      craft_time: 2
+      success_rate: 1.0
+      result: { item: "hp_potion_s", count: 3 }
+
+    hp_potion_l:
+      category: "potion"
+      proficiency_required: 15
+      materials: [{ item: "rare_herb", count: 5 }, { item: "crystal_water", count: 1 }]
+      gold_cost: 200
+      craft_time: 5
+      success_rate: 0.8
+      result: { item: "hp_potion_l", count: 3 }
+
+    # 보석 세공
+    polished_ruby:
+      category: "gem"
+      proficiency_required: 10
+      materials: [{ item: "rough_ruby", count: 3 }]
+      gold_cost: 100
+      craft_time: 5
+      success_rate: 1.0
+      result: { item: "polished_ruby", count: 1 }
+
+    # 재료 가공
+    steel_ingot:
+      category: "material"
+      proficiency_required: 5
+      materials: [{ item: "iron_ore", count: 3 }, { item: "coal", count: 1 }]
+      gold_cost: 50
+      craft_time: 3
+      success_rate: 1.0
+      result: { item: "steel_ingot", count: 1 }
+
+# ──────────────────────────────────────────────────────────
+# 2. 채집 시스템
+# ──────────────────────────────────────────────────────────
+gathering:
+  types:
+    herbalism:
+      name: "약초 채집"
+      tool: "없음 (맨손)"
+      nodes: ["herb_bush", "flower", "mushroom"]
+      gather_time: 3.0
+      exp_per_gather: 5
+      loot:
+        common: { item: "herb", chance: 0.8 }
+        rare: { item: "rare_herb", chance: 0.15 }
+        epic: { item: "legendary_herb", chance: 0.05 }
+
+    mining:
+      name: "채광"
+      tool: "곡괭이"
+      nodes: ["iron_vein", "gold_vein", "crystal_vein"]
+      gather_time: 5.0
+      exp_per_gather: 8
+      loot:
+        common: { item: "iron_ore", chance: 0.7 }
+        uncommon: { item: "gold_ore", chance: 0.2 }
+        rare: { item: "crystal", chance: 0.08 }
+        epic: { item: "diamond_ore", chance: 0.02 }
+
+    logging:
+      name: "벌목"
+      tool: "도끼"
+      nodes: ["tree", "ancient_tree"]
+      gather_time: 4.0
+      exp_per_gather: 6
+      loot:
+        common: { item: "wood", chance: 0.8 }
+        rare: { item: "hardwood", chance: 0.15 }
+        epic: { item: "world_tree_branch", chance: 0.05 }
+
+    fishing:
+      name: "낚시"
+      tool: "낚싯대"
+      minigame: true
+      minigame_type: "timing"  # 타이밍 미니게임
+      fish_by_zone:
+        town: ["잉어", "붕어", "송어"]
+        coast: ["참치", "광어", "문어"]
+        mountain: ["산천어", "연어"]
+      rare_fish_chance: 0.05
+      treasure_chance: 0.01     # 1% 확률 보물상자
+
+  # 채집 레벨
+  proficiency:
+    max_level: 30
+    benefits:
+      5: "채집 속도 10% 감소"
+      10: "희귀 재료 드롭 +5%"
+      15: "채집 속도 20% 감소"
+      20: "영웅 재료 드롭 +5%"
+      25: "한 번에 2개 채집"
+      30: "전설 재료 드롭 +3%"
+
+  # 에너지 시스템 (무한 채집 방지)
+  energy:
+    max: 200
+    cost_per_gather: 5
+    regen_rate: 1              # 분당 1 회복
+    full_recharge: 200         # 200분 (3.3시간)
+    recharge_item: { item: "에너지 물약", restore: 50 }
+
+# ──────────────────────────────────────────────────────────
+# 3. 요리 시스템
+# ──────────────────────────────────────────────────────────
+cooking:
+  unlock_level: 10
+  station: "요리 화덕 (마을)"
+
+  buff_duration: 1800         # 30분
+  max_food_buff: 1            # 동시에 1개만
+
+  recipes:
+    grilled_meat:
+      materials: [{ item: "raw_meat", count: 3 }]
+      effect: { atk: 10 }
+      duration: 1800
+      proficiency_required: 1
+
+    fish_stew:
+      materials: [{ item: "fish", count: 2 }, { item: "herb", count: 1 }]
+      effect: { max_hp: 200, hp_regen: 5 }
+      duration: 1800
+      proficiency_required: 5
+
+    royal_feast:
+      materials: [{ item: "rare_meat", count: 2 }, { item: "rare_herb", count: 2 }, { item: "spice", count: 1 }]
+      effect: { all_stats: 5, exp_bonus: 0.05 }
+      duration: 3600
+      proficiency_required: 20
+
+# ──────────────────────────────────────────────────────────
+# 4. 인챈트 시스템 (원소 부여)
+# ──────────────────────────────────────────────────────────
+enchanting:
+  desc: "무기에 원소 속성 부여"
+  station: "마법진 (마을)"
+
+  elements: ["fire", "ice", "lightning", "dark", "holy", "nature"]
+
+  enchant_levels:
+    1: { damage_bonus: 0.05, material_cost: 5, gold_cost: 1000 }
+    2: { damage_bonus: 0.10, material_cost: 10, gold_cost: 3000 }
+    3: { damage_bonus: 0.15, material_cost: 20, gold_cost: 10000 }
+
+  materials:
+    fire: "화염 정수"
+    ice: "얼음 정수"
+    lightning: "번개 정수"
+    dark: "암흑 정수"
+    holy: "신성 정수"
+    nature: "자연 정수"
+
+  rules:
+    one_element_per_weapon: true   # 무기당 1개 원소만
+    overwrite: true                # 덮어쓰기 가능 (기존 제거)
+    overwrite_cost: "enchant cost * 1.5"

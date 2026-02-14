@@ -1,0 +1,348 @@
+# ============================================================
+# PROGRESSION SYSTEM — 성장 규칙 완전 정의
+# Reference: Lost Ark / MapleStory / WoW
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 레벨 시스템
+# ──────────────────────────────────────────────────────────
+level:
+  max_level: 60
+  exp_formula: |
+    # 레벨별 필요 경험치 = base * level^exponent + linear * level
+    required_exp = 100 * level^1.8 + 50 * level
+
+  # 명시적 경험치 테이블 (공식 결과를 보정한 최종값)
+  exp_table:
+    1:  100
+    2:  280
+    3:  520
+    4:  830
+    5:  1200
+    6:  1650
+    7:  2180
+    8:  2800
+    9:  3500
+    10: 4300     # 튜토리얼 종료 기준
+    11: 5200
+    12: 6200
+    13: 7400
+    14: 8700
+    15: 10200    # 첫 던전 입장 기준
+    16: 11900
+    17: 13800
+    18: 15900
+    19: 18200
+    20: 20800    # 2차 전직 기준
+    25: 38000
+    30: 65000    # 중반 사냥터
+    35: 105000
+    40: 160000   # 엔드게임 진입
+    45: 240000
+    50: 350000   # 레이드 입장 기준
+    55: 500000
+    60: 0        # 만렙 (경험치 불필요)
+
+  # 레벨업 보상
+  per_level_reward:
+    stat_points: 5       # 레벨당 스탯 포인트 5점
+    skill_points: 1      # 레벨당 스킬 포인트 1점
+    hp_base_increase: 50
+    mp_base_increase: 20
+
+  # 특수 레벨 보상
+  milestone_rewards:
+    10:
+      desc: "튜토리얼 완료"
+      rewards: [{ type: "equipment_box", tier: "uncommon" }, { type: "gold", amount: 1000 }]
+      unlock: ["dungeon_system", "enhancement"]
+    15:
+      desc: "던전 해금"
+      rewards: [{ type: "equipment_box", tier: "rare" }]
+      unlock: ["party_dungeon"]
+    20:
+      desc: "2차 전직"
+      rewards: [{ type: "skill_book", skills: 3 }, { type: "gold", amount: 5000 }]
+      unlock: ["second_job", "pvp_arena"]
+    30:
+      desc: "길드 가입 가능"
+      rewards: [{ type: "title", name: "숙련 모험가" }]
+      unlock: ["guild_system"]
+    40:
+      desc: "엔드게임 진입"
+      rewards: [{ type: "equipment_box", tier: "epic" }, { type: "gold", amount: 20000 }]
+      unlock: ["raid_system", "world_boss"]
+    50:
+      desc: "레이드 입장"
+      rewards: [{ type: "equipment_box", tier: "legendary" }]
+      unlock: ["hard_mode_dungeon"]
+    60:
+      desc: "만렙 달성"
+      rewards: [{ type: "title", name: "전설의 용사" }, { type: "cosmetic", name: "만렙 아우라" }]
+      unlock: ["chaos_dungeon", "weekly_raid"]
+
+# ──────────────────────────────────────────────────────────
+# 2. 경험치 획득
+# ──────────────────────────────────────────────────────────
+exp_sources:
+  monster_kill:
+    formula: "monster_base_exp * (1 + level_diff_bonus) * (1 + party_bonus) * (1 + buff_bonus)"
+    level_diff_bonus:
+      # 레벨 차이별 보정
+      "+5_이상": 0.0      # 5레벨 이상 낮은 몬스터 → 경험치 0
+      "+4": 0.1
+      "+3": 0.3
+      "+2": 0.6
+      "+1": 0.8
+      "0": 1.0            # 동레벨 기본
+      "-1": 1.1
+      "-2": 1.15
+      "-3": 1.1           # 너무 높은 몬스터도 보정 감소
+      "-4": 0.9
+      "-5_이상": 0.5
+
+    party_bonus:
+      2_members: 0.1     # 10% 추가
+      3_members: 0.15
+      4_members: 0.2     # 20% 추가 (파티 권장)
+    notes: "파티 경험치는 균등 분배 + 파티 보너스"
+
+  quest_completion:
+    formula: "quest_base_exp"
+    notes: "퀘스트 경험치는 보정 없이 고정값"
+
+  dungeon_clear:
+    formula: "dungeon_base_exp * (1 + first_clear_bonus)"
+    first_clear_bonus: 1.0  # 첫 클리어 시 2배
+    daily_bonus: 0.5         # 일일 첫 클리어 50% 추가
+
+  daily_bonus:
+    desc: "하루 첫 접속 시 경험치 버프"
+    buff_name: "휴식의 은혜"
+    bonus: 0.5             # 50% 추가
+    duration_kills: 50     # 몬스터 50마리까지
+    accumulate_offline: true  # 접속 안 하면 최대 3일치 누적
+
+# ──────────────────────────────────────────────────────────
+# 3. 직업 시스템
+# ──────────────────────────────────────────────────────────
+classes:
+  warrior:
+    name: "전사"
+    desc: "근접 물리 딜러/탱커"
+    role: ["melee_dps", "tank"]
+    weapon: "대검/검+방패"
+    base_stats:
+      hp: 500
+      mp: 200
+      str: 15
+      dex: 8
+      int: 5
+      vit: 12
+      wis: 5
+      luk: 5
+    stat_growth_per_level:
+      hp: 80
+      mp: 15
+      str: 4
+      dex: 2
+      int: 1
+      vit: 3
+      wis: 1
+      luk: 1
+    skills:
+      starter: [1, 2, 3]         # 기본 공격, 슬래시, 방어
+      level_5: [4, 5]             # 차지, 워크라이
+      level_10: [6, 7]            # 월풍, 스턴블로우
+      level_20_job2: [8, 9, 10]   # 2차: 블레이드댄스, 어스쉐이크, 블러드러스트
+    second_jobs:
+      berserker:
+        name: "버서커"
+        desc: "공격 특화, HP 소모로 데미지 증폭"
+        bonus: { atk: "+20%", crit_rate: "+10%", def: "-15%" }
+      guardian:
+        name: "가디언"
+        desc: "방어 특화, 파티 보호"
+        bonus: { def: "+30%", max_hp: "+20%", atk: "-10%" }
+
+  archer:
+    name: "궁수"
+    desc: "원거리 물리 딜러"
+    role: ["ranged_dps"]
+    weapon: "활/석궁"
+    base_stats:
+      hp: 350
+      mp: 250
+      str: 8
+      dex: 15
+      int: 8
+      vit: 7
+      wis: 7
+      luk: 10
+    stat_growth_per_level:
+      hp: 50
+      mp: 25
+      str: 2
+      dex: 4
+      int: 1
+      vit: 2
+      wis: 1
+      luk: 2
+    skills:
+      starter: [20, 21, 22]
+      level_5: [23, 24]
+      level_10: [25, 26]
+      level_20_job2: [27, 28, 29]
+    second_jobs:
+      sharpshooter:
+        name: "샤프슈터"
+        desc: "단일 대상 극딜, 치명타 특화"
+        bonus: { crit_rate: "+15%", crit_dmg: "+30%", attack_speed: "+10%" }
+      ranger:
+        name: "레인저"
+        desc: "광역 + 기동성, 함정/다중 화살"
+        bonus: { move_speed: "+15%", aoe_damage: "+20%", dodge: "+10%" }
+
+  mage:
+    name: "마법사"
+    desc: "원거리 마법 딜러/서포터"
+    role: ["ranged_dps", "support"]
+    weapon: "지팡이/오브"
+    base_stats:
+      hp: 300
+      mp: 400
+      str: 5
+      dex: 7
+      int: 15
+      vit: 5
+      wis: 12
+      luk: 6
+    stat_growth_per_level:
+      hp: 40
+      mp: 40
+      str: 1
+      dex: 1
+      int: 4
+      vit: 1
+      wis: 3
+      luk: 1
+    skills:
+      starter: [40, 41, 42]
+      level_5: [43, 44]
+      level_10: [45, 46]
+      level_20_job2: [47, 48, 49]
+    second_jobs:
+      archmage:
+        name: "아크메이지"
+        desc: "광역 원소 마법 특화"
+        bonus: { matk: "+25%", aoe_damage: "+30%", mp_cost: "+15%" }
+      priest:
+        name: "프리스트"
+        desc: "힐러/서포터 특화"
+        bonus: { healing_power: "+40%", max_mp: "+20%", matk: "-20%" }
+
+# ──────────────────────────────────────────────────────────
+# 4. 스킬 시스템
+# ──────────────────────────────────────────────────────────
+skills:
+  max_level: 10
+  level_up_cost:
+    skill_points: 1        # 레벨당 1포인트
+    gold_per_level: [0, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
+
+  # 스킬 레벨별 성장
+  scaling_per_level:
+    damage_increase: 0.12   # 레벨당 12% 데미지 증가
+    cooldown_decrease: 0.02 # 레벨당 2% 쿨감
+    range_increase: 0.0     # 범위는 증가 안 함 (밸런스)
+    mp_cost_increase: 0.05  # 레벨당 MP 비용 5% 증가
+
+  # 스킬 슬롯
+  slots:
+    total: 8               # Q W E R 1 2 3 4
+    quick_slots: 4          # 1 2 3 4 (포션/소모품용)
+    skill_slots: 4          # Q W E R (스킬 전용)
+    swap_in_combat: false   # 전투 중 슬롯 변경 불가
+
+  # 궁극기
+  ultimate:
+    unlock_level: 30
+    charge_method: "damage_dealt"  # 데미지 누적으로 게이지 충전
+    charge_required: 10000         # 10000 데미지 → 1회 충전
+    max_charges: 1
+    cooldown_after_use: 120.0
+
+  # 각성 스킬 (2차 전직 후)
+  awakening:
+    unlock: "second_job"
+    desc: "직업 고유 변신/강화 스킬"
+    duration: 20.0
+    cooldown: 180.0
+    effects: "직업별 다름 (berserker: 공격력 2배, guardian: 무적 등)"
+
+# ──────────────────────────────────────────────────────────
+# 5. 칭호 시스템
+# ──────────────────────────────────────────────────────────
+titles:
+  desc: "달성 조건 충족 시 칭호 획득. 장착 시 보너스 스탯."
+  max_equipped: 1  # 동시에 1개만 장착
+
+  list:
+    - name: "초보 모험가"
+      condition: "레벨 5 달성"
+      bonus: { max_hp: 50 }
+    - name: "숙련 모험가"
+      condition: "레벨 30 달성"
+      bonus: { atk: 10, def: 10 }
+    - name: "전설의 용사"
+      condition: "레벨 60 달성"
+      bonus: { all_stats: 5 }
+    - name: "첫 번째 던전"
+      condition: "던전 1회 클리어"
+      bonus: { exp_bonus: 0.05 }
+    - name: "보스 슬레이어"
+      condition: "보스 10회 처치"
+      bonus: { crit_rate: 0.02 }
+    - name: "만물박사"
+      condition: "모든 퀘스트 완료"
+      bonus: { all_stats: 3, gold_bonus: 0.05 }
+    - name: "PvP 챔피언"
+      condition: "투기장 시즌 1위"
+      bonus: { pvp_damage: 0.05 }
+      cosmetic: "빛나는 아우라"
+    - name: "길드 마스터"
+      condition: "길드 레벨 10 달성"
+      bonus: { leadership: 10 }
+    - name: "부자"
+      condition: "골드 1,000,000 보유"
+      bonus: { gold_bonus: 0.1 }
+
+# ──────────────────────────────────────────────────────────
+# 6. 도감 시스템 (컬렉션)
+# ──────────────────────────────────────────────────────────
+collection:
+  monster_encyclopedia:
+    desc: "몬스터 처치 시 도감 등록. 모두 등록 시 보너스."
+    categories:
+      - name: "튜토리얼 몬스터"
+        monsters: ["slime", "goblin"]
+        completion_bonus: { atk: 5 }
+      - name: "필드 몬스터"
+        monsters: ["wolf", "orc", "bear", "skeleton", "bandit"]
+        completion_bonus: { def: 10 }
+      - name: "엘리트 몬스터"
+        monsters: ["elite_golem", "elite_dragon_whelp"]
+        completion_bonus: { max_hp: 200 }
+      - name: "보스"
+        monsters: ["ancient_golem", "dragon", "demon_king"]
+        completion_bonus: { all_stats: 3 }
+
+  equipment_codex:
+    desc: "장비 획득 시 도감 등록. 한번 등록하면 장비 버려도 유지."
+    tiers: ["common", "uncommon", "rare", "epic", "legendary"]
+    completion_bonus_per_tier:
+      common: { max_hp: 10 }
+      uncommon: { atk: 3 }
+      rare: { def: 5 }
+      epic: { all_stats: 2 }
+      legendary: { all_stats: 5, title: "수집왕" }

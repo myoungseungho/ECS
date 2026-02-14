@@ -1,0 +1,495 @@
+# ============================================================
+# COMBAT SYSTEM — 전투 규칙 완전 정의
+# Reference: Lost Ark / Diablo IV / WoW
+# ============================================================
+# 이 파일만으로 전투 시스템 전체를 구현할 수 있어야 한다.
+# 모든 공식은 서버 에이전트가 코드로 변환한다.
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 기본 스탯 정의
+# ──────────────────────────────────────────────────────────
+stats:
+  primary:
+    STR:
+      desc: "물리 공격력 + 물리 방어 보조"
+      per_point:
+        atk: 2.0
+        def: 0.5
+    DEX:
+      desc: "치명타율 + 회피율 + 이동속도 보조"
+      per_point:
+        crit_rate: 0.001    # 0.1% per point
+        dodge_rate: 0.0005  # 0.05% per point
+        move_speed: 0.1     # 0.1 per point (base 200)
+    INT:
+      desc: "마법 공격력 + 마법 방어"
+      per_point:
+        matk: 2.5
+        mdef: 0.8
+    VIT:
+      desc: "최대 HP + HP 자연회복"
+      per_point:
+        max_hp: 15
+        hp_regen: 0.2      # per 5 seconds
+    WIS:
+      desc: "최대 MP + MP 자연회복 + 쿨다운 감소"
+      per_point:
+        max_mp: 10
+        mp_regen: 0.3      # per 5 seconds
+        cooldown_reduction: 0.0002  # 0.02% per point
+    LUK:
+      desc: "치명타 데미지 + 아이템 드롭률 + 강화 보너스"
+      per_point:
+        crit_damage: 0.002  # 0.2% per point
+        drop_rate: 0.001    # 0.1% per point
+        enhance_bonus: 0.0005  # 0.05% per point
+
+  secondary:  # 1차 스탯에서 파생, 장비/버프로도 직접 증가
+    ATK:
+      desc: "물리 공격력"
+      base_formula: "STR * 2.0 + weapon_atk + equip_atk_bonus"
+    MATK:
+      desc: "마법 공격력"
+      base_formula: "INT * 2.5 + weapon_matk + equip_matk_bonus"
+    DEF:
+      desc: "물리 방어력"
+      base_formula: "STR * 0.5 + VIT * 0.3 + armor_def + equip_def_bonus"
+    MDEF:
+      desc: "마법 방어력"
+      base_formula: "INT * 0.8 + WIS * 0.3 + armor_mdef + equip_mdef_bonus"
+    MAX_HP:
+      desc: "최대 체력"
+      base_formula: "base_hp + VIT * 15 + equip_hp_bonus"
+    MAX_MP:
+      desc: "최대 마나"
+      base_formula: "base_mp + WIS * 10 + equip_mp_bonus"
+    CRIT_RATE:
+      desc: "치명타 확률"
+      base_formula: "0.05 + DEX * 0.001 + equip_crit_bonus"
+      cap: 0.60  # 60% 상한
+    CRIT_DMG:
+      desc: "치명타 배율"
+      base_formula: "1.5 + LUK * 0.002 + equip_crit_dmg_bonus"
+      cap: 4.0  # 400% 상한
+    DODGE:
+      desc: "회피율"
+      base_formula: "DEX * 0.0005 + equip_dodge_bonus"
+      cap: 0.30  # 30% 상한
+    ACCURACY:
+      desc: "명중률 (회피 상쇄)"
+      base_formula: "0.95 + DEX * 0.0003"
+      cap: 1.0
+    MOVE_SPEED:
+      desc: "이동 속도"
+      base: 200
+      formula: "200 + DEX * 0.1 + equip_speed_bonus"
+      cap: 500
+    ATTACK_SPEED:
+      desc: "공격 속도 배율"
+      base: 1.0
+      cap: 2.5
+    COOLDOWN_REDUCTION:
+      desc: "스킬 쿨다운 감소율"
+      base_formula: "WIS * 0.0002 + equip_cdr_bonus"
+      cap: 0.40  # 40% 상한
+
+# ──────────────────────────────────────────────────────────
+# 2. 데미지 계산
+# ──────────────────────────────────────────────────────────
+damage:
+  physical:
+    formula: |
+      raw_damage = ATK * skill_multiplier
+      defense_reduction = DEF * (1 - armor_penetration)
+      reduced = max(raw_damage - defense_reduction, 1)
+      final = reduced * (1 + elemental_bonus) * (1 + damage_bonus) * random(0.95, 1.05)
+    notes:
+      - "최소 데미지 1 보장 (0이나 음수 불가)"
+      - "skill_multiplier: 스킬별 배율 (skills.yaml 참조)"
+      - "armor_penetration: 장비/버프에서 획득 (0~0.5 범위)"
+      - "random(0.95, 1.05): ±5% 랜덤 편차"
+
+  magical:
+    formula: |
+      raw_damage = MATK * skill_multiplier
+      resistance_reduction = MDEF * (1 - magic_penetration)
+      reduced = max(raw_damage - resistance_reduction, 1)
+      final = reduced * (1 + elemental_bonus) * (1 + damage_bonus) * random(0.95, 1.05)
+
+  true_damage:
+    formula: |
+      final = base_amount * skill_multiplier
+    notes: "방어력/저항 무시. 특수 스킬에만 사용 (궁극기, 보스 기믹 등)"
+
+  dot_damage:  # Damage over Time
+    formula: |
+      tick_damage = base_dot * (1 + damage_bonus)
+      # DEF/MDEF의 30%만 적용
+      reduction = (DEF or MDEF) * 0.3
+      final_per_tick = max(tick_damage - reduction, 1)
+    tick_interval: 1.0  # 1초마다
+    max_stacks: 5       # 같은 DoT 최대 중첩
+
+# ──────────────────────────────────────────────────────────
+# 3. 치명타 시스템
+# ──────────────────────────────────────────────────────────
+critical:
+  check: "random(0, 1) < CRIT_RATE"
+  damage_formula: "final_damage * CRIT_DMG"
+  visual:
+    normal_hit: "흰색 데미지 텍스트"
+    critical_hit: "노란색 데미지 텍스트 + 1.5배 크기 + '!' 접미사"
+  skills:
+    guaranteed_crit: "특정 스킬은 100% 크리 (스킬 데이터에 is_guaranteed_crit: true)"
+    crit_rate_bonus: "스킬별 추가 크리 확률 (스킬 데이터에 extra_crit_rate)"
+
+# ──────────────────────────────────────────────────────────
+# 4. 명중 / 회피
+# ──────────────────────────────────────────────────────────
+hit_check:
+  formula: |
+    hit_chance = attacker.ACCURACY - defender.DODGE
+    hit_chance = clamp(hit_chance, 0.05, 1.0)  # 최소 5% 명중, 최대 100%
+    is_hit = random(0, 1) < hit_chance
+  miss_visual: "회색 'MISS' 텍스트, 떠오르며 사라짐"
+  notes:
+    - "보스 몬스터는 회피 불가 (DODGE=0)"
+    - "PvP에서는 DODGE 캡이 20%로 줄어듦"
+    - "스킬 중 일부는 필중 (is_undodgeable: true)"
+
+# ──────────────────────────────────────────────────────────
+# 5. 원소 시스템
+# ──────────────────────────────────────────────────────────
+elements:
+  types: [fire, ice, lightning, dark, holy, nature]
+
+  # 상성 테이블 (행=공격자 원소, 열=방어자 원소)
+  # 1.0 = 보통, 1.3 = 강함, 0.7 = 약함
+  affinity_table:
+    fire:      { fire: 0.5, ice: 1.3, lightning: 1.0, dark: 1.0, holy: 0.7, nature: 1.3 }
+    ice:       { fire: 0.7, ice: 0.5, lightning: 1.3, dark: 1.0, holy: 1.0, nature: 0.7 }
+    lightning: { fire: 1.0, ice: 0.7, lightning: 0.5, dark: 1.3, holy: 1.0, nature: 1.0 }
+    dark:      { fire: 1.0, ice: 1.0, lightning: 0.7, dark: 0.5, holy: 0.7, nature: 1.3 }
+    holy:      { fire: 1.3, ice: 1.0, lightning: 1.0, dark: 1.3, holy: 0.5, nature: 0.7 }
+    nature:    { fire: 0.7, ice: 1.3, lightning: 1.0, dark: 0.7, holy: 1.3, nature: 0.5 }
+
+  # 원소 부여
+  application:
+    - "무기에 원소 부여 가능 (인챈트)"
+    - "스킬에 고유 원소 있음"
+    - "몬스터에 원소 속성/약점 있음"
+    - "원소 보너스 = affinity_table[atk_element][def_element] - 1.0"
+
+# ──────────────────────────────────────────────────────────
+# 6. 군중 제어 (CC) 시스템
+# ──────────────────────────────────────────────────────────
+crowd_control:
+  types:
+    stun:
+      desc: "행동 불가 (이동/공격/스킬 모두 차단)"
+      max_duration: 3.0
+      pvp_max_duration: 1.5
+      icon: "cc_stun.png"
+      visual: "캐릭터 머리 위 별 이펙트"
+
+    knockback:
+      desc: "밀려남 (이동 방향 반대로 N유닛)"
+      default_distance: 5.0
+      knockback_immune_while: ["casting", "super_armor"]
+      visual: "캐릭터가 뒤로 미끄러짐"
+
+    knockdown:
+      desc: "넘어짐 (2초간 행동 불가 후 일어남)"
+      duration: 2.0
+      pvp_duration: 1.0
+      recovery_invincible: 0.5  # 일어나면서 0.5초 무적
+      visual: "캐릭터 눕는 애니메이션"
+
+    freeze:
+      desc: "얼림 (이동/공격 불가, 받는 데미지 +20%)"
+      damage_amplify: 1.2
+      max_duration: 4.0
+      pvp_max_duration: 2.0
+      break_on_damage: false
+      visual: "얼음 이펙트로 캐릭터 감싸기"
+
+    slow:
+      desc: "이동속도 감소"
+      default_amount: 0.3  # 30% 감소
+      max_stack: 3         # 최대 90% 감소 (최소 이동속도 보장)
+      min_move_speed: 50   # 절대 0이 되지 않음
+      visual: "발밑 파란 이펙트"
+
+    silence:
+      desc: "스킬 사용 불가 (기본 공격은 가능)"
+      max_duration: 5.0
+      pvp_max_duration: 2.5
+      visual: "입 위에 X 표시"
+
+    fear:
+      desc: "제어 불가, 랜덤 방향으로 도주"
+      max_duration: 3.0
+      pvp_max_duration: 1.5
+      visual: "보라색 안개 + 캐릭터 떨림"
+
+    pull:
+      desc: "시전자 방향으로 끌어당김"
+      max_distance: 10.0
+      visual: "체인/줄 이펙트"
+
+    taunt:
+      desc: "강제로 시전자를 공격하게 만듦 (PvE only)"
+      max_duration: 5.0
+      pve_only: true
+      visual: "빨간 느낌표 머리 위"
+
+    bind:
+      desc: "이동 불가 (공격/스킬은 가능)"
+      max_duration: 4.0
+      pvp_max_duration: 2.0
+      visual: "발밑 덫/사슬 이펙트"
+
+  # CC 면역 (연속 CC 방지)
+  diminishing_returns:
+    enabled: true
+    window: 15.0           # 15초 내 같은 CC 재적용 시
+    reduction_per_stack: 0.5  # 지속시간 50% 감소
+    max_stack: 3           # 3회차 = 면역
+    immunity_duration: 5.0 # 면역 후 5초간 해당 CC 무효
+    notes: "DR은 CC 종류별로 독립 추적 (stun DR ≠ freeze DR)"
+
+  # 슈퍼아머 (피격 경직 면역)
+  super_armor:
+    desc: "스킬 시전 중 CC 면역"
+    types:
+      none: "CC에 모두 걸림"
+      partial: "stun/knockdown만 면역, 나머지 걸림"
+      full: "모든 CC 면역"
+    notes: "각 스킬에 super_armor 타입 지정. 궁극기는 대부분 full."
+
+  # CC 해제 스킬
+  cleanse:
+    desc: "CC 상태 즉시 해제"
+    cooldown: 30.0
+    pvp_cooldown: 45.0
+    cleanses: ["stun", "freeze", "slow", "silence", "fear", "bind"]
+    not_cleanses: ["knockback", "knockdown"]  # 물리적 CC는 해제 불가
+
+# ──────────────────────────────────────────────────────────
+# 7. 전투 상태 & 타겟팅
+# ──────────────────────────────────────────────────────────
+targeting:
+  pve:
+    auto_target: true          # 가장 가까운 적 자동 타겟
+    tab_targeting: true        # Tab 키로 타겟 순환
+    click_targeting: true      # 클릭으로 직접 타겟
+    max_target_range: 30.0     # 30유닛 이상은 타겟 불가
+    target_priority: "closest" # closest / lowest_hp / highest_threat
+
+  pvp:
+    friendly_fire: false       # 아군 공격 불가
+    party_immune: true         # 파티원 공격 불가
+    guild_immune: false        # 길드원은 공격 가능 (전쟁 시)
+
+  aoe:  # Area of Effect
+    shapes:
+      circle:
+        params: [center_x, center_y, radius]
+        check: "distance(target, center) <= radius"
+      rectangle:
+        params: [origin_x, origin_y, width, length, rotation]
+        check: "target in rotated_rect(origin, w, l, rot)"
+      cone:
+        params: [origin_x, origin_y, direction, angle, range]
+        check: "angle_between(origin→target, direction) <= angle/2 AND distance <= range"
+      line:
+        params: [start_x, start_y, end_x, end_y, width]
+        check: "distance_to_line(target, start, end) <= width/2"
+
+    max_targets:
+      pve: 20       # PvE에서 최대 20마리
+      pvp: 8        # PvP에서 최대 8명
+
+# ──────────────────────────────────────────────────────────
+# 8. 버프 / 디버프 시스템
+# ──────────────────────────────────────────────────────────
+buffs:
+  max_buffs: 30        # 한 캐릭터에 최대 30개 버프
+  max_debuffs: 15      # 한 캐릭터에 최대 15개 디버프
+
+  stacking:
+    same_source: "refresh"     # 같은 시전자 → 지속시간 갱신
+    different_source: "stack"  # 다른 시전자 → 중첩 (max_stack까지)
+    exception: "strongest_wins"  # 일부 버프는 가장 강한 것만 적용
+
+  categories:
+    stat_buff:
+      desc: "스탯 증가 (ATK UP, DEF UP 등)"
+      example: { stat: "ATK", amount: 50, duration: 30, max_stack: 1 }
+
+    stat_debuff:
+      desc: "스탯 감소 (ATK DOWN, SLOW 등)"
+      example: { stat: "MOVE_SPEED", amount: -0.3, duration: 10, max_stack: 3 }
+
+    hot:
+      desc: "Heal over Time (지속 회복)"
+      example: { heal_per_tick: 50, tick_interval: 1.0, duration: 10 }
+
+    dot:
+      desc: "Damage over Time (지속 피해)"
+      example: { damage_per_tick: 30, tick_interval: 1.0, duration: 8, element: "fire" }
+
+    shield:
+      desc: "피해 흡수 실드"
+      example: { absorb_amount: 500, duration: 10, element: "all" }
+      notes: "데미지 받으면 HP 대신 실드 먼저 소모. 실드끼리 중첩 가능."
+
+    immunity:
+      desc: "특정 효과 면역"
+      example: { immune_to: ["stun", "knockback"], duration: 5 }
+
+    transform:
+      desc: "변신 (스탯 변경 + 스킬 교체)"
+      example: { new_stats: {atk: 500, def: 300}, new_skills: [101,102], duration: 20 }
+
+  # 버프 우선도 (같은 종류끼리 충돌 시)
+  priority_rules:
+    - "수치가 높은 버프가 우선"
+    - "지속시간이 긴 버프가 우선 (수치 동일 시)"
+    - "파티 버프 > 개인 버프 (카테고리 우선)"
+
+# ──────────────────────────────────────────────────────────
+# 9. 회복 시스템
+# ──────────────────────────────────────────────────────────
+healing:
+  formula: |
+    raw_heal = base_heal * (1 + healing_power_bonus)
+    final_heal = min(raw_heal, target.MAX_HP - target.current_hp)
+  over_heal: false  # 최대 HP 초과 불가
+  combat_reduction: 0.0    # 전투 중 회복 감소 없음 (PvE 친화)
+  pvp_reduction: 0.3       # PvP에서 회복량 30% 감소
+
+  natural_regen:
+    hp:
+      interval: 5.0       # 5초마다
+      amount: "hp_regen"   # 스탯에서 계산
+      in_combat: false     # 전투 중 자연회복 없음
+      out_of_combat_delay: 5.0  # 전투 종료 5초 후 시작
+    mp:
+      interval: 5.0
+      amount: "mp_regen"
+      in_combat: true      # MP는 전투 중에도 자연회복
+      in_combat_rate: 0.5  # 전투 중 50% 감소
+
+  potions:
+    hp_potion_small: { heal: 300, cooldown: 15, type: "instant" }
+    hp_potion_medium: { heal: 800, cooldown: 15, type: "instant" }
+    hp_potion_large: { heal: 2000, cooldown: 15, type: "instant" }
+    mp_potion_small: { restore: 200, cooldown: 15, type: "instant" }
+    mp_potion_medium: { restore: 500, cooldown: 15, type: "instant" }
+    elixir: { heal_hp: 1000, restore_mp: 500, cooldown: 60, type: "instant" }
+    potion_shared_cooldown: true  # 모든 포션 공유 쿨다운
+
+# ──────────────────────────────────────────────────────────
+# 10. 사망 & 부활
+# ──────────────────────────────────────────────────────────
+death:
+  player:
+    on_death:
+      - "모든 버프 제거"
+      - "화면 흑백 + 사망 오버레이"
+      - "부활 옵션 UI 표시"
+    revival_options:
+      town_revive:
+        desc: "마을에서 부활"
+        cost: "없음"
+        hp_on_revive: 0.3       # 30% HP
+        mp_on_revive: 0.3
+        cooldown: 0
+      field_revive:
+        desc: "제자리 부활"
+        cost: { gold: 100, scales_with_level: true, formula: "100 * level" }
+        hp_on_revive: 0.5       # 50% HP
+        mp_on_revive: 0.5
+        cooldown: 60             # 60초 쿨다운
+        invincible_on_revive: 3.0  # 3초 무적
+      party_revive:
+        desc: "파티원 부활 스킬로 부활"
+        hp_on_revive: 0.3
+        mp_on_revive: 0.1
+        invincible_on_revive: 2.0
+
+    penalties:
+      pve:
+        exp_loss: 0.0          # 경험치 손실 없음 (캐주얼 친화)
+        gold_loss: 0.0
+        equipment_damage: 0.01  # 장비 내구도 1% 감소
+      pvp:
+        exp_loss: 0.0
+        rating_loss: true      # 레이팅 감소
+
+  monster:
+    on_death:
+      - "사망 애니메이션 재생 (1~2초)"
+      - "루트 드롭 생성"
+      - "경험치 분배"
+      - "퀘스트 카운트 갱신"
+      - "1초 후 페이드아웃"
+    respawn:
+      normal: { delay: 30, variance: 5 }      # 30±5초
+      elite: { delay: 300, variance: 30 }      # 5±0.5분
+      boss: { delay: 3600, variance: 0 }       # 1시간 고정
+      raid_boss: { delay: 0, manual: true }    # 수동 리셋
+
+# ──────────────────────────────────────────────────────────
+# 11. 어그로 시스템 (PvE 위협도)
+# ──────────────────────────────────────────────────────────
+aggro:
+  formula: |
+    threat = damage_dealt * threat_multiplier + heal_amount * 0.5 + taunt_bonus
+  threat_multiplier_by_class:
+    warrior: 1.5    # 탱커는 위협도 보너스
+    archer: 0.8     # 딜러는 위협도 감소
+    mage: 0.8
+  taunt_bonus: 99999  # 도발 = 최대 위협도
+  decay:
+    rate: 0.0        # 자연 감소 없음
+    on_death: "clear" # 사망 시 위협도 초기화
+  leash_range: 40.0   # 40유닛 밖으로 나가면 위협도 초기화 + 귀환
+  max_table_size: 8    # 어그로 테이블 최대 8명
+
+# ──────────────────────────────────────────────────────────
+# 12. 전투 속도 & 글로벌 쿨다운
+# ──────────────────────────────────────────────────────────
+combat_timing:
+  global_cooldown: 0.0     # GCD 없음 (로아 스타일: 스킬별 개별 쿨)
+  animation_cancel: true   # 대시로 공격 모션 캔슬 가능
+  dash:
+    cooldown: 4.0
+    distance: 6.0
+    invincible_frames: 0.3  # 대시 중 0.3초 무적
+    charges: 2              # 2회 연속 사용 가능
+    charge_recover: 6.0     # 충전 복구 6초
+  basic_attack:
+    combo_chain: 3          # 기본 공격 3타 콤보
+    combo_window: 1.5       # 1.5초 내 다음 타 입력
+    combo_reset: 2.0        # 2초 무입력 시 콤보 초기화
+    combo_multipliers: [1.0, 1.2, 1.5]  # 각 타수별 배율
+
+# ──────────────────────────────────────────────────────────
+# 13. PvP 전용 규칙
+# ──────────────────────────────────────────────────────────
+pvp_modifiers:
+  damage_reduction: 0.4     # PvP 데미지 40% 감소
+  healing_reduction: 0.3    # PvP 회복 30% 감소
+  cc_duration_cap: 0.5      # CC 최대 지속시간 50% (PvE 대비)
+  dodge_cap: 0.20           # 회피율 20% 상한
+  crit_rate_cap: 0.40       # 크리 40% 상한
+  stat_normalization:
+    enabled: false           # 스탯 정규화 OFF (장비 차이 반영)
+    arena_normalized: true   # 투기장에서만 정규화 ON
+    arena_base_stats:        # 투기장 기본 스탯 (장비 무시)
+      warrior: { hp: 10000, atk: 300, def: 200, speed: 200 }
+      archer:  { hp: 7000, atk: 350, def: 150, speed: 220 }
+      mage:    { hp: 6000, matk: 400, mdef: 180, speed: 200 }

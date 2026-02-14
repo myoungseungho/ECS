@@ -1,0 +1,285 @@
+# ============================================================
+# ENHANCEMENT SYSTEM — 강화/각인/보석/초월 완전 정의
+# Reference: Lost Ark / 메이플 / 리니지
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 장비 강화 (Enhancement)
+# ──────────────────────────────────────────────────────────
+enhancement:
+  max_level: 20
+  available_tiers: ["uncommon", "rare", "epic", "legendary"]  # common은 강화 불가
+
+  # 강화 확률 테이블
+  success_rate:
+    # [강화 단계]: 성공률
+    1:  0.95    # 95%
+    2:  0.90    # 90%
+    3:  0.85
+    4:  0.80
+    5:  0.75
+    6:  0.70
+    7:  0.60
+    8:  0.50
+    9:  0.40
+    10: 0.30    # +10 = 30%
+    11: 0.25
+    12: 0.20
+    13: 0.15
+    14: 0.10
+    15: 0.07    # +15 = 7%
+    16: 0.05
+    17: 0.03
+    18: 0.02
+    19: 0.01
+    20: 0.005   # +20 = 0.5%
+
+  # 강화 비용
+  gold_cost:
+    formula: "base_cost * (1 + enhancement_level * 0.5)"
+    base_cost_by_tier:
+      uncommon: 100
+      rare: 500
+      epic: 2000
+      legendary: 10000
+
+  material_cost:
+    name: "강화석"
+    count_per_attempt:
+      1-5: 1
+      6-10: 2
+      11-15: 5
+      16-20: 10
+
+  # 실패 시 처리
+  on_failure:
+    level_1_to_10:
+      downgrade: false      # 강화 단계 유지
+      destroy: false
+      notes: "+10까지는 실패해도 안전 (캐주얼 친화)"
+    level_11_to_15:
+      downgrade: true       # 1단계 하락
+      destroy: false
+      downgrade_amount: 1
+    level_16_to_20:
+      downgrade: true       # 2단계 하락
+      destroy: false
+      downgrade_amount: 2
+      notes: "파괴는 없음 (유저 이탈 방지)"
+
+  # 안전장치 (Pity System)
+  pity_system:
+    enabled: true
+    desc: "연속 실패 시 성공률 누적 증가"
+    bonus_per_fail: 0.05    # 실패당 5% 추가
+    max_bonus: 0.50         # 최대 50% 추가 (기본 + 50%)
+    reset_on_success: true  # 성공 시 누적 초기화
+    notes: "예: +15(7%) 연속 10회 실패 → 7% + 50% = 57%"
+
+  # 축복 강화 (보호권)
+  protection:
+    name: "축복의 보호권"
+    effect: "실패해도 강화 단계 유지 (하락 방지)"
+    source: "캐시샵 / 이벤트 보상"
+    usable_at: "11단계 이상"
+
+  # 강화 스탯 증가량
+  stat_bonus_per_level:
+    weapon:
+      atk: 5           # +1당 ATK +5
+      matk: 5           # 마법 무기의 경우
+    armor:
+      def: 3            # +1당 DEF +3
+      max_hp: 20        # +1당 HP +20
+    accessory:
+      crit_rate: 0.002  # +1당 크리 0.2%
+      crit_dmg: 0.005   # +1당 크뎀 0.5%
+
+  # 강화 시각 효과
+  visual:
+    0-4: "없음"
+    5-9: "은색 빛남"
+    10-14: "금색 빛남"
+    15-19: "붉은 오라"
+    20: "무지개 오라 + 파티클"
+
+  # 강화 연출
+  animation:
+    duration: 2.0       # 2초 연출
+    sequence:
+      - "장비가 대장장이 모루 위에 올라감"
+      - "망치 3회 타격 (불꽃)"
+      - "빛 폭발 → 성공(금색) / 실패(회색)"
+      - "결과 텍스트 + 사운드"
+
+# ──────────────────────────────────────────────────────────
+# 2. 보석 시스템 (Gem)
+# ──────────────────────────────────────────────────────────
+gems:
+  desc: "장비에 보석을 장착하여 추가 능력 부여"
+  max_sockets_per_equipment: 3
+
+  tiers:
+    rough:    { level: 1, stat_bonus: 1.0, color: "회색" }
+    polished: { level: 2, stat_bonus: 2.0, color: "초록" }
+    refined:  { level: 3, stat_bonus: 3.5, color: "파랑" }
+    flawless: { level: 4, stat_bonus: 5.0, color: "보라" }
+    perfect:  { level: 5, stat_bonus: 8.0, color: "주황" }
+
+  types:
+    ruby:
+      name: "루비"
+      stat: "ATK"
+      bonus_per_tier: [5, 10, 18, 25, 40]
+    sapphire:
+      name: "사파이어"
+      stat: "MATK"
+      bonus_per_tier: [5, 10, 18, 25, 40]
+    emerald:
+      name: "에메랄드"
+      stat: "DEF"
+      bonus_per_tier: [3, 6, 10, 15, 25]
+    diamond:
+      name: "다이아몬드"
+      stat: "MAX_HP"
+      bonus_per_tier: [30, 60, 100, 150, 250]
+    topaz:
+      name: "토파즈"
+      stat: "CRIT_RATE"
+      bonus_per_tier: [0.005, 0.01, 0.015, 0.02, 0.03]
+    amethyst:
+      name: "자수정"
+      stat: "CRIT_DMG"
+      bonus_per_tier: [0.01, 0.02, 0.035, 0.05, 0.08]
+
+  # 보석 합성 (3개 → 상위 1개)
+  fusion:
+    same_type_required: true  # 같은 종류만 합성 가능
+    count_required: 3         # 3개 합성 → 1단계 상위
+    gold_cost: [100, 500, 2000, 10000]  # 단계별 합성 비용
+    success_rate: 1.0         # 100% 성공 (실패 없음)
+
+  # 보석 탈거
+  removal:
+    cost: 500
+    destroy_gem: false  # 탈거 시 보석 유지
+
+# ──────────────────────────────────────────────────────────
+# 3. 각인 시스템 (Engraving)
+# ──────────────────────────────────────────────────────────
+engravings:
+  desc: "캐릭터에 패시브 효과 부여. 장비의 각인 슬롯에서 획득."
+  max_active: 6            # 동시에 최대 6개 각인 활성화
+  max_level: 3             # 각인 레벨 1~3
+
+  # 활성화 조건: 각인 포인트 누적
+  activation:
+    level_1: 5   # 5포인트 → 레벨 1
+    level_2: 10  # 10포인트 → 레벨 2
+    level_3: 15  # 15포인트 → 레벨 3
+
+  # 각인 목록 (예시, 전체 20~30개)
+  list:
+    grudge:
+      name: "원한"
+      desc: "보스 몬스터에게 주는 피해 증가 / 받는 피해도 증가"
+      effects:
+        1: { boss_damage: +0.04, damage_taken: +0.20 }  # 4% 딜 / 20% 피격
+        2: { boss_damage: +0.10, damage_taken: +0.20 }
+        3: { boss_damage: +0.20, damage_taken: +0.20 }
+      notes: "고위험 고수익. 숙련자용."
+
+    cursed_doll:
+      name: "저주받은 인형"
+      desc: "ATK 증가 / 회복 효율 감소"
+      effects:
+        1: { atk_bonus: +0.03, healing_received: -0.25 }
+        2: { atk_bonus: +0.08, healing_received: -0.25 }
+        3: { atk_bonus: +0.16, healing_received: -0.25 }
+
+    keen_blunt:
+      name: "예리한 둔기"
+      desc: "치명타 데미지 증가 / 일반 데미지 감소"
+      effects:
+        1: { crit_dmg: +0.10, non_crit_dmg: -0.02 }
+        2: { crit_dmg: +0.25, non_crit_dmg: -0.02 }
+        3: { crit_dmg: +0.50, non_crit_dmg: -0.02 }
+
+    master_brawler:
+      name: "정면승부"
+      desc: "정면 공격 시 피해 증가"
+      effects:
+        1: { front_attack_bonus: +0.05 }
+        2: { front_attack_bonus: +0.12 }
+        3: { front_attack_bonus: +0.25 }
+
+    adrenaline:
+      name: "아드레날린"
+      desc: "스킬 사용 시 ATK 스택 누적 (최대 6)"
+      effects:
+        1: { atk_per_stack: +0.003, crit_at_max: +0.05, stacks: 6 }
+        2: { atk_per_stack: +0.006, crit_at_max: +0.10, stacks: 6 }
+        3: { atk_per_stack: +0.01,  crit_at_max: +0.15, stacks: 6 }
+
+    spirit_absorption:
+      name: "정기 흡수"
+      desc: "공격 속도 / 이동 속도 증가"
+      effects:
+        1: { attack_speed: +0.03, move_speed: +0.03 }
+        2: { attack_speed: +0.08, move_speed: +0.08 }
+        3: { attack_speed: +0.15, move_speed: +0.15 }
+
+    heavy_armor:
+      name: "중갑"
+      desc: "방어력 대폭 증가"
+      effects:
+        1: { def_bonus: +0.20 }
+        2: { def_bonus: +0.50 }
+        3: { def_bonus: +1.00 }  # 방어력 2배
+
+    expert:
+      name: "전문가"
+      desc: "실드/회복 효과 증가 (서포터용)"
+      effects:
+        1: { healing_bonus: +0.06, shield_bonus: +0.06 }
+        2: { healing_bonus: +0.14, shield_bonus: +0.14 }
+        3: { healing_bonus: +0.24, shield_bonus: +0.24 }
+
+    awakening_engraving:
+      name: "각성"
+      desc: "궁극기 쿨다운 감소"
+      effects:
+        1: { ultimate_cdr: -0.10 }
+        2: { ultimate_cdr: -0.25 }
+        3: { ultimate_cdr: -0.50 }
+
+# ──────────────────────────────────────────────────────────
+# 4. 초월 시스템 (Transcendence) — 만렙 후 성장
+# ──────────────────────────────────────────────────────────
+transcendence:
+  desc: "레벨 60(만렙) 이후 추가 성장 수단"
+  unlock: "level >= 60"
+
+  # 초월 경험치 (파라곤 레벨 개념)
+  paragon_level:
+    max: 100
+    exp_per_level: 500000   # 만렙 경험치의 약 1.5배
+    per_level_bonus:
+      all_stats: 1          # 레벨당 전스탯 +1
+      max_hp: 50
+    milestone_bonuses:
+      10: { title: "초월자 I", bonus: { atk: 20 } }
+      25: { title: "초월자 II", bonus: { all_stats: 5 } }
+      50: { title: "초월자 III", bonus: { atk: 50, def: 50 } }
+      100: { title: "궁극의 초월자", cosmetic: "황금 날개 이펙트" }
+
+  # 장비 초월 (기존 장비의 한계 돌파)
+  equipment_transcend:
+    desc: "레전더리 장비를 초월하여 추가 스탯 획득"
+    max_transcend: 5
+    requirement: "enhancement +15 이상"
+    cost:
+      material: "초월석"
+      gold: [50000, 100000, 200000, 500000, 1000000]
+    success_rate: [0.50, 0.30, 0.20, 0.10, 0.05]
+    bonus_per_level: "기본 스탯 +10%씩 누적"
