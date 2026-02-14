@@ -280,6 +280,58 @@ namespace Network
         GEM_EQUIP_RESULT   = 451,  // S→C: status(1) item_slot(1) gem_slot(1) gem_type(1) gem_tier(1) = 5B
         GEM_FUSE           = 452,  // C→S: gem_type(1) gem_tier(1)
         GEM_FUSE_RESULT    = 453,  // S→C: status(1) gem_type(1) new_tier(1) = 3B
+
+        // ━━━ S042: Phase 5 — 캐시샵/배틀패스/이벤트 (TASK 11, MsgType 474-489) ━━━
+        CASH_SHOP_LIST_REQ      = 474,  // C→S: category(1)
+        CASH_SHOP_LIST          = 475,  // S→C: count(1) {item_id(4) name(32) category(1) price(4) currency(1)}*N = 42B/entry
+        CASH_SHOP_BUY           = 476,  // C→S: item_id(4) count(1)
+        CASH_SHOP_BUY_RESULT    = 477,  // S→C: result(1) item_id(4) remaining_crystals(4) = 9B
+        BATTLEPASS_INFO_REQ     = 478,  // C→S: empty
+        BATTLEPASS_INFO         = 479,  // S→C: season_id(2) level(1) exp(2) max_exp(2) is_premium(1) days_left(2) = 10B
+        BATTLEPASS_REWARD_CLAIM = 480,  // C→S: level(1) track(1) (0=free, 1=premium)
+        BATTLEPASS_REWARD_RESULT = 481, // S→C: result(1) level(1) track(1) reward_type(1) reward_id(4) reward_count(2) = 10B
+        BATTLEPASS_BUY_PREMIUM  = 482,  // C→S: empty
+        BATTLEPASS_BUY_RESULT   = 483,  // S→C: result(1) remaining_crystals(4) = 5B
+        EVENT_LIST_REQ          = 484,  // C→S: empty
+        EVENT_LIST              = 485,  // S→C: count(1) {event_id(2) type(1) name(32) remaining_sec(4)}*N = 39B/entry
+        EVENT_CLAIM             = 486,  // C→S: event_id(2)
+        EVENT_CLAIM_RESULT      = 487,  // S→C: result(1) event_id(2) reward_type(1) reward_id(4) reward_count(2) = 10B
+        SUBSCRIPTION_INFO_REQ   = 488,  // C→S: empty
+        SUBSCRIPTION_INFO       = 489,  // S→C: is_active(1) days_left(2) daily_crystals(2) = 5B
+
+        // ━━━ S042: Phase 5 — 월드 시스템 (TASK 12, MsgType 490-501) ━━━
+        WEATHER_UPDATE          = 490,  // S→C: zone_id(4) weather_type(1) transition_sec(1) = 6B
+        TIME_UPDATE             = 491,  // S→C: game_time_sec(4) = 4B (0~3600 게임내 하루)
+        TELEPORT_LIST_REQ       = 492,  // C→S: empty
+        TELEPORT_LIST           = 493,  // S→C: count(1) {waypoint_id(2) zone_id(4) name(32) x(4f) y(4f) z(4f) cost(4)}*N = 50B/entry
+        TELEPORT_REQ            = 494,  // C→S: waypoint_id(2)
+        TELEPORT_RESULT         = 495,  // S→C: result(1) zone_id(4) x(4f) y(4f) z(4f) = 17B
+        WORLD_OBJECT_INTERACT   = 496,  // C→S: object_id(4) action(1) = 5B
+        WORLD_OBJECT_RESULT     = 497,  // S→C: result(1) object_id(4) item_id(4) count(2) gold(4) = 15B
+        MOUNT_SUMMON            = 498,  // C→S: mount_id(4)
+        MOUNT_RESULT            = 499,  // S→C: result(1) mount_id(4) speed_mult(2) = 7B (speed_mult * 100)
+        MOUNT_DISMOUNT          = 500,  // C→S: empty
+        MOUNT_DISMOUNT_RESULT   = 501,  // S→C: result(1) = 1B
+
+        // ━━━ S042: Phase 5 — 출석/리셋/컨텐츠 해금 (TASK 13, MsgType 502-509) ━━━
+        ATTENDANCE_INFO_REQ     = 502,  // C→S: empty
+        ATTENDANCE_INFO         = 503,  // S→C: day(1) total_days(1) {claimed(1)}*14 = 16B
+        ATTENDANCE_CLAIM        = 504,  // C→S: day(1)
+        ATTENDANCE_CLAIM_RESULT = 505,  // S→C: result(1) day(1) reward_type(1) reward_id(4) reward_count(2) = 9B
+        DAILY_RESET_NOTIFY      = 506,  // S→C: reset_type(1) timestamp(4) = 5B (0=daily, 1=weekly)
+        CONTENT_UNLOCK_NOTIFY   = 507,  // S→C: unlock_type(1) system_name_len(1) system_name(N) description_len(1) description(N)
+        CONTENT_UNLOCK_ACK      = 508,  // C→S: unlock_type(1) (클라 확인 응답)
+        LOGIN_REWARD_NOTIFY     = 509,  // S→C: reward_type(1) reward_id(4) reward_count(2) = 7B
+
+        // ━━━ S042: Phase 5 — 스토리/대화 시스템 (TASK 14, MsgType 510-517) ━━━
+        DIALOG_CHOICE           = 510,  // C→S: npc_id(2) choice_index(1) = 3B
+        DIALOG_CHOICE_RESULT    = 511,  // S→C: npc_id(2) next_line_count(1) {speaker_len(1) speaker(N) text_len(2) text(N)}*N choice_count(1) {text_len(1) text(N)}*N
+        CUTSCENE_TRIGGER        = 512,  // S→C: cutscene_id(2) duration_sec(2) = 4B
+        CUTSCENE_SKIP           = 513,  // C→S: cutscene_id(2)
+        CUTSCENE_END            = 514,  // S→C: cutscene_id(2) = 2B
+        STORY_PROGRESS_REQ      = 515,  // C→S: empty
+        STORY_PROGRESS          = 516,  // S→C: chapter(1) quest_id(4) quest_state(1) = 6B
+        MAIN_QUEST_DATA         = 517,  // S→C: quest_id(4) name(32) desc_len(2) desc(N) objective_count(1) {type(1) target(4) current(4) required(4)}*N
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -1369,5 +1421,333 @@ namespace Network
         public GemResult Status;
         public byte GemType;
         public byte NewTier;
+    }
+
+    // ━━━ S042: Phase 5 — 캐시샵/배틀패스/이벤트 (TASK 11) ━━━
+
+    /// <summary>캐시샵 카테고리</summary>
+    public enum CashShopCategory : byte
+    {
+        ALL         = 0,
+        COSMETIC    = 1,
+        CONVENIENCE = 2,
+        MOUNT       = 3,
+        PET         = 4,
+        EMOTE       = 5,
+    }
+
+    /// <summary>캐시샵 화폐 타입</summary>
+    public enum CashCurrency : byte
+    {
+        CRYSTAL = 0,
+        GOLD    = 1,
+    }
+
+    /// <summary>캐시샵 구매 결과 코드</summary>
+    public enum CashShopBuyResult : byte
+    {
+        SUCCESS          = 0,
+        ITEM_NOT_FOUND   = 1,
+        NOT_ENOUGH_CRYSTAL = 2,
+        INVENTORY_FULL   = 3,
+        PURCHASE_LIMIT   = 4,
+    }
+
+    /// <summary>캐시샵 아이템 정보 (CASH_SHOP_LIST 파싱용)</summary>
+    public class CashShopItemInfo
+    {
+        public uint ItemId;
+        public string Name;
+        public CashShopCategory Category;
+        public uint Price;
+        public CashCurrency Currency;
+    }
+
+    /// <summary>캐시샵 구매 결과 (CASH_SHOP_BUY_RESULT 파싱용)</summary>
+    public class CashShopBuyResultData
+    {
+        public CashShopBuyResult Result;
+        public uint ItemId;
+        public uint RemainingCrystals;
+    }
+
+    /// <summary>배틀패스 보상 트랙</summary>
+    public enum BattlePassTrack : byte
+    {
+        FREE    = 0,
+        PREMIUM = 1,
+    }
+
+    /// <summary>배틀패스 보상 결과 코드</summary>
+    public enum BattlePassRewardResult : byte
+    {
+        SUCCESS          = 0,
+        ALREADY_CLAIMED  = 1,
+        LEVEL_NOT_REACHED = 2,
+        NOT_PREMIUM      = 3,
+        INVENTORY_FULL   = 4,
+    }
+
+    /// <summary>배틀패스 정보 (BATTLEPASS_INFO 파싱용)</summary>
+    public class BattlePassInfoData
+    {
+        public ushort SeasonId;
+        public byte Level;
+        public ushort Exp;
+        public ushort MaxExp;
+        public bool IsPremium;
+        public ushort DaysLeft;
+    }
+
+    /// <summary>배틀패스 보상 결과 (BATTLEPASS_REWARD_RESULT 파싱용)</summary>
+    public class BattlePassRewardResultData
+    {
+        public BattlePassRewardResult Result;
+        public byte Level;
+        public BattlePassTrack Track;
+        public byte RewardType;
+        public uint RewardId;
+        public ushort RewardCount;
+    }
+
+    /// <summary>배틀패스 구매 결과 (BATTLEPASS_BUY_RESULT 파싱용)</summary>
+    public class BattlePassBuyResultData
+    {
+        public byte Result;
+        public uint RemainingCrystals;
+    }
+
+    /// <summary>이벤트 타입</summary>
+    public enum GameEventType : byte
+    {
+        LOGIN_EVENT     = 0,
+        DOUBLE_EXP      = 1,
+        BOSS_RUSH       = 2,
+        SEASONAL        = 3,
+    }
+
+    /// <summary>이벤트 정보 (EVENT_LIST 파싱용)</summary>
+    public class GameEventInfo
+    {
+        public ushort EventId;
+        public GameEventType Type;
+        public string Name;
+        public uint RemainingSeconds;
+    }
+
+    /// <summary>이벤트 보상 결과 (EVENT_CLAIM_RESULT 파싱용)</summary>
+    public class EventClaimResultData
+    {
+        public byte Result;
+        public ushort EventId;
+        public byte RewardType;
+        public uint RewardId;
+        public ushort RewardCount;
+    }
+
+    /// <summary>월정액 정보 (SUBSCRIPTION_INFO 파싱용)</summary>
+    public class SubscriptionInfoData
+    {
+        public bool IsActive;
+        public ushort DaysLeft;
+        public ushort DailyCrystals;
+    }
+
+    // ━━━ S042: Phase 5 — 월드 시스템 (TASK 12) ━━━
+
+    /// <summary>날씨 타입</summary>
+    public enum WeatherType : byte
+    {
+        CLEAR     = 0,
+        RAIN      = 1,
+        SNOW      = 2,
+        FOG       = 3,
+        STORM     = 4,
+        SANDSTORM = 5,
+    }
+
+    /// <summary>날씨 업데이트 데이터 (WEATHER_UPDATE 파싱용)</summary>
+    public class WeatherUpdateData
+    {
+        public uint ZoneId;
+        public WeatherType Weather;
+        public byte TransitionSeconds;
+    }
+
+    /// <summary>텔레포트 결과 코드</summary>
+    public enum TeleportResult : byte
+    {
+        SUCCESS            = 0,
+        WAYPOINT_NOT_FOUND = 1,
+        NOT_ENOUGH_GOLD    = 2,
+        IN_COMBAT          = 3,
+        COOLDOWN           = 4,
+    }
+
+    /// <summary>워프포인트 정보 (TELEPORT_LIST 파싱용)</summary>
+    public class WaypointInfo
+    {
+        public ushort WaypointId;
+        public uint ZoneId;
+        public string Name;
+        public float X, Y, Z;
+        public uint Cost;
+    }
+
+    /// <summary>텔레포트 결과 (TELEPORT_RESULT 파싱용)</summary>
+    public class TeleportResultData
+    {
+        public TeleportResult Result;
+        public uint ZoneId;
+        public float X, Y, Z;
+    }
+
+    /// <summary>월드 오브젝트 액션</summary>
+    public enum WorldObjectAction : byte
+    {
+        INTERACT  = 0,
+        DESTROY   = 1,
+        OPEN      = 2,
+    }
+
+    /// <summary>월드 오브젝트 상호작용 결과 (WORLD_OBJECT_RESULT 파싱용)</summary>
+    public class WorldObjectResultData
+    {
+        public byte Result;
+        public uint ObjectId;
+        public uint ItemId;
+        public ushort Count;
+        public uint Gold;
+    }
+
+    /// <summary>탈것 소환 결과 코드</summary>
+    public enum MountResult : byte
+    {
+        SUCCESS        = 0,
+        MOUNT_NOT_FOUND = 1,
+        IN_COMBAT      = 2,
+        ALREADY_MOUNTED = 3,
+        LEVEL_TOO_LOW  = 4,
+        CAST_INTERRUPTED = 5,
+    }
+
+    /// <summary>탈것 소환 결과 (MOUNT_RESULT 파싱용)</summary>
+    public class MountResultData
+    {
+        public MountResult Result;
+        public uint MountId;
+        public ushort SpeedMultiplied;   // speed * 100 (예: 200 = 2.0x)
+    }
+
+    // ━━━ S042: Phase 5 — 출석/리셋/컨텐츠 해금 (TASK 13) ━━━
+
+    /// <summary>출석 보상 결과 코드</summary>
+    public enum AttendanceClaimResult : byte
+    {
+        SUCCESS          = 0,
+        ALREADY_CLAIMED  = 1,
+        DAY_NOT_REACHED  = 2,
+        INVENTORY_FULL   = 3,
+    }
+
+    /// <summary>출석 정보 (ATTENDANCE_INFO 파싱용)</summary>
+    public class AttendanceInfoData
+    {
+        public byte CurrentDay;
+        public byte TotalDays;
+        public bool[] Claimed;     // 14일 기준
+    }
+
+    /// <summary>출석 보상 결과 (ATTENDANCE_CLAIM_RESULT 파싱용)</summary>
+    public class AttendanceClaimResultData
+    {
+        public AttendanceClaimResult Result;
+        public byte Day;
+        public byte RewardType;
+        public uint RewardId;
+        public ushort RewardCount;
+    }
+
+    /// <summary>리셋 타입</summary>
+    public enum ResetType : byte
+    {
+        DAILY  = 0,
+        WEEKLY = 1,
+    }
+
+    /// <summary>일일/주간 리셋 알림 (DAILY_RESET_NOTIFY 파싱용)</summary>
+    public class DailyResetNotifyData
+    {
+        public ResetType Type;
+        public uint Timestamp;
+    }
+
+    /// <summary>컨텐츠 해금 알림 (CONTENT_UNLOCK_NOTIFY 파싱용)</summary>
+    public class ContentUnlockNotifyData
+    {
+        public byte UnlockType;
+        public string SystemName;
+        public string Description;
+    }
+
+    /// <summary>로그인 보상 알림 (LOGIN_REWARD_NOTIFY 파싱용)</summary>
+    public class LoginRewardNotifyData
+    {
+        public byte RewardType;
+        public uint RewardId;
+        public ushort RewardCount;
+    }
+
+    // ━━━ S042: Phase 5 — 스토리/대화 시스템 (TASK 14) ━━━
+
+    /// <summary>대화 선택지 (DIALOG_CHOICE_RESULT 파싱용)</summary>
+    public class DialogChoiceResultData
+    {
+        public ushort NpcId;
+        public NpcDialogLine[] Lines;
+        public string[] Choices;
+    }
+
+    /// <summary>컷씬 트리거 데이터 (CUTSCENE_TRIGGER 파싱용)</summary>
+    public class CutsceneTriggerData
+    {
+        public ushort CutsceneId;
+        public ushort DurationSeconds;
+    }
+
+    /// <summary>스토리 진행 데이터 (STORY_PROGRESS 파싱용)</summary>
+    public class StoryProgressData
+    {
+        public byte Chapter;
+        public uint QuestId;
+        public QuestState QuestState;
+    }
+
+    /// <summary>메인 퀘스트 목표 타입</summary>
+    public enum MainQuestObjectiveType : byte
+    {
+        KILL     = 0,
+        COLLECT  = 1,
+        TALK     = 2,
+        EXPLORE  = 3,
+        DUNGEON  = 4,
+    }
+
+    /// <summary>메인 퀘스트 목표 항목</summary>
+    public class MainQuestObjective
+    {
+        public MainQuestObjectiveType Type;
+        public uint Target;
+        public uint Current;
+        public uint Required;
+    }
+
+    /// <summary>메인 퀘스트 데이터 (MAIN_QUEST_DATA 파싱용)</summary>
+    public class MainQuestDataInfo
+    {
+        public uint QuestId;
+        public string Name;
+        public string Description;
+        public MainQuestObjective[] Objectives;
     }
 }
