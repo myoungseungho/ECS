@@ -35,6 +35,6 @@ questions:
       - "5. HUD 리뉴얼 먼저"
       - "6. IntroScene 먼저"
       - "기타 (직접 지시)"
-    status: pending
-    answer: ""
-    answered_at: ""
+    status: answered
+    answer: "전부 다 해. 순서대로 1→2→3→4→5→6 진행. 끝나면 다음 거 바로 이어서."
+    answered_at: "2026-02-14T23:48:00"
