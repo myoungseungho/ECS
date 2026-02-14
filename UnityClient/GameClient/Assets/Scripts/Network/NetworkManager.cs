@@ -190,6 +190,11 @@ namespace Network
         public event Action<DailyQuestListData> OnDailyQuestList;
         public event Action<WeeklyQuestData> OnWeeklyQuest;
         public event Action<ReputationInfoData> OnReputationInfo;
+        // S049: 칭호/도감/2차전직 (TASK 7)
+        public event Action<TitleListData> OnTitleList;
+        public event Action<TitleEquipResultData> OnTitleEquipResult;
+        public event Action<CollectionInfoData> OnCollectionInfo;
+        public event Action<JobChangeResultData> OnJobChangeResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -982,6 +987,32 @@ namespace Network
         public void RequestReputation()
         {
             _field?.Send(PacketBuilder.ReputationQuery());
+        }
+
+        // ━━━ S049: 칭호/도감/2차전직 API (TASK 7) ━━━
+
+        /// <summary>칭호 목록 요청</summary>
+        public void RequestTitleList()
+        {
+            _field?.Send(PacketBuilder.TitleListReq());
+        }
+
+        /// <summary>칭호 장착/해제 (titleId=0이면 해제)</summary>
+        public void EquipTitle(ushort titleId)
+        {
+            _field?.Send(PacketBuilder.TitleEquip(titleId));
+        }
+
+        /// <summary>도감 조회 요청</summary>
+        public void RequestCollection()
+        {
+            _field?.Send(PacketBuilder.CollectionQuery());
+        }
+
+        /// <summary>2차 전직 요청</summary>
+        public void RequestJobChange(string jobName)
+        {
+            _field?.Send(PacketBuilder.JobChangeReq(jobName));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2131,6 +2162,37 @@ namespace Network
                     var data = PacketBuilder.ParseReputationInfo(payload);
                     Debug.Log($"[Net] ReputationInfo: factions={data.Factions.Length}");
                     OnReputationInfo?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S049: 칭호/도감/2차전직 (TASK 7) ━━━
+
+                case MsgType.TITLE_LIST:
+                {
+                    var data = PacketBuilder.ParseTitleList(payload);
+                    Debug.Log($"[Net] TitleList: equipped={data.EquippedId}, count={data.Titles.Length}");
+                    OnTitleList?.Invoke(data);
+                    break;
+                }
+                case MsgType.TITLE_EQUIP_RESULT:
+                {
+                    var data = PacketBuilder.ParseTitleEquipResult(payload);
+                    Debug.Log($"[Net] TitleEquip: result={data.Result}, titleId={data.TitleId}");
+                    OnTitleEquipResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.COLLECTION_INFO:
+                {
+                    var data = PacketBuilder.ParseCollectionInfo(payload);
+                    Debug.Log($"[Net] CollectionInfo: monsters={data.MonsterCategories.Length}, equips={data.EquipTiers.Length}");
+                    OnCollectionInfo?.Invoke(data);
+                    break;
+                }
+                case MsgType.JOB_CHANGE_RESULT:
+                {
+                    var data = PacketBuilder.ParseJobChangeResult(payload);
+                    Debug.Log($"[Net] JobChange: result={data.Result}, job={data.JobName}, bonuses={data.Bonuses.Length}, skills={data.NewSkills.Length}");
+                    OnJobChangeResult?.Invoke(data);
                     break;
                 }
 

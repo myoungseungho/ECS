@@ -608,6 +608,9 @@ public static class ProjectSetup
         var bountyManagerGo = CreateManagerObject("BountyManager", typeof(BountyManager));
         var dailyQuestManagerGo = CreateManagerObject("DailyQuestManager", typeof(DailyQuestManager));
         var reputationManagerGo = CreateManagerObject("ReputationManager", typeof(ReputationManager));
+        var titleManagerGo = CreateManagerObject("TitleManager", typeof(TitleManager));
+        var collectionManagerGo = CreateManagerObject("CollectionManager", typeof(CollectionManager));
+        var jobChangeUIGo = CreateManagerObject("JobChangeUI", typeof(JobChangeUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

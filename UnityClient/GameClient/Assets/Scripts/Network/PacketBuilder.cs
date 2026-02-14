@@ -2422,27 +2422,27 @@ namespace Network
         /// <summary>BOUNTY_LIST_REQ 빌더: empty</summary>
         public static byte[] BountyListReq()
         {
-            return BuildPacket(MsgType.BOUNTY_LIST_REQ);
+            return Build(MsgType.BOUNTY_LIST_REQ);
         }
 
         /// <summary>BOUNTY_ACCEPT 빌더: bounty_id(2)</summary>
         public static byte[] BountyAccept(ushort bountyId)
         {
             var payload = BitConverter.GetBytes(bountyId);
-            return BuildPacket(MsgType.BOUNTY_ACCEPT, payload);
+            return Build(MsgType.BOUNTY_ACCEPT, payload);
         }
 
         /// <summary>BOUNTY_COMPLETE REQ 빌더: bounty_id(2)</summary>
         public static byte[] BountyCompleteReq(ushort bountyId)
         {
             var payload = BitConverter.GetBytes(bountyId);
-            return BuildPacket(MsgType.BOUNTY_COMPLETE, payload);
+            return Build(MsgType.BOUNTY_COMPLETE, payload);
         }
 
         /// <summary>BOUNTY_RANKING_REQ 빌더: empty</summary>
         public static byte[] BountyRankingReq()
         {
-            return BuildPacket(MsgType.BOUNTY_RANKING_REQ);
+            return Build(MsgType.BOUNTY_RANKING_REQ);
         }
 
         /// <summary>BOUNTY_LIST 파싱: daily_count(1) + [bounty entries] + has_weekly(1) + [weekly] + accepted_count(1)</summary>
@@ -2676,6 +2676,165 @@ namespace Network
                 f.NextTierMin = BitConverter.ToUInt32(payload, off); off += 4;
 
                 d.Factions[i] = f;
+            }
+
+            return d;
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  S049: 칭호/도감/2차전직 (TASK 7, MsgType 440-447)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        /// <summary>TITLE_LIST_REQ 빌더: empty</summary>
+        public static byte[] TitleListReq()
+        {
+            return Build(MsgType.TITLE_LIST_REQ);
+        }
+
+        /// <summary>TITLE_EQUIP 빌더: title_id(u16) — 0이면 해제</summary>
+        public static byte[] TitleEquip(ushort titleId)
+        {
+            return Build(MsgType.TITLE_EQUIP, BitConverter.GetBytes(titleId));
+        }
+
+        /// <summary>COLLECTION_QUERY 빌더: empty</summary>
+        public static byte[] CollectionQuery()
+        {
+            return Build(MsgType.COLLECTION_QUERY);
+        }
+
+        /// <summary>JOB_CHANGE_REQ 빌더: job_name_len(u8) + job_name(utf8)</summary>
+        public static byte[] JobChangeReq(string jobName)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(jobName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.JOB_CHANGE_REQ, payload);
+        }
+
+        /// <summary>TITLE_LIST 파싱: equipped_id(u16) + count(u8) + [title_id(u16)+name_len(u8)+name(utf8)+bonus_type_len(u8)+bonus_type(utf8)+bonus_value(u16)+unlocked(u8)]*N</summary>
+        public static TitleListData ParseTitleList(byte[] payload)
+        {
+            var d = new TitleListData();
+            int off = 0;
+
+            d.EquippedId = BitConverter.ToUInt16(payload, off); off += 2;
+            byte count = payload[off]; off += 1;
+            d.Titles = new TitleInfo[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var t = new TitleInfo();
+                t.TitleId = BitConverter.ToUInt16(payload, off); off += 2;
+
+                byte nameLen = payload[off]; off += 1;
+                t.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+                byte bonusTypeLen = payload[off]; off += 1;
+                t.BonusType = Encoding.UTF8.GetString(payload, off, bonusTypeLen); off += bonusTypeLen;
+
+                t.BonusValue = BitConverter.ToUInt16(payload, off); off += 2;
+                t.Unlocked = payload[off] != 0; off += 1;
+
+                d.Titles[i] = t;
+            }
+
+            return d;
+        }
+
+        /// <summary>TITLE_EQUIP_RESULT 파싱: result(u8) + title_id(u16)</summary>
+        public static TitleEquipResultData ParseTitleEquipResult(byte[] payload)
+        {
+            var d = new TitleEquipResultData();
+            d.Result = (TitleEquipResult)payload[0];
+            d.TitleId = BitConverter.ToUInt16(payload, 1);
+            return d;
+        }
+
+        /// <summary>COLLECTION_INFO 파싱: monster_cat_count(u8) + [...] + equip_tier_count(u8) + [...]</summary>
+        public static CollectionInfoData ParseCollectionInfo(byte[] payload)
+        {
+            var d = new CollectionInfoData();
+            int off = 0;
+
+            // 몬스터 도감
+            byte monsterCatCount = payload[off]; off += 1;
+            d.MonsterCategories = new MonsterCollectionCategory[monsterCatCount];
+            for (int i = 0; i < monsterCatCount; i++)
+            {
+                var c = new MonsterCollectionCategory();
+                c.CatId = payload[off]; off += 1;
+
+                byte nameLen = payload[off]; off += 1;
+                c.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+                c.Total = payload[off]; off += 1;
+                c.Registered = payload[off]; off += 1;
+                c.Completed = payload[off]; off += 1;
+
+                byte bonusTypeLen = payload[off]; off += 1;
+                c.BonusType = Encoding.UTF8.GetString(payload, off, bonusTypeLen); off += bonusTypeLen;
+
+                c.BonusValue = BitConverter.ToUInt16(payload, off); off += 2;
+
+                d.MonsterCategories[i] = c;
+            }
+
+            // 장비 도감
+            byte equipTierCount = payload[off]; off += 1;
+            d.EquipTiers = new EquipCollectionTier[equipTierCount];
+            for (int i = 0; i < equipTierCount; i++)
+            {
+                var e = new EquipCollectionTier();
+
+                byte tierLen = payload[off]; off += 1;
+                e.Tier = Encoding.UTF8.GetString(payload, off, tierLen); off += tierLen;
+
+                byte tierKrLen = payload[off]; off += 1;
+                e.TierKr = Encoding.UTF8.GetString(payload, off, tierKrLen); off += tierKrLen;
+
+                e.Registered = payload[off]; off += 1;
+
+                byte bonusTypeLen = payload[off]; off += 1;
+                e.BonusType = Encoding.UTF8.GetString(payload, off, bonusTypeLen); off += bonusTypeLen;
+
+                e.BonusValue = BitConverter.ToUInt16(payload, off); off += 2;
+
+                d.EquipTiers[i] = e;
+            }
+
+            return d;
+        }
+
+        /// <summary>JOB_CHANGE_RESULT 파싱: result(u8)+job_name_len(u8)+job_name(utf8)+bonus_count(u8)+[bonus_key_len(u8)+bonus_key(utf8)+bonus_value(i16)]*N+new_skill_count(u8)+[skill_id(u16)]*M</summary>
+        public static JobChangeResultData ParseJobChangeResult(byte[] payload)
+        {
+            var d = new JobChangeResultData();
+            int off = 0;
+
+            d.Result = (JobChangeResult)payload[off]; off += 1;
+
+            byte jobNameLen = payload[off]; off += 1;
+            d.JobName = Encoding.UTF8.GetString(payload, off, jobNameLen); off += jobNameLen;
+
+            byte bonusCount = payload[off]; off += 1;
+            d.Bonuses = new JobChangeBonusEntry[bonusCount];
+            for (int i = 0; i < bonusCount; i++)
+            {
+                var b = new JobChangeBonusEntry();
+                byte keyLen = payload[off]; off += 1;
+                b.Key = Encoding.UTF8.GetString(payload, off, keyLen); off += keyLen;
+                b.Value = BitConverter.ToInt16(payload, off); off += 2;
+                d.Bonuses[i] = b;
+            }
+
+            byte skillCount = payload[off]; off += 1;
+            d.NewSkills = new ushort[skillCount];
+            for (int i = 0; i < skillCount; i++)
+            {
+                d.NewSkills[i] = BitConverter.ToUInt16(payload, off); off += 2;
             }
 
             return d;

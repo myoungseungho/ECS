@@ -360,6 +360,16 @@ namespace Network
         BOUNTY_RANKING          = 536,  // S→C: rank_count(1) + [rank(1)+name_len(1)+name(str)+score(2)] + my_rank(1)+my_score(2)
         PVP_BOUNTY_NOTIFY       = 537,  // S→C: target_entity(8)+tier(1)+kill_streak(2)+gold_reward(4)+name_len(1)+name(str)
 
+        // ━━━ S049: 칭호/도감/2차전직 (TASK 7, MsgType 440-447) ━━━
+        TITLE_LIST_REQ          = 440,  // C→S: empty
+        TITLE_LIST              = 441,  // S→C: equipped_id(u16) + count(u8) + [title_id(u16) + name_len(u8) + name(utf8) + bonus_type_len(u8) + bonus_type(utf8) + bonus_value(u16) + unlocked(u8)] * N
+        TITLE_EQUIP             = 442,  // C→S: title_id(u16) -- 0이면 해제
+        TITLE_EQUIP_RESULT      = 443,  // S→C: result(u8) + title_id(u16)
+        COLLECTION_QUERY        = 444,  // C→S: empty
+        COLLECTION_INFO         = 445,  // S→C: monster_cat_count(u8) + [...] + equip_tier_count(u8) + [...]
+        JOB_CHANGE_REQ          = 446,  // C→S: job_name_len(u8) + job_name(utf8)
+        JOB_CHANGE_RESULT       = 447,  // S→C: result(u8) + job_name_len(u8) + job_name(utf8) + bonus_count(u8) + [...] + new_skill_count(u8) + [skill_id(u16)] * M
+
         // ━━━ S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405) ━━━
         DAILY_QUEST_LIST_REQ    = 400,  // C→S: empty
         DAILY_QUEST_LIST        = 401,  // S→C: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
@@ -2083,5 +2093,96 @@ namespace Network
     public class ReputationInfoData
     {
         public ReputationFactionInfo[] Factions;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S049: 칭호/도감/2차전직 (TASK 7, MsgType 440-447)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>칭호 장착 결과 코드</summary>
+    public enum TitleEquipResult : byte
+    {
+        SUCCESS          = 0,
+        NOT_UNLOCKED     = 1,
+        ALREADY_EQUIPPED = 2,
+    }
+
+    /// <summary>2차 전직 결과 코드</summary>
+    public enum JobChangeResult : byte
+    {
+        SUCCESS         = 0,
+        LEVEL_TOO_LOW   = 1,
+        ALREADY_CHANGED = 2,
+        INVALID_JOB     = 3,
+        WRONG_CLASS     = 4,
+    }
+
+    /// <summary>칭호 정보 (TITLE_LIST 파싱용)</summary>
+    public class TitleInfo
+    {
+        public ushort TitleId;
+        public string Name;
+        public string BonusType;
+        public ushort BonusValue;
+        public bool Unlocked;
+    }
+
+    /// <summary>칭호 목록 데이터 (TITLE_LIST 파싱용)</summary>
+    public class TitleListData
+    {
+        public ushort EquippedId;
+        public TitleInfo[] Titles;
+    }
+
+    /// <summary>칭호 장착 결과 데이터 (TITLE_EQUIP_RESULT 파싱용)</summary>
+    public class TitleEquipResultData
+    {
+        public TitleEquipResult Result;
+        public ushort TitleId;
+    }
+
+    /// <summary>몬스터 도감 카테고리 (COLLECTION_INFO 파싱용)</summary>
+    public class MonsterCollectionCategory
+    {
+        public byte CatId;
+        public string Name;
+        public byte Total;
+        public byte Registered;
+        public byte Completed;
+        public string BonusType;
+        public ushort BonusValue;
+    }
+
+    /// <summary>장비 도감 등급 (COLLECTION_INFO 파싱용)</summary>
+    public class EquipCollectionTier
+    {
+        public string Tier;
+        public string TierKr;
+        public byte Registered;
+        public string BonusType;
+        public ushort BonusValue;
+    }
+
+    /// <summary>도감 정보 데이터 (COLLECTION_INFO 파싱용)</summary>
+    public class CollectionInfoData
+    {
+        public MonsterCollectionCategory[] MonsterCategories;
+        public EquipCollectionTier[] EquipTiers;
+    }
+
+    /// <summary>전직 보너스 항목 (JOB_CHANGE_RESULT 파싱용)</summary>
+    public class JobChangeBonusEntry
+    {
+        public string Key;
+        public short Value;     // signed! 음수 가능
+    }
+
+    /// <summary>전직 결과 데이터 (JOB_CHANGE_RESULT 파싱용)</summary>
+    public class JobChangeResultData
+    {
+        public JobChangeResult Result;
+        public string JobName;
+        public JobChangeBonusEntry[] Bonuses;
+        public ushort[] NewSkills;
     }
 }

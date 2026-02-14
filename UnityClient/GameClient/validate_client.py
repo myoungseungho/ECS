@@ -146,7 +146,12 @@ def check_interaction_map_sync():
     utils_files = get_cs_files(utils_dir)
     utils_names = {f.replace(".cs", "") for f in utils_files}
 
-    all_actual = actual_names | network_names | utils_names
+    # JobChangeUI 등 일부 싱글톤은 UI/에 위치
+    ui_dir = os.path.join(SCRIPTS_DIR, "UI")
+    ui_files = get_cs_files(ui_dir)
+    ui_names = {f.replace(".cs", "") for f in ui_files}
+
+    all_actual = actual_names | network_names | utils_names | ui_names
 
     # yaml에 있는데 파일이 없는 것
     missing_files = yaml_set - all_actual

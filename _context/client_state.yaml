@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-16T06:00:00"
+last_session: "2026-02-16T07:00:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 9 퀘스트 심화 구현 완료 — DailyQuestManager + ReputationManager + UI 2종 + 패킷 6종(400-405) + TCP 테스트 10건 | 89 PASS 0 FAIL"
+current_status: "Phase 10 칭호/도감/2차전직 구현 완료 — TitleManager + CollectionManager + JobChangeUI + TitleUI + CollectionUI + 패킷 8종(440-447) + TCP 테스트 12건 + S047 BuildPacket 버그 수정 | 93 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -198,6 +198,22 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase9_quest_tcp.py"
+  - id: A24
+    desc: "S049 Phase 10 칭호/도감/2차전직 — TitleManager + CollectionManager + JobChangeUI + TitleUI + CollectionUI + 패킷 8종(440-447) + TCP 테스트 12건 + S047 BuildPacket 버그 수정"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/TitleManager.cs"
+      - "Assets/Scripts/Managers/CollectionManager.cs"
+      - "Assets/Scripts/UI/TitleUI.cs"
+      - "Assets/Scripts/UI/CollectionUI.cs"
+      - "Assets/Scripts/UI/JobChangeUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase10_progression_tcp.py"
+      - "UnityClient/GameClient/validate_client.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -276,8 +292,9 @@ pending_tasks:
   - id: "gdd_task7_progression_ui"
     desc: "칭호/도감 UI — TitleUI + CollectionUI + JobChangeUI (서버 TASK 7 MsgType 440-447)"
     priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 7 (칭호/도감/2차전직 핸들러) 구현 대기 — Batch 3"
+    blocked: false
+    blocked_reason: "완료 (A24)"
+    status: done
   - id: "gdd_task9_durability_ui"
     desc: "내구도 UI — DurabilityUI (서버 TASK 9 MsgType 462-467)"
     priority: P1
@@ -341,6 +358,9 @@ recent_decisions:
   - "Phase 7: 비급&트라이포드(520-524) TripodManager+TripodUI 클라 구현 완료 — S046 응답"
   - "Phase 8: 현상금 시스템(530-537) BountyManager+BountyUI 클라 구현 완료 — S047 응답"
   - "Phase 9: 퀘스트 심화(400-405) DailyQuestManager+ReputationManager+DailyQuestUI+ReputationUI 클라 구현 완료 — S048 응답"
+  - "Phase 10: 칭호/도감/2차전직(440-447) TitleManager+CollectionManager+JobChangeUI+TitleUI+CollectionUI 클라 구현 완료 — S049 응답"
+  - "S047 BuildPacket→Build 버그 수정: BountyListReq/BountyAccept/BountyCompleteReq/BountyRankingReq 4건"
+  - "validate_client.py에 UI/ 디렉토리 검색 추가 — JobChangeUI 등 싱글톤 UI 지원"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -389,6 +409,7 @@ processed_messages:
   - "S046"
   - "S047"
   - "S048"
+  - "S049"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_phase9_quest_enhancement
+version: session_phase10_progression
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -1132,6 +1132,83 @@ managers:
       - Factions (IReadOnlyList<ReputationFactionInfo>)
       - IsPanelOpen (bool)
 
+  - name: TitleManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "칭호 시스템 관리 — 목록 조회/장착/해제 + 보너스 표시"
+    reads: []
+    writes:
+      - _titles (List<TitleInfo>)
+      - _equippedId (ushort)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnTitleListChanged()
+      - OnEquipResult(TitleEquipResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnTitleList → 칭호 목록 수신
+      - NetworkManager.OnTitleEquipResult → 장착 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshList()
+      - EquipTitle(ushort)
+      - UnequipTitle()
+      - GetTitle(ushort) → TitleInfo
+      - GetEquippedTitleName() → string
+    computed_properties:
+      - Titles (IReadOnlyList<TitleInfo>)
+      - EquippedId (ushort)
+      - IsPanelOpen (bool)
+
+  - name: CollectionManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "도감 시스템 관리 — 몬스터 4카테고리 + 장비 5등급 도감 조회"
+    reads: []
+    writes:
+      - _monsterCategories (List<MonsterCollectionCategory>)
+      - _equipTiers (List<EquipCollectionTier>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnCollectionChanged()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnCollectionInfo → 도감 정보 수신
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshCollection()
+      - GetMonsterCompletionRate() → float
+      - GetEquipTotalRegistered() → int
+    computed_properties:
+      - MonsterCategories (IReadOnlyList<MonsterCollectionCategory>)
+      - EquipTiers (IReadOnlyList<EquipCollectionTier>)
+      - IsPanelOpen (bool)
+
+  - name: JobChangeUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "2차 전직 UI — 전직 요청/결과 표시 (매니저 없이 직접 NetworkManager 구독)"
+    reads: []
+    writes:
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnJobChanged(JobChangeResultData)
+    subscribes_to:
+      - NetworkManager.OnJobChangeResult → 전직 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RequestJobChange(string)
+    computed_properties:
+      - IsPanelOpen (bool)
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1593,6 +1670,31 @@ data_flows:
     to: ReputationUI
     via: "C# events (OnReputationChanged, OnPanelOpened, OnPanelClosed)"
     description: "평판 UI 갱신 (N키 토글)"
+
+  - from: NetworkManager
+    to: TitleManager
+    via: "C# events (OnTitleList, OnTitleEquipResult)"
+    description: "칭호 목록/장착 결과 수신 (440-443)"
+
+  - from: TitleManager
+    to: TitleUI
+    via: "C# events (OnTitleListChanged, OnEquipResult, OnPanelOpened, OnPanelClosed)"
+    description: "칭호 UI 갱신 (H키 토글)"
+
+  - from: NetworkManager
+    to: CollectionManager
+    via: "C# event (OnCollectionInfo)"
+    description: "도감 정보 수신 (444-445)"
+
+  - from: CollectionManager
+    to: CollectionUI
+    via: "C# events (OnCollectionChanged, OnPanelOpened, OnPanelClosed)"
+    description: "도감 UI 갱신 (F6키 토글)"
+
+  - from: NetworkManager
+    to: JobChangeUI
+    via: "C# event (OnJobChangeResult)"
+    description: "2차 전직 결과 수신 (446-447, 매니저 없이 직접 구독)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 
