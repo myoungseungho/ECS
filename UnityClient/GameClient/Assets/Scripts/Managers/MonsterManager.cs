@@ -3,6 +3,7 @@
 // NetworkManager 이벤트 구독 → 몬스터 생성/파괴/이동/HP 갱신
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Network;
@@ -141,10 +142,19 @@ public class MonsterManager : MonoBehaviour
         if (!_monsterMap.TryGetValue(data.DeadEntityId, out var monster)) return;
 
         monster.HP = 0;
-        monster.gameObject.SetActive(false);
+        monster.PlayDeath();
 
         Debug.Log($"[MonsterManager] Died: entity={data.DeadEntityId}, killer={data.KillerEntityId}");
         OnMonsterDied?.Invoke(data.DeadEntityId);
+
+        StartCoroutine(DelayedDeactivate(monster.gameObject, 2f));
+    }
+
+    private IEnumerator DelayedDeactivate(GameObject go, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (go != null)
+            go.SetActive(false);
     }
 
     private void HandleEntityMove(ulong entityId, float x, float y, float z)

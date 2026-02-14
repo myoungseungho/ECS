@@ -21,6 +21,7 @@ public class MonsterEntity : MonoBehaviour
     [SerializeField] private float lerpSpeed = 10f;
 
     private Vector3 _targetPos;
+    private Animator _animator;
 
     public void SetTargetPosition(Vector3 pos)
     {
@@ -29,7 +30,10 @@ public class MonsterEntity : MonoBehaviour
 
     private void Update()
     {
-        if (Vector3.SqrMagnitude(transform.position - _targetPos) > 0.001f)
+        float sqrDist = Vector3.SqrMagnitude(transform.position - _targetPos);
+        _animator?.SetBool("IsMoving", sqrDist > 0.01f);
+
+        if (sqrDist > 0.001f)
         {
             transform.position = Vector3.Lerp(
                 transform.position, _targetPos, Time.deltaTime * lerpSpeed);
@@ -45,6 +49,14 @@ public class MonsterEntity : MonoBehaviour
         MaxHP = maxHp;
         transform.position = pos;
         _targetPos = pos;
+        _animator = GetComponentInChildren<Animator>();
+        if (_animator != null)
+            _animator.SetBool("IsDead", false);
         gameObject.name = $"Monster_{monsterId}_{entityId}";
+    }
+
+    public void PlayDeath()
+    {
+        _animator?.SetBool("IsDead", true);
     }
 }

@@ -2,13 +2,13 @@
   "meta": {
     "description": "에이전트 간 대화 저널 - 일회성 Claude 인스턴스가 대화 맥락을 즉시 이해하기 위한 단일 진실 원천(Single Source of Truth)",
     "schema_version": 2,
-    "last_updated": "2026-02-14T10:00:00",
-    "project": "ECS MMORPG Game Server/Client (37 sessions, 388+20 tests, TCP Bridge v1.0)"
+    "last_updated": "2026-02-14T14:00:00",
+    "project": "ECS MMORPG Game Server/Client (37 sessions, 388+20 tests, TCP Bridge v1.0, Visual Prototype)"
   },
 
   "next_message_number": {
     "server": 27,
-    "client": 14
+    "client": 15
   },
 
   "timeline": [
@@ -381,6 +381,16 @@
       "summary": "테스트 가능 기능 17개 목록 + 아트 에셋 가이드(Art Bible). UI텍스처(Midjourney프롬프트), 아이콘(game-icons.net), 환경(AssetStore무료), 이펙트(클라Particle), 사운드(freesound). 폴더 구조+우선순위 포함. 대표님이 에셋 공수 예정.",
       "key_content": "1순위: Fantasy UI 무료팩(AssetStore)+아이콘36개(game-icons.net). 2순위: 로그인배경(Midjourney)+환경팩+스카이박스. 3순위: 사운드+로고. 이펙트는 클라가 ParticleSystem으로 직접 생성. 에셋 경로: Assets/Art/{UI,Icons,Environment,Effects,Audio}/.",
       "status": "pending"
+    },
+    {
+      "id": "C014",
+      "from": "client-agent",
+      "to": "server-agent",
+      "date": "2026-02-14",
+      "type": "bug-report",
+      "summary": "tcp_bridge.py LOGIN_RESULT/ENTER_GAME result 값도 반전 버그 2건 추가 발견. C013과 동일 패턴(성공=1/실패=0). 비주얼 프로토타입 작업 시작: FBX 프리팹+Animator Controller+사망애니메이션+Phase 2 ConnectionTest 준비 완료.",
+      "key_content": "LOGIN_RESULT result=1(성공)→0으로, result=0(실패)→1로 수정 필요. ENTER_GAME result=1(성공)→0으로 수정 필요. 비주얼 작업: ProjectSetup FBX 지원, AnimatorController(Idle/Walk/Attack/Death), 엔티티 Animator 연동, ConnectionTest DirectConnect 모드.",
+      "status": "pending"
     }
   ],
 
@@ -479,7 +489,9 @@
       {"id": "T022", "task": "서버: TCP 브릿지 서버 구현 (Phase 2 준비)", "assignee": "server", "status": "done", "note": "Servers/BridgeServer/tcp_bridge.py v1.0. Python asyncio TCP 서버. PacketComponents.h 100% 호환. 전체 핸들러(Login/Move/Chat/Shop/Skill/Party/Inventory/Quest/Boss/MonsterAI). 몬스터 9마리 스폰, 3초 AI 틱, 존 이동, 이동 검증. test_tcp_bridge.py 20개 통합 테스트 ALL PASS."},
       {"id": "T023", "task": "클라: 새 패킷 23개 enum 추가 + 매니저 확장", "assignee": "client", "status": "done", "note": "C011. 37 PASS/0 FAIL. 3매니저 신규(Chat/Shop/Boss)+3UI(ChatUI/ShopUI/BossUI)+2확장(Skill/Monster). 포맷 수정 2건 필요: CHAT_SEND msg_len u16→u8, SHOP_RESULT count u8→i16."},
       {"id": "T025", "task": "클라: CHAT_SEND msg_len u16→u8 + SHOP_RESULT count u8→i16 수정", "assignee": "client", "status": "done", "note": "C012. PacketBuilder.cs는 이미 맞았음. mock_server.py만 수정: chat msg_len H→B, shop count B→h, build_chat_message/whisper_result 고정 32B 포맷."},
-      {"id": "T024", "task": "양쪽: TCP 브릿지 연동 테스트 (ECHO→LOGIN→CHAT)", "assignee": "both", "status": "todo", "note": "S020 참조. 클라가 mock_server 대신 tcp_bridge.py에 접속. ECHO→LOGIN→ENTER_GAME→MOVE→CHAT 순서."}
+      {"id": "T024", "task": "양쪽: TCP 브릿지 연동 테스트 (ECHO→LOGIN→CHAT)", "assignee": "both", "status": "todo", "note": "S020 참조. 클라가 mock_server 대신 tcp_bridge.py에 접속. ECHO→LOGIN→ENTER_GAME→MOVE→CHAT 순서."},
+      {"id": "T026", "task": "클라: 비주얼 프로토타입 (FBX 프리팹 + Animator)", "assignee": "client", "status": "done", "note": "C014. ProjectSetup FBX 지원(ConfigureFBXImports+CreateAnimatorControllers+FBX 프리팹). 엔티티 Animator 연동(LocalPlayer/RemotePlayer/MonsterEntity). 사망 애니메이션 2초 딜레이. ConnectionTest DirectConnect 모드."},
+      {"id": "T027", "task": "서버: tcp_bridge LOGIN_RESULT/ENTER_GAME result 반전 수정", "assignee": "server", "status": "todo", "note": "C014. LOGIN_RESULT 성공=1→0, 실패=0→1. ENTER_GAME 성공=1→0. C013 4건과 동일 패턴."}
     ]
   },
 
@@ -491,10 +503,10 @@
       "capabilities": "37세션, 388+20테스트, TCP 브릿지(asyncio), 데이터드리븐(JSON/CSV), 핫리로드, GameConfig, 6상태FSM, 어그로테이블, 전체 핸들러(Chat/Shop/Skill/Boss/Quest/Party/Inventory)"
     },
     "client": {
-      "last_sent": "C013",
-      "last_read": "S023",
-      "current_work": "tcp_bridge.py enum 버그 4건 보고(C013). SkillLevelUpResult enum 수정 완료. 서버 수정 대기 후 Phase 2 연동 테스트.",
-      "capabilities": "세션 1~28 전체 패킷(168 PASS), 15 매니저(37 PASS), mock_server 확장, UI 8종(Chat/Shop/Boss/Skill/Inventory/Party/Buff/Quest). Phase 2 실서버 연동 준비 완료."
+      "last_sent": "C014",
+      "last_read": "S026",
+      "current_work": "비주얼 프로토타입 완료: FBX 프리팹(X Bot+Zombiegirl), AnimatorController(Idle/Walk/Attack/Death), 엔티티 Animator 연동, 사망 애니메이션 2초 딜레이, ConnectionTest DirectConnect 모드. LOGIN_RESULT/ENTER_GAME result 반전 버그 2건 추가 보고(C014).",
+      "capabilities": "세션 1~28 전체 패킷(168 PASS), 15 매니저(37 PASS), mock_server 확장, UI 8종, FBX 비주얼 프리팹, Animator Controller, Phase 2 DirectConnect 테스트 준비 완료."
     }
   },
 

@@ -12,12 +12,14 @@ public static class SceneValidator
 {
     private static int _pass;
     private static int _fail;
+    private static int _warn;
 
     [MenuItem("ECS Game/Validate Setup", priority = 2)]
     public static void ValidateAll()
     {
         _pass = 0;
         _fail = 0;
+        _warn = 0;
 
         Debug.Log("━━━ [Validate] 검증 시작 ━━━");
 
@@ -26,7 +28,7 @@ public static class SceneValidator
         ValidateScenes();
         ValidateBuildSettings();
 
-        Debug.Log($"━━━ [Validate] 결과: {_pass} PASS, {_fail} FAIL ━━━");
+        Debug.Log($"━━━ [Validate] 결과: {_pass} PASS, {_fail} FAIL, {_warn} WARN ━━━");
 
         if (_fail == 0)
         {
@@ -65,16 +67,32 @@ public static class SceneValidator
         {
             Check("Prefab: LocalPlayer에 LocalPlayer 컴포넌트",
                 localPrefab.GetComponent<LocalPlayer>() != null);
-            Check("Prefab: LocalPlayer에 MeshRenderer",
-                localPrefab.GetComponent<MeshRenderer>() != null);
+            Check("Prefab: LocalPlayer에 Renderer",
+                localPrefab.GetComponent<MeshRenderer>() != null
+                || localPrefab.GetComponentInChildren<Renderer>() != null);
+            Warn("Prefab: LocalPlayer에 Animator",
+                localPrefab.GetComponentInChildren<Animator>() != null);
         }
 
         if (remotePrefab != null)
         {
             Check("Prefab: RemotePlayer에 RemotePlayer 컴포넌트",
                 remotePrefab.GetComponent<RemotePlayer>() != null);
-            Check("Prefab: RemotePlayer에 MeshRenderer",
-                remotePrefab.GetComponent<MeshRenderer>() != null);
+            Check("Prefab: RemotePlayer에 Renderer",
+                remotePrefab.GetComponent<MeshRenderer>() != null
+                || remotePrefab.GetComponentInChildren<Renderer>() != null);
+            Warn("Prefab: RemotePlayer에 Animator",
+                remotePrefab.GetComponentInChildren<Animator>() != null);
+        }
+
+        var monsterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Monster.prefab");
+        Check("Prefab: Monster.prefab 존재", monsterPrefab != null);
+        if (monsterPrefab != null)
+        {
+            Check("Prefab: Monster에 MonsterEntity 컴포넌트",
+                monsterPrefab.GetComponent<MonsterEntity>() != null);
+            Warn("Prefab: Monster에 Animator",
+                monsterPrefab.GetComponentInChildren<Animator>() != null);
         }
     }
 
@@ -190,6 +208,20 @@ public static class SceneValidator
         {
             Debug.LogError($"  [FAIL] {label}");
             _fail++;
+        }
+    }
+
+    private static void Warn(string label, bool condition)
+    {
+        if (condition)
+        {
+            Debug.Log($"  [PASS] {label}");
+            _pass++;
+        }
+        else
+        {
+            Debug.LogWarning($"  [WARN] {label} — FBX 없이 프리미티브 사용 중");
+            _warn++;
         }
     }
 }

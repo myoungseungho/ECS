@@ -14,12 +14,14 @@ public class LocalPlayer : MonoBehaviour
     public ulong EntityId { get; set; }
 
     private Camera _mainCamera;
+    private Animator _animator;
     private float _lastSendTime;
     private float _clientStartTime;
 
     private void Start()
     {
         _mainCamera = Camera.main;
+        _animator = GetComponentInChildren<Animator>();
         _clientStartTime = Time.realtimeSinceStartup;
 
         var net = NetworkManager.Instance;
@@ -49,7 +51,10 @@ public class LocalPlayer : MonoBehaviour
         float h = Input.GetAxis("Horizontal"); // A/D
         float v = Input.GetAxis("Vertical");   // W/S
 
-        if (Mathf.Abs(h) < 0.01f && Mathf.Abs(v) < 0.01f)
+        bool isMoving = Mathf.Abs(h) > 0.01f || Mathf.Abs(v) > 0.01f;
+        _animator?.SetBool("IsMoving", isMoving);
+
+        if (!isMoving)
             return;
 
         Vector3 dir = new Vector3(h, 0f, v).normalized;
