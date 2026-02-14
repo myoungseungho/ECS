@@ -186,6 +186,10 @@ namespace Network
         public event Action<BountyCompleteData> OnBountyComplete;
         public event Action<BountyRankingData> OnBountyRanking;
         public event Action<PvPBountyNotifyData> OnPvPBountyNotify;
+        // S048: 퀘스트 심화 (TASK 4)
+        public event Action<DailyQuestListData> OnDailyQuestList;
+        public event Action<WeeklyQuestData> OnWeeklyQuest;
+        public event Action<ReputationInfoData> OnReputationInfo;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -958,6 +962,26 @@ namespace Network
         public void RequestBountyRanking()
         {
             _field?.Send(PacketBuilder.BountyRankingReq());
+        }
+
+        // ━━━ S048: 퀘스트 심화 API (TASK 4) ━━━
+
+        /// <summary>일일 퀘스트 목록 요청</summary>
+        public void RequestDailyQuestList()
+        {
+            _field?.Send(PacketBuilder.DailyQuestListReq());
+        }
+
+        /// <summary>주간 퀘스트 요청</summary>
+        public void RequestWeeklyQuest()
+        {
+            _field?.Send(PacketBuilder.WeeklyQuestReq());
+        }
+
+        /// <summary>평판 조회 요청</summary>
+        public void RequestReputation()
+        {
+            _field?.Send(PacketBuilder.ReputationQuery());
         }
 
         /// <summary>연결 끊기</summary>
@@ -2084,6 +2108,29 @@ namespace Network
                     var data = PacketBuilder.ParsePvPBountyNotify(payload);
                     Debug.Log($"[Net] PvPBounty: target={data.TargetEntity}, tier={data.Tier}, streak={data.KillStreak}, gold={data.GoldReward}, name={data.Name}");
                     OnPvPBountyNotify?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S048: 퀘스트 심화 (TASK 4) ━━━
+                case MsgType.DAILY_QUEST_LIST:
+                {
+                    var data = PacketBuilder.ParseDailyQuestList(payload);
+                    Debug.Log($"[Net] DailyQuestList: count={data.Quests.Length}");
+                    OnDailyQuestList?.Invoke(data);
+                    break;
+                }
+                case MsgType.WEEKLY_QUEST:
+                {
+                    var data = PacketBuilder.ParseWeeklyQuest(payload);
+                    Debug.Log($"[Net] WeeklyQuest: hasQuest={data.HasQuest}");
+                    OnWeeklyQuest?.Invoke(data);
+                    break;
+                }
+                case MsgType.REPUTATION_INFO:
+                {
+                    var data = PacketBuilder.ParseReputationInfo(payload);
+                    Debug.Log($"[Net] ReputationInfo: factions={data.Factions.Length}");
+                    OnReputationInfo?.Invoke(data);
                     break;
                 }
 

@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-16T05:00:00"
+last_session: "2026-02-16T06:00:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 8 현상금 시스템 구현 완료 — BountyManager + BountyUI + 패킷 8종(530-537) + TCP 테스트 10건 | 85 PASS 0 FAIL"
+current_status: "Phase 9 퀘스트 심화 구현 완료 — DailyQuestManager + ReputationManager + UI 2종 + 패킷 6종(400-405) + TCP 테스트 10건 | 89 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -184,6 +184,20 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase8_bounty_tcp.py"
+  - id: A23
+    desc: "S048 Phase 9 퀘스트 심화 — DailyQuestManager + ReputationManager + DailyQuestUI + ReputationUI + 패킷 6종(400-405) + TCP 테스트 10건"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/DailyQuestManager.cs"
+      - "Assets/Scripts/Managers/ReputationManager.cs"
+      - "Assets/Scripts/UI/DailyQuestUI.cs"
+      - "Assets/Scripts/UI/ReputationUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase9_quest_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -256,8 +270,9 @@ pending_tasks:
   - id: "gdd_task4_daily_quest_ui"
     desc: "일일/주간 퀘스트 UI — DailyQuestUI + ReputationUI (서버 TASK 4 MsgType 400-405)"
     priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 4 (일일/주간 퀘스트 핸들러) 구현 대기 — Batch 3"
+    blocked: false
+    blocked_reason: "완료 (A23)"
+    status: done
   - id: "gdd_task7_progression_ui"
     desc: "칭호/도감 UI — TitleUI + CollectionUI + JobChangeUI (서버 TASK 7 MsgType 440-447)"
     priority: P2
@@ -325,6 +340,7 @@ recent_decisions:
   - "S044 신규 4대 시스템: 비급(520-524)/현상금(530-537)/비경(540-544)/사제(550-560) — 모두 서버 블로킹"
   - "Phase 7: 비급&트라이포드(520-524) TripodManager+TripodUI 클라 구현 완료 — S046 응답"
   - "Phase 8: 현상금 시스템(530-537) BountyManager+BountyUI 클라 구현 완료 — S047 응답"
+  - "Phase 9: 퀘스트 심화(400-405) DailyQuestManager+ReputationManager+DailyQuestUI+ReputationUI 클라 구현 완료 — S048 응답"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -372,6 +388,7 @@ processed_messages:
   - "S045"
   - "S046"
   - "S047"
+  - "S048"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

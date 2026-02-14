@@ -359,6 +359,14 @@ namespace Network
         BOUNTY_RANKING_REQ      = 535,  // C→S: empty
         BOUNTY_RANKING          = 536,  // S→C: rank_count(1) + [rank(1)+name_len(1)+name(str)+score(2)] + my_rank(1)+my_score(2)
         PVP_BOUNTY_NOTIFY       = 537,  // S→C: target_entity(8)+tier(1)+kill_streak(2)+gold_reward(4)+name_len(1)+name(str)
+
+        // ━━━ S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405) ━━━
+        DAILY_QUEST_LIST_REQ    = 400,  // C→S: empty
+        DAILY_QUEST_LIST        = 401,  // S→C: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
+        WEEKLY_QUEST_REQ        = 402,  // C→S: empty
+        WEEKLY_QUEST            = 403,  // S→C: has_quest(1) + [wq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+reward_dungeon_token(1)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
+        REPUTATION_QUERY        = 404,  // C→S: empty
+        REPUTATION_INFO         = 405,  // S→C: faction_count(1) + [faction_len(1)+faction(str)+name_kr_len(1)+name_kr(str)+points(4)+tier_name_len(1)+tier_name(str)+next_tier_min(4)]
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -2009,5 +2017,71 @@ namespace Network
         public ushort KillStreak;
         public uint GoldReward;
         public string Name;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>일일 퀘스트 정보 (DAILY_QUEST_LIST 내 개별 항목)</summary>
+    public class DailyQuestInfo
+    {
+        public ushort DqId;
+        public string Type;       // kill / collect / craft
+        public string NameKr;
+        public ushort TargetId;
+        public byte Count;
+        public byte Progress;
+        public byte Completed;    // 0 or 1
+        public uint RewardExp;
+        public uint RewardGold;
+        public string RepFaction;
+        public ushort RepAmount;
+    }
+
+    /// <summary>일일 퀘스트 목록 데이터 (DAILY_QUEST_LIST 파싱용)</summary>
+    public class DailyQuestListData
+    {
+        public DailyQuestInfo[] Quests;
+    }
+
+    /// <summary>주간 퀘스트 정보 (WEEKLY_QUEST 내 개별 항목)</summary>
+    public class WeeklyQuestInfo
+    {
+        public ushort WqId;
+        public string Type;       // dungeon_clear / kill / pvp_win
+        public string NameKr;
+        public ushort TargetId;
+        public byte Count;
+        public byte Progress;
+        public byte Completed;    // 0 or 1
+        public uint RewardExp;
+        public uint RewardGold;
+        public byte RewardDungeonToken;
+        public string RepFaction;
+        public ushort RepAmount;
+    }
+
+    /// <summary>주간 퀘스트 데이터 (WEEKLY_QUEST 파싱용)</summary>
+    public class WeeklyQuestData
+    {
+        public bool HasQuest;
+        public WeeklyQuestInfo Quest;
+    }
+
+    /// <summary>평판 세력 정보 (REPUTATION_INFO 내 개별 항목)</summary>
+    public class ReputationFactionInfo
+    {
+        public string Faction;     // village_guard / merchant_guild
+        public string NameKr;
+        public uint Points;
+        public string TierName;    // neutral / friendly / honored / revered / exalted
+        public uint NextTierMin;
+    }
+
+    /// <summary>평판 정보 데이터 (REPUTATION_INFO 파싱용)</summary>
+    public class ReputationInfoData
+    {
+        public ReputationFactionInfo[] Factions;
     }
 }

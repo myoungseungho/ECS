@@ -2551,5 +2551,134 @@ namespace Network
             d.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
             return d;
         }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        /// <summary>DAILY_QUEST_LIST_REQ 빌더: empty</summary>
+        public static byte[] DailyQuestListReq()
+        {
+            return Build(MsgType.DAILY_QUEST_LIST_REQ);
+        }
+
+        /// <summary>WEEKLY_QUEST_REQ 빌더: empty</summary>
+        public static byte[] WeeklyQuestReq()
+        {
+            return Build(MsgType.WEEKLY_QUEST_REQ);
+        }
+
+        /// <summary>REPUTATION_QUERY 빌더: empty</summary>
+        public static byte[] ReputationQuery()
+        {
+            return Build(MsgType.REPUTATION_QUERY);
+        }
+
+        /// <summary>DAILY_QUEST_LIST 파싱: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]</summary>
+        public static DailyQuestListData ParseDailyQuestList(byte[] payload)
+        {
+            var d = new DailyQuestListData();
+            int off = 0;
+
+            byte questCount = payload[off]; off += 1;
+            d.Quests = new DailyQuestInfo[questCount];
+
+            for (int i = 0; i < questCount; i++)
+            {
+                var q = new DailyQuestInfo();
+                q.DqId = BitConverter.ToUInt16(payload, off); off += 2;
+
+                byte typeLen = payload[off]; off += 1;
+                q.Type = System.Text.Encoding.UTF8.GetString(payload, off, typeLen); off += typeLen;
+
+                byte nameLen = payload[off]; off += 1;
+                q.NameKr = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+                q.TargetId = BitConverter.ToUInt16(payload, off); off += 2;
+                q.Count = payload[off]; off += 1;
+                q.Progress = payload[off]; off += 1;
+                q.Completed = payload[off]; off += 1;
+                q.RewardExp = BitConverter.ToUInt32(payload, off); off += 4;
+                q.RewardGold = BitConverter.ToUInt32(payload, off); off += 4;
+
+                byte repFactionLen = payload[off]; off += 1;
+                q.RepFaction = System.Text.Encoding.UTF8.GetString(payload, off, repFactionLen); off += repFactionLen;
+                q.RepAmount = BitConverter.ToUInt16(payload, off); off += 2;
+
+                d.Quests[i] = q;
+            }
+
+            return d;
+        }
+
+        /// <summary>WEEKLY_QUEST 파싱: has_quest(1) + [wq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+reward_dungeon_token(1)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]</summary>
+        public static WeeklyQuestData ParseWeeklyQuest(byte[] payload)
+        {
+            var d = new WeeklyQuestData();
+            int off = 0;
+
+            byte hasQuest = payload[off]; off += 1;
+            d.HasQuest = hasQuest != 0;
+
+            if (d.HasQuest)
+            {
+                var q = new WeeklyQuestInfo();
+                q.WqId = BitConverter.ToUInt16(payload, off); off += 2;
+
+                byte typeLen = payload[off]; off += 1;
+                q.Type = System.Text.Encoding.UTF8.GetString(payload, off, typeLen); off += typeLen;
+
+                byte nameLen = payload[off]; off += 1;
+                q.NameKr = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+
+                q.TargetId = BitConverter.ToUInt16(payload, off); off += 2;
+                q.Count = payload[off]; off += 1;
+                q.Progress = payload[off]; off += 1;
+                q.Completed = payload[off]; off += 1;
+                q.RewardExp = BitConverter.ToUInt32(payload, off); off += 4;
+                q.RewardGold = BitConverter.ToUInt32(payload, off); off += 4;
+                q.RewardDungeonToken = payload[off]; off += 1;
+
+                byte repFactionLen = payload[off]; off += 1;
+                q.RepFaction = System.Text.Encoding.UTF8.GetString(payload, off, repFactionLen); off += repFactionLen;
+                q.RepAmount = BitConverter.ToUInt16(payload, off); off += 2;
+
+                d.Quest = q;
+            }
+
+            return d;
+        }
+
+        /// <summary>REPUTATION_INFO 파싱: faction_count(1) + [faction_len(1)+faction(str)+name_kr_len(1)+name_kr(str)+points(4)+tier_name_len(1)+tier_name(str)+next_tier_min(4)]</summary>
+        public static ReputationInfoData ParseReputationInfo(byte[] payload)
+        {
+            var d = new ReputationInfoData();
+            int off = 0;
+
+            byte factionCount = payload[off]; off += 1;
+            d.Factions = new ReputationFactionInfo[factionCount];
+
+            for (int i = 0; i < factionCount; i++)
+            {
+                var f = new ReputationFactionInfo();
+
+                byte factionLen = payload[off]; off += 1;
+                f.Faction = System.Text.Encoding.UTF8.GetString(payload, off, factionLen); off += factionLen;
+
+                byte nameKrLen = payload[off]; off += 1;
+                f.NameKr = System.Text.Encoding.UTF8.GetString(payload, off, nameKrLen); off += nameKrLen;
+
+                f.Points = BitConverter.ToUInt32(payload, off); off += 4;
+
+                byte tierNameLen = payload[off]; off += 1;
+                f.TierName = System.Text.Encoding.UTF8.GetString(payload, off, tierNameLen); off += tierNameLen;
+
+                f.NextTierMin = BitConverter.ToUInt32(payload, off); off += 4;
+
+                d.Factions[i] = f;
+            }
+
+            return d;
+        }
     }
 }
