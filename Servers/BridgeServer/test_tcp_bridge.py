@@ -33,7 +33,11 @@ from tcp_bridge import (
     TRANSCEND_MAX_LEVEL, TRANSCEND_GOLD_COST, TRANSCEND_SUCCESS_RATE,
     ENHANCE_PITY_BONUS_PER_FAIL, ENHANCE_PITY_MAX_BONUS,
     FRIEND_MAX, BLOCK_MAX, PARTY_FINDER_CATEGORIES,
-    PARTY_FINDER_MAX_LISTINGS, PARTY_FINDER_ROLES
+    PARTY_FINDER_MAX_LISTINGS, PARTY_FINDER_ROLES,
+    DURABILITY_MAX, REPAIR_COST_MULTIPLIER,
+    REROLL_GOLD_COST, REROLL_MATERIAL, REROLL_LOCK_COST,
+    BG_MODE_CAPTURE_POINT, BG_MODE_PAYLOAD, BG_TEAM_SIZE,
+    BG_WIN_SCORE, GW_CRYSTAL_HP, GW_MIN_PARTICIPANTS
 )
 
 
@@ -2181,6 +2185,169 @@ async def run_tests(port: int):
         c.close()
 
     await test("PARTY_FINDER: 파티 찾기 등록 + 목록 조회", test_party_finder())
+
+
+    # ━━━ Test: DURABILITY_QUERY — 내구도 조회 ━━━
+    async def test_durability_query():
+        """내구도 조회 — 장착 없으면 알림 없음, 크래시 없음."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.DURABILITY_QUERY, b'')
+        import asyncio as _asyncio
+        await _asyncio.sleep(0.15)
+        c.close()
+
+    await test("DURABILITY_QUERY: 내구도 조회 (장착 없음)", test_durability_query())
+
+    # ━━━ Test: REPAIR_ALL — 전체 수리 (미장착) ━━━
+    async def test_repair_all():
+        """전체 수리 — 장착 장비 없으면 NO_EQUIPMENT."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.REPAIR_REQ, struct.pack('<B B', 1, 0))
+        msg_type, resp = await c.recv_expect(MsgType.REPAIR_RESULT)
+        assert msg_type == MsgType.REPAIR_RESULT, f"Expected REPAIR_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result in (1, 3), f"Expected NO_EQUIPMENT(1) or ALREADY_FULL(3), got {result}"
+        c.close()
+
+    await test("REPAIR_ALL: 전체 수리 (미장착 → NO_EQUIPMENT)", test_repair_all())
+
+    # ━━━ Test: REPAIR_WITH_EQUIP — 장착+수리 E2E ━━━
+    async def test_repair_with_equip():
+        """무기 구매+장착+피격+수리 E2E."""
+        c = await login_and_enter(port)
+
+        # Buy weapon from WeaponShop (npc=2, item_id=201, price=500)
+        await c.send(MsgType.SHOP_BUY, struct.pack('<IIH', 2, 201, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SHOP_RESULT)
+        assert msg_type == MsgType.SHOP_RESULT
+        buy_result = resp[0]
+        assert buy_result == 0, f"Shop buy failed: result={buy_result}"
+
+        # Equip inventory slot 0 (where weapon was placed)
+        await c.send(MsgType.ITEM_EQUIP, struct.pack('<B', 0))
+        msg_type, _ = await c.recv_expect(MsgType.ITEM_EQUIP_RESULT)
+
+        # Take a hit to decrease durability (STAT_TAKE_DMG: damage u32)
+        await c.send(MsgType.STAT_TAKE_DMG, struct.pack('<I', 10))
+        await c.recv_expect(MsgType.STATS)
+
+        # Repair that single slot — mode=0, inv_slot=0
+        await c.send(MsgType.REPAIR_REQ, struct.pack('<B B', 0, 0))
+        msg_type, resp = await c.recv_expect(MsgType.REPAIR_RESULT)
+        assert msg_type == MsgType.REPAIR_RESULT, f"Expected REPAIR_RESULT, got {msg_type}"
+        result = resp[0]
+        # SUCCESS(0) — hit decreased dur by 0.1, repair restores
+        assert result in (0, 3), f"Expected SUCCESS(0) or ALREADY_FULL(3), got {result}"
+        c.close()
+
+    await test("REPAIR_WITH_EQUIP: 구매+장착+피격+수리 E2E", test_repair_with_equip())
+
+    # ━━━ Test: REROLL_NO_EQUIP — 미장착 리롤 ━━━
+    async def test_reroll_no_equip():
+        """리롤 요청 — 미장착 시 NO_EQUIPMENT."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.REROLL_REQ, struct.pack('<B B', 0, 0))
+        msg_type, resp = await c.recv_expect(MsgType.REROLL_RESULT)
+        assert msg_type == MsgType.REROLL_RESULT
+        result = resp[0]
+        assert result == 1, f"Expected NO_EQUIPMENT(1), got {result}"
+        c.close()
+
+    await test("REROLL_NO_EQUIP: 리롤 미장착 → NO_EQUIPMENT", test_reroll_no_equip())
+
+    # ━━━ Test: REROLL_NO_SCROLL — 재감정서 없이 리롤 ━━━
+    async def test_reroll_no_scroll():
+        """장비 장착 후 리롤 — 재감정서 부족 or 골드 부족."""
+        c = await login_and_enter(port)
+
+        # Buy weapon and equip
+        await c.send(MsgType.SHOP_BUY, struct.pack('<IIH', 2, 201, 1))
+        await c.recv_expect(MsgType.SHOP_RESULT)
+        await c.send(MsgType.ITEM_EQUIP, struct.pack('<B', 0))
+        await c.recv_expect(MsgType.ITEM_EQUIP_RESULT)
+
+        # Try reroll — no scroll, and possibly not enough gold (500g remaining after buy)
+        await c.send(MsgType.REROLL_REQ, struct.pack('<B B', 0, 0))
+        msg_type, resp = await c.recv_expect(MsgType.REROLL_RESULT)
+        assert msg_type == MsgType.REROLL_RESULT
+        result = resp[0]
+        # NOT_ENOUGH_GOLD(2) since 500 < 5000, or NO_SCROLL(3)
+        assert result in (2, 3), f"Expected NOT_ENOUGH_GOLD(2) or NO_SCROLL(3), got {result}"
+        c.close()
+
+    await test("REROLL_NO_SCROLL: 리롤 재감정서/골드 부족", test_reroll_no_scroll())
+
+
+    # ━━━ Test: BG_QUEUE — 전장 큐 등록/취소 ━━━
+    async def test_bg_queue():
+        """전장 큐 등록 → QUEUED(0), 취소 → CANCELLED(2)."""
+        c = await login_and_enter(port)
+        # Join capture_point queue
+        await c.send(MsgType.BATTLEGROUND_QUEUE, struct.pack('<B B', 0, 0))
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEGROUND_STATUS)
+        assert msg_type == MsgType.BATTLEGROUND_STATUS, f"Expected BG_STATUS, got {msg_type}"
+        status = resp[0]
+        assert status in (0, 1), f"Expected QUEUED(0) or MATCH_FOUND(1), got {status}"
+
+        # Cancel queue
+        await c.send(MsgType.BATTLEGROUND_QUEUE, struct.pack('<B B', 1, 0))
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEGROUND_STATUS)
+        status = resp[0]
+        assert status == 2, f"Expected CANCELLED(2), got {status}"
+        c.close()
+
+    await test("BG_QUEUE: 전장 큐 등록/취소", test_bg_queue())
+
+    # ━━━ Test: BG_INVALID_MODE — 잘못된 전장 모드 ━━━
+    async def test_bg_invalid_mode():
+        """잘못된 모드 전장 큐 → INVALID_MODE(4)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.BATTLEGROUND_QUEUE, struct.pack('<B B', 0, 99))
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEGROUND_STATUS)
+        status = resp[0]
+        assert status == 4, f"Expected INVALID_MODE(4), got {status}"
+        c.close()
+
+    await test("BG_INVALID_MODE: 잘못된 전장 모드 → INVALID_MODE", test_bg_invalid_mode())
+
+    # ━━━ Test: BG_SCORE_NOT_IN_MATCH — 매치 없이 점수 조회 ━━━
+    async def test_bg_score_no_match():
+        """매치 없이 점수 조회 → 빈 응답."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.BATTLEGROUND_SCORE, struct.pack('<B B', 2, 0))
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEGROUND_SCORE_UPDATE)
+        assert msg_type == MsgType.BATTLEGROUND_SCORE_UPDATE
+        mode = resp[0]
+        assert mode == 0, f"Expected mode=0 (default), got {mode}"
+        c.close()
+
+    await test("BG_SCORE: 매치 없이 점수 조회 → 빈 응답", test_bg_score_no_match())
+
+    # ━━━ Test: GW_DECLARE_NO_GUILD — 길드 없이 길드전 선언 ━━━
+    async def test_gw_no_guild():
+        """길드 없이 길드전 선언 → NO_GUILD(3)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.GUILD_WAR_DECLARE, struct.pack('<B I', 0, 999))
+        msg_type, resp = await c.recv_expect(MsgType.GUILD_WAR_STATUS)
+        assert msg_type == MsgType.GUILD_WAR_STATUS
+        status = resp[0]
+        assert status == 3, f"Expected NO_GUILD(3), got {status}"
+        c.close()
+
+    await test("GW_DECLARE: 길드 없이 길드전 선언 → NO_GUILD", test_gw_no_guild())
+
+    # ━━━ Test: GW_QUERY_NO_WAR — 전쟁 없을 때 상태 조회 ━━━
+    async def test_gw_query_no_war():
+        """길드전 상태 조회 (전쟁 없음) → NO_WAR(7) or NO_GUILD(3)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.GUILD_WAR_DECLARE, struct.pack('<B I', 3, 0))
+        msg_type, resp = await c.recv_expect(MsgType.GUILD_WAR_STATUS)
+        assert msg_type == MsgType.GUILD_WAR_STATUS
+        status = resp[0]
+        assert status in (3, 7), f"Expected NO_GUILD(3) or NO_WAR(7), got {status}"
+        c.close()
+
+    await test("GW_QUERY: 길드전 상태 조회 (없음) → NO_WAR", test_gw_query_no_war())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

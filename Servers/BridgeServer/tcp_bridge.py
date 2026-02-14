@@ -352,6 +352,22 @@ class MsgType(IntEnum):
     PARTY_FINDER_LIST = 421
     PARTY_FINDER_CREATE = 422
 
+    # Durability / Repair / Reroll (TASK 9)
+    REPAIR_REQ = 462
+    REPAIR_RESULT = 463
+    REROLL_REQ = 464
+    REROLL_RESULT = 465
+    DURABILITY_NOTIFY = 466
+    DURABILITY_QUERY = 467
+
+    # Battleground / Guild War (TASK 6)
+    BATTLEGROUND_QUEUE = 430
+    BATTLEGROUND_STATUS = 431
+    BATTLEGROUND_SCORE = 432
+    BATTLEGROUND_SCORE_UPDATE = 433
+    GUILD_WAR_DECLARE = 434
+    GUILD_WAR_STATUS = 435
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -522,6 +538,18 @@ class PlayerSession:
     friend_requests_recv: list = field(default_factory=list) # [from_name, ...]
     blocked_players: list = field(default_factory=list)      # [player_name, ...]
     party_finder_listing: dict = field(default_factory=dict) # current listing or {}
+    # ---- Durability / Repair / Reroll (TASK 9) ----
+    equipment_durability: dict = field(default_factory=dict)  # {inv_slot_idx: durability_float}
+    equipment_random_opts: dict = field(default_factory=dict) # {inv_slot_idx: [{stat, value}, ...]}
+    reappraisal_scrolls: int = 0                              # 재감정서 수량
+    # ---- Battleground / Guild War (TASK 6) ----
+    bg_queue_mode: int = -1                   # -1=not queued, 0=capture, 1=payload
+    bg_match_id: int = 0                      # active match id
+    bg_team: int = 0                          # 0=red, 1=blue
+    gw_war_id: int = 0                        # active guild war id
+    pvp_season_rating: int = 1000             # season rating (initial 1000)
+    pvp_season_matches: int = 0               # matches played this season
+    pvp_season_wins: int = 0                  # wins this season
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -1560,6 +1588,119 @@ PARTY_FINDER_ROLES = ["tank", "dps", "support", "any"]
 _PARTY_FINDER_BOARD = []   # [{listing_id, owner, title, category, min_level, role, created_at}, ...]
 _PARTY_FINDER_NEXT_ID = [1]
 
+# ---- Durability / Repair / Reroll Data (GDD items.yaml) ----
+DURABILITY_MAX = 100.0               # max durability
+DURABILITY_DECREASE_PER_HIT = 0.1    # per hit taken
+DURABILITY_DECREASE_PER_DEATH = 1.0  # all equips on death
+DURABILITY_BROKEN_PENALTY = 0.5      # stat reduction when broken (50%)
+DURABILITY_WARNING_AT = 20.0         # warn when below 20%
+REPAIR_COST_MULTIPLIER = 5           # tier * (100 - dur) * 5
+REROLL_GOLD_COST = 5000              # gold cost per reroll
+REROLL_MATERIAL = "reappraisal_scroll"  # required material
+REROLL_LOCK_COST = 10000             # gold to lock 1 line
+REROLL_MAX_LOCKS = 1                 # max locked lines per reroll
+
+# ---- Battleground / Guild War Data (GDD pvp.yaml) ----
+# Battleground modes
+BG_MODE_CAPTURE_POINT = 0
+BG_MODE_PAYLOAD = 1
+BG_MODES = ["capture_point", "payload"]
+BG_TEAM_SIZE = 6
+BG_MAP_SIZE = 200
+BG_TIME_LIMIT = 900             # 15 minutes
+BG_RESPAWN_TIMER = 10           # seconds
+# Capture point
+BG_CAPTURE_POINTS = 3
+BG_CAPTURE_TIME = 10            # seconds to capture
+BG_SCORE_PER_SECOND = 1
+BG_WIN_SCORE = 1000
+# Payload
+BG_PAYLOAD_PHASES = 2
+BG_PUSH_SPEED = 2.0
+BG_PUSH_RADIUS = 5.0
+BG_CHECKPOINTS = 3
+BG_PHASE_TIME = 300             # 5 min per phase
+# Guild war
+GW_MIN_PARTICIPANTS = 10
+GW_MAX_PARTICIPANTS = 20
+GW_MAP_SIZE = 300
+GW_TIME_LIMIT = 1800            # 30 minutes
+GW_RESPAWN_TIMER = 15
+GW_CRYSTAL_HP = 10000
+# PvP season
+PVP_SEASON_WEEKS = 12
+PVP_INITIAL_RATING = 1000
+PVP_PLACEMENT_MATCHES = 10
+PVP_PLACEMENT_K_FACTOR = 64
+PVP_DECAY_INACTIVITY_DAYS = 7
+PVP_DECAY_PER_DAY = 25
+PVP_TIERS = [
+    {"name": "bronze",       "min": 0,    "max": 999,  "token": 100,  "title": "브론즈 투사"},
+    {"name": "silver",       "min": 1000, "max": 1299, "token": 200,  "title": "실버 투사"},
+    {"name": "gold",         "min": 1300, "max": 1599, "token": 500,  "title": "골드 투사"},
+    {"name": "platinum",     "min": 1600, "max": 1899, "token": 1000, "title": "플래티넘 투사"},
+    {"name": "diamond",      "min": 1900, "max": 2199, "token": 2000, "title": "다이아 투사"},
+    {"name": "master",       "min": 2200, "max": 2499, "token": 3000, "title": "마스터"},
+    {"name": "grandmaster",  "min": 2500, "max": 9999, "token": 5000, "title": "그랜드마스터"},
+]
+def _get_pvp_tier(rating):
+    """Return tier dict for given rating."""
+    for t in PVP_TIERS:
+        if t["min"] <= rating <= t["max"]:
+            return t
+    return PVP_TIERS[0]
+
+def _pvp_soft_reset(rating):
+    """Season soft reset: new = 1000 + (current-1000)*0.5"""
+    return int(1000 + (rating - 1000) * 0.5)
+
+# Battleground queue state
+_BG_QUEUE = {BG_MODE_CAPTURE_POINT: [], BG_MODE_PAYLOAD: []}
+_BG_MATCH_NEXT_ID = 1
+_BG_ACTIVE_MATCHES = {}  # match_id -> {mode, teams, scores, ...}
+# Guild war state
+_GW_PENDING = {}   # guild_id_a -> {target_guild_id, timestamp}
+_GW_ACTIVE = {}    # war_id -> {guild_a, guild_b, crystals, scores, ...}
+_GW_NEXT_ID = 1
+# Equipment type by item_id range for random option pool
+def _get_equip_type_by_id(item_id):
+    """Map item_id to equipment type for random option pool lookup."""
+    if 200 <= item_id < 300:
+        return "weapon"
+    elif 300 <= item_id < 350:
+        return "armor"
+    elif 350 <= item_id < 370:
+        return "helmet"
+    elif 370 <= item_id < 390:
+        return "gloves"
+    elif 390 <= item_id < 400:
+        return "boots"
+    return "armor"  # default
+
+def _get_equip_tier_by_id(item_id):
+    """Derive equipment tier from item_id. Higher item_id = higher tier."""
+    if item_id < 200:
+        return 0
+    base = (item_id % 100)
+    return max(1, (base // 20) + 1)  # tier 1-5
+
+RANDOM_OPTION_POOL = {
+    "weapon": ["atk", "crit_rate", "crit_dmg", "skill_dmg", "speed"],
+    "armor":  ["hp", "def", "damage_reduction", "elemental_resist", "hp_regen"],
+    "helmet": ["hp", "def", "crit_resist", "mp", "cooldown_reduction"],
+    "gloves": ["atk", "attack_speed", "crit_rate", "accuracy", "speed"],
+    "boots":  ["speed", "evasion", "hp", "def", "mp_regen"],
+}
+RANDOM_OPTION_RANGES = {
+    "atk": (5, 30), "hp": (50, 300), "def": (3, 20),
+    "crit_rate": (1, 5), "crit_dmg": (2, 10), "speed": (1, 5),
+    "skill_dmg": (2, 8), "damage_reduction": (1, 5),
+    "elemental_resist": (2, 10), "hp_regen": (1, 5),
+    "mp": (20, 100), "cooldown_reduction": (1, 5),
+    "attack_speed": (1, 5), "accuracy": (1, 5),
+    "evasion": (1, 5), "mp_regen": (1, 5), "crit_resist": (1, 5),
+}
+
 # ──── 던전 목록 데이터 (P2_S03_S01) ────
 DUNGEON_LIST_DATA = [
     {"id": 1, "name": "고블린 동굴",    "type": "party", "min_level": 15, "stages": 3, "zone_id": 100, "party_size": 4, "boss_id": 3004, "boss_hp": 30000},
@@ -1931,6 +2072,12 @@ class BridgeServer:
             MsgType.BLOCK_LIST_REQ: self._on_block_list_req,
             MsgType.PARTY_FINDER_LIST_REQ: self._on_party_finder_list_req,
             MsgType.PARTY_FINDER_CREATE: self._on_party_finder_create,
+            MsgType.REPAIR_REQ: self._on_repair_req,
+            MsgType.REROLL_REQ: self._on_reroll_req,
+            MsgType.DURABILITY_QUERY: self._on_durability_query,
+            MsgType.BATTLEGROUND_QUEUE: self._on_battleground_queue,
+            MsgType.BATTLEGROUND_SCORE: self._on_battleground_score,
+            MsgType.GUILD_WAR_DECLARE: self._on_guild_war_declare,
         }
 
         handler = handlers.get(msg_type)
@@ -4390,6 +4537,581 @@ class BridgeServer:
 
 
 
+
+
+
+    # ---- Battleground / Guild War (TASK 6: MsgType 430-435) ----
+
+    async def _on_battleground_queue(self, session, payload: bytes):
+        """BATTLEGROUND_QUEUE(430) -> BATTLEGROUND_STATUS(431)
+        Request: action(u8) + mode(u8)
+          action: 0=join queue, 1=cancel queue
+          mode: 0=capture_point, 1=payload
+        Response: status(u8) + match_id(u32) + mode(u8) + team(u8) + queue_count(u8)
+          status: 0=QUEUED, 1=MATCH_FOUND, 2=CANCELLED, 3=ALREADY_IN_MATCH, 4=INVALID_MODE"""
+        if not session.in_game or len(payload) < 2:
+            return
+
+        action = payload[0]
+        mode = payload[1]
+
+        def _send_status(status, match_id=0, m=0, team=0, qcount=0):
+            self._send(session, MsgType.BATTLEGROUND_STATUS,
+                       struct.pack('<B I B B B', status, match_id, m, team, qcount))
+
+        # Cancel queue
+        if action == 1:
+            if session.bg_queue_mode >= 0:
+                q = _BG_QUEUE.get(session.bg_queue_mode, [])
+                if session.entity_id in q:
+                    q.remove(session.entity_id)
+                session.bg_queue_mode = -1
+            _send_status(2)  # CANCELLED
+            return
+
+        # Validate mode
+        if mode not in (BG_MODE_CAPTURE_POINT, BG_MODE_PAYLOAD):
+            _send_status(4)  # INVALID_MODE
+            return
+
+        # Already in match?
+        if session.bg_match_id > 0:
+            _send_status(3, session.bg_match_id, mode, session.bg_team)
+            return
+
+        # Add to queue
+        q = _BG_QUEUE.setdefault(mode, [])
+        if session.entity_id not in q:
+            q.append(session.entity_id)
+        session.bg_queue_mode = mode
+
+        # Check if enough players for match (BG_TEAM_SIZE * 2)
+        needed = BG_TEAM_SIZE * 2
+        if len(q) >= needed:
+            global _BG_MATCH_NEXT_ID
+            match_id = _BG_MATCH_NEXT_ID
+            _BG_MATCH_NEXT_ID += 1
+
+            # Pop players from queue
+            players = q[:needed]
+            del q[:needed]
+
+            # Split teams
+            red_team = players[:BG_TEAM_SIZE]
+            blue_team = players[BG_TEAM_SIZE:]
+
+            # Create match state
+            if mode == BG_MODE_CAPTURE_POINT:
+                match_state = {
+                    "mode": mode,
+                    "red_team": red_team, "blue_team": blue_team,
+                    "red_score": 0, "blue_score": 0,
+                    "win_score": BG_WIN_SCORE,
+                    "capture_points": [0] * BG_CAPTURE_POINTS,  # 0=neutral, 1=red, 2=blue
+                    "time_remaining": BG_TIME_LIMIT,
+                }
+            else:  # payload
+                match_state = {
+                    "mode": mode,
+                    "red_team": red_team, "blue_team": blue_team,
+                    "red_distance": 0.0, "blue_distance": 0.0,
+                    "phase": 1,
+                    "checkpoints": BG_CHECKPOINTS,
+                    "time_remaining": BG_PHASE_TIME,
+                }
+            _BG_ACTIVE_MATCHES[match_id] = match_state
+
+            # Notify all players in match
+            for eid in red_team + blue_team:
+                for s in self.sessions.values():
+                    if s.entity_id == eid:
+                        team = 0 if eid in red_team else 1
+                        s.bg_match_id = match_id
+                        s.bg_team = team
+                        s.bg_queue_mode = -1
+                        _send_status2 = lambda st, mid, md, tm, qc, ss=s: self._send(
+                            ss, MsgType.BATTLEGROUND_STATUS,
+                            struct.pack('<B I B B B', st, mid, md, tm, qc))
+                        _send_status2(1, match_id, mode, team, 0)  # MATCH_FOUND
+                        break
+        else:
+            # Still waiting
+            _send_status(0, 0, mode, 0, len(q))  # QUEUED
+
+    async def _on_battleground_score(self, session, payload: bytes):
+        """BATTLEGROUND_SCORE(432) -> BATTLEGROUND_SCORE_UPDATE(433)
+        Request: action(u8) + point_index(u8)
+          action: 0=capture_point (point_index used), 1=push_payload, 2=query_score
+        Response: mode(u8) + red_score(u32) + blue_score(u32) + time_remaining(u32) + point_data(variable)
+        """
+        if not session.in_game or len(payload) < 2:
+            return
+
+        action = payload[0]
+        point_index = payload[1]
+
+        match_id = session.bg_match_id
+        if match_id <= 0 or match_id not in _BG_ACTIVE_MATCHES:
+            # Not in match — send empty score
+            self._send(session, MsgType.BATTLEGROUND_SCORE_UPDATE,
+                       struct.pack('<B I I I B', 0, 0, 0, 0, 0))
+            return
+
+        match = _BG_ACTIVE_MATCHES[match_id]
+        mode = match["mode"]
+
+        if mode == BG_MODE_CAPTURE_POINT:
+            if action == 0 and 0 <= point_index < BG_CAPTURE_POINTS:
+                # Capture a point — team takes ownership
+                team_val = 1 if session.bg_team == 0 else 2  # 1=red, 2=blue
+                match["capture_points"][point_index] = team_val
+
+                # Update scores based on controlled points
+                red_owned = sum(1 for p in match["capture_points"] if p == 1)
+                blue_owned = sum(1 for p in match["capture_points"] if p == 2)
+                match["red_score"] += red_owned * BG_SCORE_PER_SECOND
+                match["blue_score"] += blue_owned * BG_SCORE_PER_SECOND
+
+            # Build response: mode + red_score + blue_score + time + num_points + [point_owner]
+            data = struct.pack('<B I I I B', mode,
+                               match["red_score"], match["blue_score"],
+                               match["time_remaining"],
+                               BG_CAPTURE_POINTS)
+            for p in match["capture_points"]:
+                data += struct.pack('<B', p)
+
+            # Check win
+            winner = -1
+            if match["red_score"] >= BG_WIN_SCORE:
+                winner = 0  # red wins
+            elif match["blue_score"] >= BG_WIN_SCORE:
+                winner = 1  # blue wins
+
+            if winner >= 0:
+                data += struct.pack('<b', winner)
+                # Cleanup match
+                self._bg_end_match(match_id, winner)
+            else:
+                data += struct.pack('<b', -1)  # no winner yet
+
+            self._send(session, MsgType.BATTLEGROUND_SCORE_UPDATE, data)
+
+        elif mode == BG_MODE_PAYLOAD:
+            if action == 1:
+                # Push payload
+                key = "red_distance" if session.bg_team == 0 else "blue_distance"
+                match[key] = match.get(key, 0.0) + BG_PUSH_SPEED
+
+            # Build response
+            data = struct.pack('<B I I I B',
+                               mode,
+                               int(match.get("red_distance", 0)),
+                               int(match.get("blue_distance", 0)),
+                               match["time_remaining"],
+                               match.get("phase", 1))
+
+            # Check checkpoint completion
+            total_dist = BG_PUSH_SPEED * BG_PHASE_TIME  # max distance
+            red_progress = match.get("red_distance", 0) / max(total_dist, 1)
+            blue_progress = match.get("blue_distance", 0) / max(total_dist, 1)
+            winner = -1
+            if red_progress >= 1.0 and blue_progress >= 1.0:
+                winner = 0 if match.get("red_distance", 0) > match.get("blue_distance", 0) else 1
+            elif red_progress >= 1.0 and match.get("phase", 1) >= BG_PAYLOAD_PHASES:
+                winner = 0
+            elif blue_progress >= 1.0 and match.get("phase", 1) >= BG_PAYLOAD_PHASES:
+                winner = 1
+
+            data += struct.pack('<b', winner)
+            if winner >= 0:
+                self._bg_end_match(match_id, winner)
+
+            self._send(session, MsgType.BATTLEGROUND_SCORE_UPDATE, data)
+        else:
+            # Query only
+            self._send(session, MsgType.BATTLEGROUND_SCORE_UPDATE,
+                       struct.pack('<B I I I B b', 0, 0, 0, 0, 0, -1))
+
+    def _bg_end_match(self, match_id, winner_team):
+        """End a battleground match. Award PvP rating to winners."""
+        match = _BG_ACTIVE_MATCHES.pop(match_id, None)
+        if not match:
+            return
+        all_players = match.get("red_team", []) + match.get("blue_team", [])
+        red = set(match.get("red_team", []))
+        for eid in all_players:
+            for s in self.sessions.values():
+                if s.entity_id == eid:
+                    is_red = eid in red
+                    won = (winner_team == 0 and is_red) or (winner_team == 1 and not is_red)
+                    if won:
+                        s.pvp_season_wins += 1
+                        s.pvp_season_rating += 15
+                    else:
+                        s.pvp_season_rating = max(0, s.pvp_season_rating - 10)
+                    s.pvp_season_matches += 1
+                    s.bg_match_id = 0
+                    s.bg_team = 0
+                    break
+
+    async def _on_guild_war_declare(self, session, payload: bytes):
+        """GUILD_WAR_DECLARE(434) -> GUILD_WAR_STATUS(435)
+        Request: action(u8) + target_guild_id(u32)
+          action: 0=declare_war, 1=accept_war, 2=reject_war, 3=query_status
+        Response: status(u8) + war_id(u32) + guild_a(u32) + guild_b(u32) +
+                  crystal_hp_a(u32) + crystal_hp_b(u32) + time_remaining(u32)
+          status: 0=WAR_DECLARED, 1=WAR_STARTED, 2=WAR_REJECTED, 3=NO_GUILD,
+                  4=TOO_FEW_MEMBERS, 5=ALREADY_AT_WAR, 6=PENDING_INFO, 7=NO_WAR"""
+        if not session.in_game or len(payload) < 5:
+            return
+
+        action = payload[0]
+        target_guild_id = struct.unpack('<I', payload[1:5])[0]
+
+        def _send_status(status, war_id=0, ga=0, gb=0, hp_a=0, hp_b=0, time_rem=0):
+            self._send(session, MsgType.GUILD_WAR_STATUS,
+                       struct.pack('<B I I I I I I', status, war_id, ga, gb, hp_a, hp_b, time_rem))
+
+        # Must be in a guild
+        if not session.guild_id:
+            _send_status(3)  # NO_GUILD
+            return
+
+        my_guild = session.guild_id
+
+        if action == 3:  # Query status
+            # Check active war
+            for wid, war in _GW_ACTIVE.items():
+                if my_guild in (war["guild_a"], war["guild_b"]):
+                    _send_status(1, wid, war["guild_a"], war["guild_b"],
+                                 war["crystal_a"], war["crystal_b"], war["time_remaining"])
+                    return
+            # Check pending
+            if my_guild in _GW_PENDING:
+                pending = _GW_PENDING[my_guild]
+                _send_status(6, 0, my_guild, pending["target_guild_id"], 0, 0, 0)
+                return
+            # Check if someone declared on us
+            for gid, pending in _GW_PENDING.items():
+                if pending["target_guild_id"] == my_guild:
+                    _send_status(6, 0, gid, my_guild, 0, 0, 0)
+                    return
+            _send_status(7)  # NO_WAR
+            return
+
+        if action == 0:  # Declare war
+            # Check not already at war
+            for war in _GW_ACTIVE.values():
+                if my_guild in (war["guild_a"], war["guild_b"]):
+                    _send_status(5)  # ALREADY_AT_WAR
+                    return
+            if my_guild in _GW_PENDING:
+                _send_status(5)
+                return
+
+            # Register pending war
+            _GW_PENDING[my_guild] = {"target_guild_id": target_guild_id, "timestamp": 0}
+            _send_status(0, 0, my_guild, target_guild_id)  # WAR_DECLARED
+            return
+
+        if action == 1:  # Accept war
+            # Find pending war targeting my guild
+            declaring_guild = None
+            for gid, pending in list(_GW_PENDING.items()):
+                if pending["target_guild_id"] == my_guild:
+                    declaring_guild = gid
+                    break
+            # Or accept by target_guild_id
+            if not declaring_guild and target_guild_id in _GW_PENDING:
+                if _GW_PENDING[target_guild_id]["target_guild_id"] == my_guild:
+                    declaring_guild = target_guild_id
+
+            if not declaring_guild:
+                _send_status(7)  # NO_WAR to accept
+                return
+
+            # Create active war
+            global _GW_NEXT_ID
+            war_id = _GW_NEXT_ID
+            _GW_NEXT_ID += 1
+            _GW_ACTIVE[war_id] = {
+                "guild_a": declaring_guild,
+                "guild_b": my_guild,
+                "crystal_a": GW_CRYSTAL_HP,
+                "crystal_b": GW_CRYSTAL_HP,
+                "time_remaining": GW_TIME_LIMIT,
+                "scores_a": 0, "scores_b": 0,
+            }
+            del _GW_PENDING[declaring_guild]
+
+            # Update session
+            session.gw_war_id = war_id
+            _send_status(1, war_id, declaring_guild, my_guild,
+                         GW_CRYSTAL_HP, GW_CRYSTAL_HP, GW_TIME_LIMIT)
+            return
+
+        if action == 2:  # Reject war
+            for gid, pending in list(_GW_PENDING.items()):
+                if pending["target_guild_id"] == my_guild:
+                    del _GW_PENDING[gid]
+                    _send_status(2, 0, gid, my_guild)
+                    return
+            _send_status(7)  # NO_WAR
+            return
+
+    def _pvp_season_reset_all(self):
+        """Reset PvP season for all sessions. Soft reset + tier rewards (called on season end)."""
+        for s in self.sessions.values():
+            if s.pvp_season_matches > 0:
+                tier = _get_pvp_tier(s.pvp_season_rating)
+                # Simulate tier reward via gold (simplified — real system would use mail)
+                s.gold += tier["token"]
+                # Soft reset
+                s.pvp_season_rating = _pvp_soft_reset(s.pvp_season_rating)
+                s.pvp_season_matches = 0
+                s.pvp_season_wins = 0
+
+    # ---- Durability / Repair / Reroll (TASK 9: MsgType 462-467) ----
+
+    def _get_equipped_slots(self, session):
+        """Get list of (inv_idx, InventorySlot) for all equipped items."""
+        result = []
+        for i, slot in enumerate(session.inventory):
+            if slot.item_id > 0 and slot.equipped:
+                result.append((i, slot))
+        return result
+
+    def _init_durability(self, session, inv_idx: int):
+        """Initialize durability for an inventory slot if not present."""
+        if inv_idx not in session.equipment_durability:
+            session.equipment_durability[inv_idx] = DURABILITY_MAX
+
+    def _init_random_opts(self, session, inv_idx: int):
+        """Initialize random options for an inventory slot if not present."""
+        if inv_idx not in session.equipment_random_opts:
+            item_id = session.inventory[inv_idx].item_id
+            equip_type = _get_equip_type_by_id(item_id)
+            pool = RANDOM_OPTION_POOL.get(equip_type, RANDOM_OPTION_POOL["armor"])
+            num_opts = min(len(pool), random.randint(2, 3))
+            opts = []
+            chosen = random.sample(pool, num_opts)
+            for stat in chosen:
+                lo, hi = RANDOM_OPTION_RANGES.get(stat, (1, 10))
+                opts.append({"stat": stat, "value": random.randint(lo, hi)})
+            session.equipment_random_opts[inv_idx] = opts
+
+    def _apply_durability_damage(self, session, amount: float, target_indices=None):
+        """Reduce durability on equipped items. Returns list of (inv_idx, new_dur, newly_broken)."""
+        results = []
+        if target_indices is None:
+            equipped = self._get_equipped_slots(session)
+            target_indices = [idx for idx, _ in equipped]
+        for inv_idx in target_indices:
+            if inv_idx >= len(session.inventory) or session.inventory[inv_idx].item_id == 0:
+                continue
+            self._init_durability(session, inv_idx)
+            old = session.equipment_durability[inv_idx]
+            new_dur = max(0.0, old - amount)
+            session.equipment_durability[inv_idx] = new_dur
+            was_broken = old <= 0
+            is_broken = new_dur <= 0
+            results.append((inv_idx, new_dur, is_broken and not was_broken))
+        return results
+
+    def _send_durability_notify(self, session, inv_idx: int, durability: float, is_broken: bool):
+        """DURABILITY_NOTIFY(466): inv_slot(u8)+durability(f32)+is_broken(u8)"""
+        self._send(session, MsgType.DURABILITY_NOTIFY,
+                   struct.pack('<B f B', inv_idx, durability, 1 if is_broken else 0))
+
+    async def _on_durability_take_hit(self, session):
+        """Called when player takes a hit — decrease durability by 0.1 on all equips."""
+        results = self._apply_durability_damage(session, DURABILITY_DECREASE_PER_HIT)
+        for inv_idx, dur, newly_broken in results:
+            if newly_broken or dur <= DURABILITY_WARNING_AT:
+                self._send_durability_notify(session, inv_idx, dur, dur <= 0)
+
+    async def _on_durability_death(self, session):
+        """Called when player dies — decrease all equip durability by 1.0."""
+        results = self._apply_durability_damage(session, DURABILITY_DECREASE_PER_DEATH)
+        for inv_idx, dur, newly_broken in results:
+            self._send_durability_notify(session, inv_idx, dur, dur <= 0)
+
+    async def _on_repair_req(self, session, payload: bytes):
+        """REPAIR_REQ(462) -> REPAIR_RESULT(463)
+        Request: mode(u8) + inv_slot(u8)
+          mode: 0=single slot (inv_slot used), 1=repair all (inv_slot ignored)
+        Response: result(u8) + total_cost(u32) + repaired_count(u8)
+          result: 0=SUCCESS, 1=NO_EQUIPMENT, 2=NOT_ENOUGH_GOLD, 3=ALREADY_FULL"""
+        if not session.in_game or len(payload) < 2:
+            return
+
+        mode = payload[0]
+        target_inv_slot = payload[1]
+
+        def _send_result(result_code, cost=0, count=0):
+            self._send(session, MsgType.REPAIR_RESULT,
+                       struct.pack('<B I B', result_code, cost, count))
+
+        # Collect slots to repair
+        if mode == 1:  # repair all
+            equipped = self._get_equipped_slots(session)
+            slots_to_repair = [idx for idx, _ in equipped]
+        else:
+            if target_inv_slot >= len(session.inventory):
+                _send_result(1)  # NO_EQUIPMENT
+                return
+            inv_s = session.inventory[target_inv_slot]
+            if inv_s.item_id == 0 or not inv_s.equipped:
+                _send_result(1)  # NO_EQUIPMENT
+                return
+            slots_to_repair = [target_inv_slot]
+
+        if not slots_to_repair:
+            _send_result(1)  # NO_EQUIPMENT
+            return
+
+        # Calculate total cost
+        total_cost = 0
+        repairs = []
+        for inv_idx in slots_to_repair:
+            self._init_durability(session, inv_idx)
+            cur_dur = session.equipment_durability[inv_idx]
+            if cur_dur >= DURABILITY_MAX:
+                continue  # already full
+            item_id = session.inventory[inv_idx].item_id
+            tier = _get_equip_tier_by_id(item_id)
+            dur_lost = DURABILITY_MAX - cur_dur
+            cost = int(tier * dur_lost * REPAIR_COST_MULTIPLIER)
+            repairs.append((inv_idx, cost))
+            total_cost += cost
+
+        if not repairs:
+            _send_result(3)  # ALREADY_FULL
+            return
+
+        # Check gold
+        if session.gold < total_cost:
+            _send_result(2)  # NOT_ENOUGH_GOLD
+            return
+
+        # Execute repair
+        session.gold -= total_cost
+        for inv_idx, cost in repairs:
+            session.equipment_durability[inv_idx] = DURABILITY_MAX
+            self._send_durability_notify(session, inv_idx, DURABILITY_MAX, False)
+
+        _send_result(0, total_cost, len(repairs))
+
+    async def _on_reroll_req(self, session, payload: bytes):
+        """REROLL_REQ(464) -> REROLL_RESULT(465)
+        Request: inv_slot(u8) + lock_count(u8) + [lock_idx(u8)]
+        Response: result(u8) + option_count(u8) + [stat_len(u8)+stat(str)+value(i16)+locked(u8)]
+          result: 0=SUCCESS, 1=NO_EQUIPMENT, 2=NOT_ENOUGH_GOLD, 3=NO_SCROLL,
+                  4=TOO_MANY_LOCKS, 5=INVALID_LOCK"""
+        if not session.in_game or len(payload) < 2:
+            return
+
+        inv_slot = payload[0]
+        lock_count = payload[1]
+        offset = 2
+
+        lock_indices = []
+        for _ in range(lock_count):
+            if offset < len(payload):
+                lock_indices.append(payload[offset])
+                offset += 1
+
+        def _send_result(result_code, options=None):
+            if options is None:
+                options = []
+            data = struct.pack('<B B', result_code, len(options))
+            for opt in options:
+                sb = opt["stat"].encode('utf-8')
+                locked = 1 if opt.get("locked", False) else 0
+                data += struct.pack('<B', len(sb)) + sb
+                data += struct.pack('<h B', opt["value"], locked)
+            self._send(session, MsgType.REROLL_RESULT, data)
+
+        # Check equipment exists
+        if inv_slot >= len(session.inventory):
+            _send_result(1)
+            return
+        inv_s = session.inventory[inv_slot]
+        if inv_s.item_id == 0 or not inv_s.equipped:
+            _send_result(1)
+            return
+
+        # Init random options if not exist
+        self._init_random_opts(session, inv_slot)
+        current_opts = session.equipment_random_opts[inv_slot]
+
+        # Check lock count
+        if lock_count > REROLL_MAX_LOCKS:
+            _send_result(4)
+            return
+
+        # Validate lock indices
+        for idx in lock_indices:
+            if idx >= len(current_opts):
+                _send_result(5)
+                return
+
+        # Calculate cost
+        total_gold = REROLL_GOLD_COST + (lock_count * REROLL_LOCK_COST)
+
+        # Check gold
+        if session.gold < total_gold:
+            _send_result(2)
+            return
+
+        # Check material
+        if session.reappraisal_scrolls < 1:
+            _send_result(3)
+            return
+
+        # Execute reroll
+        session.gold -= total_gold
+        session.reappraisal_scrolls -= 1
+
+        # Re-generate non-locked options
+        equip_type = _get_equip_type_by_id(inv_s.item_id)
+        pool = RANDOM_OPTION_POOL.get(equip_type, RANDOM_OPTION_POOL["armor"])
+        locked_stats = set()
+        new_opts = []
+        for i, opt in enumerate(current_opts):
+            if i in lock_indices:
+                new_opts.append({**opt, "locked": True})
+                locked_stats.add(opt["stat"])
+            else:
+                new_opts.append(None)  # placeholder
+
+        # Fill non-locked slots with new random stats
+        available_pool = [s for s in pool if s not in locked_stats]
+        for i, opt in enumerate(new_opts):
+            if opt is None:
+                if available_pool:
+                    stat = random.choice(available_pool)
+                    available_pool.remove(stat)
+                else:
+                    stat = random.choice(pool)
+                lo, hi = RANDOM_OPTION_RANGES.get(stat, (1, 10))
+                new_opts[i] = {"stat": stat, "value": random.randint(lo, hi), "locked": False}
+
+        session.equipment_random_opts[inv_slot] = new_opts
+        _send_result(0, new_opts)
+
+    async def _on_durability_query(self, session, payload: bytes):
+        """DURABILITY_QUERY(467) -> DURABILITY_NOTIFY(466) per equipped slot
+        Request: (empty)
+        Response: one DURABILITY_NOTIFY per equipped slot"""
+        if not session.in_game:
+            return
+
+        equipped = self._get_equipped_slots(session)
+        for inv_idx, slot in equipped:
+            self._init_durability(session, inv_idx)
+            dur = session.equipment_durability[inv_idx]
+            self._send_durability_notify(session, inv_idx, dur, dur <= 0)
 
     # ---- Social Enhancement (TASK 5: MsgType 410-422) ----
 
