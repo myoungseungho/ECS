@@ -181,6 +181,30 @@ namespace Network
         ADMIN_RELOAD_RESULT = 281,  // S→C: result(1) version(4) reload_count(4) name_len(1) name(N)
         ADMIN_GET_CONFIG    = 282,  // C→S: name_len(1) name(N) key_len(1) key(N)
         ADMIN_CONFIG_RESP   = 283,  // S→C: found(1) value_len(2) value(N)
+
+        // 서버 선택 (S033)
+        SERVER_LIST_REQ     = 320,  // C→S: empty
+        SERVER_LIST         = 321,  // S→C: count(1) {name(32) status(1) population(2)}*N = 35B/entry
+
+        // 캐릭터 CRUD (S033)
+        CHARACTER_LIST_REQ     = 322,  // C→S: empty (로그인 필요)
+        CHARACTER_LIST         = 323,  // S→C: count(1) {name(16) class(1) level(2) zone_id(4)}*N = 23B/entry
+        CHARACTER_CREATE       = 324,  // C→S: name_len(1) name(var) class(1)
+        CHARACTER_CREATE_RESULT = 325, // S→C: result(1) char_id(4) = 5B
+        CHARACTER_DELETE       = 326,  // C→S: char_id(4)
+        CHARACTER_DELETE_RESULT = 327, // S→C: result(1) char_id(4) = 5B
+
+        // 튜토리얼 (S033)
+        TUTORIAL_STEP_COMPLETE = 330,  // C→S: step_id(1)
+        TUTORIAL_REWARD        = 331,  // S→C: step_id(1) reward_type(1) amount(4) = 6B
+
+        // NPC 인터랙션 (S034)
+        NPC_INTERACT    = 332,  // C→S: npc_entity_id(4)
+        NPC_DIALOG      = 333,  // S→C: npc_id(2) npc_type(1) line_count(1) {speaker_len(1) speaker(N) text_len(2) text(N)}*N quest_count(1) {quest_id(4)}*N
+
+        // 강화 (S034)
+        ENHANCE_REQ     = 340,  // C→S: slot_index(1)
+        ENHANCE_RESULT  = 341,  // S→C: slot_index(1) result(1) new_level(1) = 3B
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -752,5 +776,134 @@ namespace Network
     {
         public bool Found;
         public string Value;
+    }
+
+    // ━━━ S033: 서버 선택 / 캐릭터 CRUD / 튜토리얼 ━━━
+
+    /// <summary>서버 상태</summary>
+    public enum ServerStatus : byte
+    {
+        OFF    = 0,
+        NORMAL = 1,
+        BUSY   = 2,
+        FULL   = 3,
+    }
+
+    /// <summary>서버 정보 (SERVER_LIST 파싱용)</summary>
+    public class ServerInfo
+    {
+        public string Name;
+        public ServerStatus Status;
+        public ushort Population;
+    }
+
+    /// <summary>캐릭터 직업</summary>
+    public enum CharacterClass : byte
+    {
+        WARRIOR = 1,
+        MAGE    = 2,
+        ARCHER  = 3,
+    }
+
+    /// <summary>캐릭터 정보 (CHARACTER_LIST 파싱용)</summary>
+    public class CharacterData
+    {
+        public string Name;
+        public CharacterClass ClassType;
+        public ushort Level;
+        public uint ZoneId;
+    }
+
+    /// <summary>캐릭터 생성 결과</summary>
+    public enum CharacterCreateResult : byte
+    {
+        SUCCESS      = 0,
+        FAIL         = 1,
+        NAME_EXISTS  = 2,
+        NAME_INVALID = 3,
+    }
+
+    /// <summary>캐릭터 생성 결과 데이터 (CHARACTER_CREATE_RESULT 파싱용)</summary>
+    public class CharacterCreateResultData
+    {
+        public CharacterCreateResult Result;
+        public uint CharId;
+    }
+
+    /// <summary>캐릭터 삭제 결과</summary>
+    public enum CharacterDeleteResult : byte
+    {
+        SUCCESS       = 0,
+        NOT_FOUND     = 1,
+        NOT_LOGGED_IN = 2,
+    }
+
+    /// <summary>캐릭터 삭제 결과 데이터 (CHARACTER_DELETE_RESULT 파싱용)</summary>
+    public class CharacterDeleteResultData
+    {
+        public CharacterDeleteResult Result;
+        public uint CharId;
+    }
+
+    /// <summary>튜토리얼 보상 타입</summary>
+    public enum TutorialRewardType : byte
+    {
+        GOLD = 0,
+        ITEM = 1,
+        EXP  = 2,
+    }
+
+    /// <summary>튜토리얼 보상 데이터 (TUTORIAL_REWARD 파싱용)</summary>
+    public class TutorialRewardData
+    {
+        public byte StepId;
+        public TutorialRewardType RewardType;
+        public uint Amount;
+    }
+
+    // ━━━ S034: NPC / 강화 ━━━
+
+    /// <summary>NPC 타입</summary>
+    public enum NpcType : byte
+    {
+        QUEST      = 0,
+        SHOP       = 1,
+        BLACKSMITH = 2,
+        SKILL      = 3,
+    }
+
+    /// <summary>NPC 대화 라인</summary>
+    public class NpcDialogLine
+    {
+        public string Speaker;
+        public string Text;
+    }
+
+    /// <summary>NPC 대화 데이터 (NPC_DIALOG 파싱용)</summary>
+    public class NpcDialogData
+    {
+        public ushort NpcId;
+        public NpcType Type;
+        public NpcDialogLine[] Lines;
+        public uint[] QuestIds;
+    }
+
+    /// <summary>강화 결과</summary>
+    public enum EnhanceResult : byte
+    {
+        SUCCESS      = 0,
+        INVALID_SLOT = 1,
+        NO_ITEM      = 2,
+        MAX_LEVEL    = 3,
+        NO_GOLD      = 4,
+        FAIL         = 5,
+    }
+
+    /// <summary>강화 결과 데이터 (ENHANCE_RESULT 파싱용)</summary>
+    public class EnhanceResultData
+    {
+        public byte SlotIndex;
+        public EnhanceResult Result;
+        public byte NewLevel;
     }
 }

@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_30_phase1_complete
+version: session_s034_npc_enhance_tutorial
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -365,6 +365,71 @@ managers:
     serialized_fields:
       - fadeDuration: float (default 0.5)
 
+  - name: NpcManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "NPC 인터랙션 관리 — F키로 NPC 대화, 대화 데이터 관리"
+    reads: []
+    writes:
+      - _currentDialog (NpcDialogData)
+      - _isDialogOpen (bool)
+    fires_events:
+      - OnDialogOpened(NpcDialogData)
+      - OnDialogClosed()
+    subscribes_to:
+      - NetworkManager.OnNpcDialog → NPC 대화 데이터 수신
+    public_api:
+      - InteractWith(uint)
+      - CloseDialog()
+    computed_properties:
+      - IsDialogOpen (bool)
+      - CurrentDialog (NpcDialogData)
+
+  - name: EnhanceManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "장비 강화 관리 — 대장장이 NPC 연동, 강화 요청/결과"
+    reads: []
+    writes:
+      - _isEnhancePanelOpen (bool)
+    fires_events:
+      - OnEnhanceComplete(EnhanceResultData)
+      - OnEnhancePanelOpened()
+      - OnEnhancePanelClosed()
+    subscribes_to:
+      - NetworkManager.OnEnhanceResult → 강화 결과 수신
+    public_api:
+      - Enhance(byte)
+      - OpenPanel()
+      - ClosePanel()
+    computed_properties:
+      - IsEnhancePanelOpen (bool)
+
+  - name: TutorialManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "튜토리얼 진행 관리 — 5스텝 보상 시스템"
+    reads: []
+    writes:
+      - _completedSteps (HashSet<byte>)
+      - _currentStep (byte)
+    fires_events:
+      - OnStepCompleted(byte)
+      - OnRewardReceived(TutorialRewardData)
+      - OnTutorialFinished()
+    subscribes_to:
+      - NetworkManager.OnTutorialReward → 튜토리얼 보상 수신
+    public_api:
+      - CompleteCurrentStep()
+      - CompleteStep(byte)
+      - IsStepCompleted(byte) → bool
+    computed_properties:
+      - CurrentStep (byte)
+      - IsComplete (bool)
+
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -606,6 +671,41 @@ data_flows:
     to: BossUI
     via: "C# events (OnBossAppeared, OnBossPhaseChanged, OnBossSpecialAttacked, OnBossEnraged, OnBossKilled, OnBossHPChanged)"
     description: "보스 HP바, 페이즈 표시, 알림 팝업"
+
+  - from: NetworkManager
+    to: NpcManager
+    via: "C# event (OnNpcDialog)"
+    description: "NPC 대화 데이터 수신"
+
+  - from: NpcManager
+    to: NpcDialogUI
+    via: "C# events (OnDialogOpened, OnDialogClosed)"
+    description: "NPC 대화 패널 표시/숨김"
+
+  - from: NetworkManager
+    to: EnhanceManager
+    via: "C# event (OnEnhanceResult)"
+    description: "강화 결과 수신"
+
+  - from: EnhanceManager
+    to: EnhanceUI
+    via: "C# events (OnEnhanceComplete, OnEnhancePanelOpened, OnEnhancePanelClosed)"
+    description: "강화 패널 UI 갱신"
+
+  - from: NetworkManager
+    to: TutorialManager
+    via: "C# event (OnTutorialReward)"
+    description: "튜토리얼 보상 수신"
+
+  - from: NetworkManager
+    to: ServerSelectUI
+    via: "C# event (OnServerList)"
+    description: "서버 목록 수신 → UI 갱신"
+
+  - from: NetworkManager
+    to: CharacterSelectUI
+    via: "C# events (OnCharacterDataList, OnCharacterCreateResult, OnCharacterDeleteResult)"
+    description: "캐릭터 목록/생성/삭제 결과 UI 갱신"
 
   - from: SceneFlowManager
     to: SceneManager (Unity)

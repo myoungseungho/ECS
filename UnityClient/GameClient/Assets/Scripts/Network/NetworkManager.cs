@@ -100,6 +100,15 @@ namespace Network
         // 세션 37: 어드민
         public event Action<AdminReloadResultData> OnAdminReloadResult;
         public event Action<AdminConfigRespData> OnAdminConfigResp;
+        // S033: 서버 선택 / 캐릭터 CRUD / 튜토리얼
+        public event Action<ServerInfo[]> OnServerList;
+        public event Action<CharacterData[]> OnCharacterDataList;
+        public event Action<CharacterCreateResultData> OnCharacterCreateResult;
+        public event Action<CharacterDeleteResultData> OnCharacterDeleteResult;
+        public event Action<TutorialRewardData> OnTutorialReward;
+        // S034: NPC / 강화
+        public event Action<NpcDialogData> OnNpcDialog;
+        public event Action<EnhanceResultData> OnEnhanceResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -428,6 +437,52 @@ namespace Network
         public void AdminGetConfig(string configName, string key)
         {
             _field?.Send(PacketBuilder.AdminGetConfig(configName, key));
+        }
+
+        // ━━━ S033: 서버 선택 / 캐릭터 CRUD / 튜토리얼 API ━━━
+
+        /// <summary>서버 목록 요청</summary>
+        public void RequestServerList()
+        {
+            _field?.Send(PacketBuilder.ServerListReq());
+        }
+
+        /// <summary>캐릭터 목록 요청 (실제 생성된 캐릭터)</summary>
+        public void RequestCharacterList()
+        {
+            _field?.Send(PacketBuilder.CharacterListReq());
+        }
+
+        /// <summary>캐릭터 생성</summary>
+        public void CreateCharacter(string name, CharacterClass classType)
+        {
+            _field?.Send(PacketBuilder.CharacterCreate(name, classType));
+        }
+
+        /// <summary>캐릭터 삭제</summary>
+        public void DeleteCharacter(uint charId)
+        {
+            _field?.Send(PacketBuilder.CharacterDelete(charId));
+        }
+
+        /// <summary>튜토리얼 스텝 완료</summary>
+        public void CompleteTutorialStep(byte stepId)
+        {
+            _field?.Send(PacketBuilder.TutorialStepComplete(stepId));
+        }
+
+        // ━━━ S034: NPC / 강화 API ━━━
+
+        /// <summary>NPC 인터랙션 (F키)</summary>
+        public void InteractNpc(uint npcEntityId)
+        {
+            _field?.Send(PacketBuilder.NpcInteract(npcEntityId));
+        }
+
+        /// <summary>강화 요청</summary>
+        public void RequestEnhance(byte slotIndex)
+        {
+            _field?.Send(PacketBuilder.EnhanceReq(slotIndex));
         }
 
         /// <summary>연결 끊기</summary>
@@ -939,6 +994,66 @@ namespace Network
                     var data = PacketBuilder.ParseAdminConfigResp(payload);
                     Debug.Log($"[Net] AdminConfig: found={data.Found}, value={data.Value}");
                     OnAdminConfigResp?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S033: 서버 선택 / 캐릭터 CRUD / 튜토리얼 ━━━
+
+                case MsgType.SERVER_LIST:
+                {
+                    var servers = PacketBuilder.ParseServerList(payload);
+                    Debug.Log($"[Net] ServerList: {servers.Length} servers");
+                    OnServerList?.Invoke(servers);
+                    break;
+                }
+
+                case MsgType.CHARACTER_LIST:
+                {
+                    var chars = PacketBuilder.ParseCharacterList(payload);
+                    Debug.Log($"[Net] CharacterList: {chars.Length} characters");
+                    OnCharacterDataList?.Invoke(chars);
+                    break;
+                }
+
+                case MsgType.CHARACTER_CREATE_RESULT:
+                {
+                    var data = PacketBuilder.ParseCharacterCreateResult(payload);
+                    Debug.Log($"[Net] CharacterCreate: result={data.Result}, charId={data.CharId}");
+                    OnCharacterCreateResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CHARACTER_DELETE_RESULT:
+                {
+                    var data = PacketBuilder.ParseCharacterDeleteResult(payload);
+                    Debug.Log($"[Net] CharacterDelete: result={data.Result}, charId={data.CharId}");
+                    OnCharacterDeleteResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.TUTORIAL_REWARD:
+                {
+                    var data = PacketBuilder.ParseTutorialReward(payload);
+                    Debug.Log($"[Net] TutorialReward: step={data.StepId}, type={data.RewardType}, amount={data.Amount}");
+                    OnTutorialReward?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S034: NPC / 강화 ━━━
+
+                case MsgType.NPC_DIALOG:
+                {
+                    var data = PacketBuilder.ParseNpcDialog(payload);
+                    Debug.Log($"[Net] NpcDialog: npcId={data.NpcId}, type={data.Type}, lines={data.Lines.Length}, quests={data.QuestIds.Length}");
+                    OnNpcDialog?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ENHANCE_RESULT:
+                {
+                    var data = PacketBuilder.ParseEnhanceResult(payload);
+                    Debug.Log($"[Net] EnhanceResult: slot={data.SlotIndex}, result={data.Result}, newLevel={data.NewLevel}");
+                    OnEnhanceResult?.Invoke(data);
                     break;
                 }
 

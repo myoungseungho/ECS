@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T23:02:00"
+last_session: "2026-02-14T23:55:00"
 
 # ── 현재 상태 ──
-current_status: "idle cycle — 검증 PASS(0 FAIL), GDD status 동기화 완료, Q001 대표님 답변 대기 중"
+current_status: "S033/S034 처리 완료 — 서버선택/캐릭터CRUD/튜토리얼/NPC대화/강화 패킷+매니저+UI 구현 (47 PASS / 0 FAIL)"
 
 # ── 완료된 작업 ──
 completed:
@@ -58,6 +58,22 @@ completed:
   - id: A12
     desc: "SceneFlowManager 구현 (P0_S01_C02) — 씬 전환 싱글톤 + 페이드 트랜지션"
     files: ["Assets/Scripts/Managers/SceneFlowManager.cs", "Assets/Editor/ProjectSetup.cs", "Assets/Editor/SceneValidator.cs", "Assets/Scripts/interaction-map.yaml"]
+  - id: A13
+    desc: "S033/S034 패킷 연동 — 서버선택/캐릭터CRUD/튜토리얼/NPC대화/강화"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/NpcManager.cs"
+      - "Assets/Scripts/Managers/EnhanceManager.cs"
+      - "Assets/Scripts/Managers/TutorialManager.cs"
+      - "Assets/Scripts/UI/NpcDialogUI.cs"
+      - "Assets/Scripts/UI/EnhanceUI.cs"
+      - "Assets/Scripts/UI/ServerSelectUI.cs"
+      - "Assets/Scripts/UI/CharacterSelectUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -83,8 +99,11 @@ recent_decisions:
   - "HitVFXManager Reflection 기반 Volume 설정 (URP 직접 참조 대신)"
   - "크리티컬 판정 임시 기준: Damage>=50 (서버 IsCritical 필드 추가 전)"
   - "SSAO는 Renderer Feature이므로 Volume이 아닌 URP Asset 설정 필요 → 추후"
-  - "Q001 대기 중: 대표님 다음 작업 우선순위 결정 필요"
   - "SceneFlowManager 선행 구현 — 모든 씬의 기반이므로 어떤 우선순위든 필요"
+  - "S033 패킷 연동: SERVER_LIST(320-321), CHARACTER_CRUD(322-327), TUTORIAL(330-331)"
+  - "S034 패킷 연동: NPC_INTERACT(332), NPC_DIALOG(333), ENHANCE(340-341)"
+  - "새 매니저 3종: NpcManager, EnhanceManager, TutorialManager"
+  - "새 UI 4종: NpcDialogUI, EnhanceUI, ServerSelectUI, CharacterSelectUI"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -119,6 +138,8 @@ processed_messages:
   - "S029"
   - "S030"
   - "S031"
+  - "S033"
+  - "S034"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

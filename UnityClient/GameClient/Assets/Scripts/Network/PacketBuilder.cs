@@ -1034,5 +1034,168 @@ namespace Network
             d.Value = valueLen > 0 ? Encoding.UTF8.GetString(payload, 3, valueLen) : "";
             return d;
         }
+
+        // ━━━ S033: 서버 선택 ━━━
+
+        /// <summary>SERVER_LIST_REQ 빌드: empty</summary>
+        public static byte[] ServerListReq()
+        {
+            return Build(MsgType.SERVER_LIST_REQ);
+        }
+
+        /// <summary>SERVER_LIST 파싱: count(1) {name(32) status(1) population(2)}*N = 35B/entry</summary>
+        public static ServerInfo[] ParseServerList(byte[] payload)
+        {
+            byte count = payload[0];
+            var servers = new ServerInfo[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var s = new ServerInfo();
+                int nameEnd = off;
+                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+                s.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 32;
+                s.Status = (ServerStatus)payload[off]; off += 1;
+                s.Population = BitConverter.ToUInt16(payload, off); off += 2;
+                servers[i] = s;
+            }
+            return servers;
+        }
+
+        // ━━━ S033: 캐릭터 CRUD ━━━
+
+        /// <summary>CHARACTER_LIST_REQ 빌드: empty</summary>
+        public static byte[] CharacterListReq()
+        {
+            return Build(MsgType.CHARACTER_LIST_REQ);
+        }
+
+        /// <summary>CHARACTER_LIST 파싱: count(1) {name(16) class(1) level(2) zone_id(4)}*N = 23B/entry</summary>
+        public static CharacterData[] ParseCharacterList(byte[] payload)
+        {
+            byte count = payload[0];
+            var chars = new CharacterData[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var c = new CharacterData();
+                int nameEnd = off;
+                while (nameEnd < off + 16 && payload[nameEnd] != 0) nameEnd++;
+                c.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 16;
+                c.ClassType = (CharacterClass)payload[off]; off += 1;
+                c.Level = BitConverter.ToUInt16(payload, off); off += 2;
+                c.ZoneId = BitConverter.ToUInt32(payload, off); off += 4;
+                chars[i] = c;
+            }
+            return chars;
+        }
+
+        /// <summary>CHARACTER_CREATE 빌드: name_len(1) name(var) class(1)</summary>
+        public static byte[] CharacterCreate(string name, CharacterClass classType)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(name);
+            byte[] payload = new byte[1 + nameBytes.Length + 1];
+            payload[0] = (byte)nameBytes.Length;
+            Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            payload[1 + nameBytes.Length] = (byte)classType;
+            return Build(MsgType.CHARACTER_CREATE, payload);
+        }
+
+        /// <summary>CHARACTER_CREATE_RESULT 파싱: result(1) char_id(4) = 5B</summary>
+        public static CharacterCreateResultData ParseCharacterCreateResult(byte[] payload)
+        {
+            var d = new CharacterCreateResultData();
+            d.Result = (CharacterCreateResult)payload[0];
+            d.CharId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        /// <summary>CHARACTER_DELETE 빌드: char_id(4)</summary>
+        public static byte[] CharacterDelete(uint charId)
+        {
+            return Build(MsgType.CHARACTER_DELETE, BitConverter.GetBytes(charId));
+        }
+
+        /// <summary>CHARACTER_DELETE_RESULT 파싱: result(1) char_id(4) = 5B</summary>
+        public static CharacterDeleteResultData ParseCharacterDeleteResult(byte[] payload)
+        {
+            var d = new CharacterDeleteResultData();
+            d.Result = (CharacterDeleteResult)payload[0];
+            d.CharId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        // ━━━ S033: 튜토리얼 ━━━
+
+        /// <summary>TUTORIAL_STEP_COMPLETE 빌드: step_id(1)</summary>
+        public static byte[] TutorialStepComplete(byte stepId)
+        {
+            return Build(MsgType.TUTORIAL_STEP_COMPLETE, new byte[] { stepId });
+        }
+
+        /// <summary>TUTORIAL_REWARD 파싱: step_id(1) reward_type(1) amount(4) = 6B</summary>
+        public static TutorialRewardData ParseTutorialReward(byte[] payload)
+        {
+            var d = new TutorialRewardData();
+            d.StepId = payload[0];
+            d.RewardType = (TutorialRewardType)payload[1];
+            d.Amount = BitConverter.ToUInt32(payload, 2);
+            return d;
+        }
+
+        // ━━━ S034: NPC 인터랙션 ━━━
+
+        /// <summary>NPC_INTERACT 빌드: npc_entity_id(4)</summary>
+        public static byte[] NpcInteract(uint npcEntityId)
+        {
+            return Build(MsgType.NPC_INTERACT, BitConverter.GetBytes(npcEntityId));
+        }
+
+        /// <summary>NPC_DIALOG 파싱: npc_id(2) npc_type(1) line_count(1) {speaker_len(1) speaker(N) text_len(2) text(N)}*N quest_count(1) {quest_id(4)}*N</summary>
+        public static NpcDialogData ParseNpcDialog(byte[] payload)
+        {
+            var d = new NpcDialogData();
+            int off = 0;
+            d.NpcId = BitConverter.ToUInt16(payload, off); off += 2;
+            d.Type = (NpcType)payload[off]; off += 1;
+            byte lineCount = payload[off]; off += 1;
+            d.Lines = new NpcDialogLine[lineCount];
+            for (int i = 0; i < lineCount; i++)
+            {
+                var line = new NpcDialogLine();
+                byte speakerLen = payload[off]; off += 1;
+                line.Speaker = Encoding.UTF8.GetString(payload, off, speakerLen); off += speakerLen;
+                ushort textLen = BitConverter.ToUInt16(payload, off); off += 2;
+                line.Text = Encoding.UTF8.GetString(payload, off, textLen); off += textLen;
+                d.Lines[i] = line;
+            }
+            byte questCount = payload[off]; off += 1;
+            d.QuestIds = new uint[questCount];
+            for (int i = 0; i < questCount; i++)
+            {
+                d.QuestIds[i] = BitConverter.ToUInt32(payload, off); off += 4;
+            }
+            return d;
+        }
+
+        // ━━━ S034: 강화 ━━━
+
+        /// <summary>ENHANCE_REQ 빌드: slot_index(1)</summary>
+        public static byte[] EnhanceReq(byte slotIndex)
+        {
+            return Build(MsgType.ENHANCE_REQ, new byte[] { slotIndex });
+        }
+
+        /// <summary>ENHANCE_RESULT 파싱: slot_index(1) result(1) new_level(1) = 3B</summary>
+        public static EnhanceResultData ParseEnhanceResult(byte[] payload)
+        {
+            var d = new EnhanceResultData();
+            d.SlotIndex = payload[0];
+            d.Result = (EnhanceResult)payload[1];
+            d.NewLevel = payload[2];
+            return d;
+        }
     }
 }
