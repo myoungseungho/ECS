@@ -1,0 +1,34 @@
+skill_id,name,name_kr,class,unlock_level,max_level,damage_type,damage_multiplier,cooldown,range,aoe_shape,aoe_radius,mp_cost,cast_time,super_armor,cc_type,cc_duration,element,is_ultimate,is_guaranteed_crit,extra_crit_rate,description
+1,basic_attack,기본 공격,warrior,1,1,physical,1.0,0,2.0,,,,0,none,,,,false,false,0,4타 콤보 (1.0/1.1/1.3/1.6 배율)
+2,slash,슬래시,warrior,1,10,physical,1.5,6.0,3.0,cone,3.0,20,0,none,,,,false,false,0,전방 부채꼴 베기
+3,guard,방어,warrior,1,10,none,0,10.0,0,,,,0,full,,,,false,false,0,3초간 받는 데미지 50% 감소
+4,charge,돌진,warrior,5,10,physical,1.8,12.0,8.0,line,2.0,30,0,partial,stun,1.5,,false,false,0,전방 돌진+적중 시 스턴
+5,war_cry,워크라이,warrior,5,10,none,0,20.0,0,circle,8.0,25,0.5,full,,,,false,false,0,범위 내 아군 ATK+20% 10초
+6,wind_slash,월풍,warrior,10,10,physical,2.5,10.0,4.0,rectangle,4.0,40,0.3,partial,,,,false,false,0.05,강력한 전방 베기
+7,stun_blow,스턴 블로우,warrior,10,10,physical,1.2,15.0,2.5,,,,0.5,partial,stun,2.0,,false,false,0,확정 스턴 2초
+8,blade_dance,블레이드 댄스,warrior,20,10,physical,3.0,18.0,3.0,circle,3.0,60,0,full,,,,false,false,0.1,회전 베기 5회 (2차 전직: 버서커)
+9,earth_shaker,어스쉐이커,warrior,20,10,physical,2.8,20.0,5.0,circle,5.0,70,1.0,full,knockdown,2.0,,false,false,0,대지 강타 (2차 전직: 가디언)
+10,blood_lust,블러드러스트,warrior,20,10,physical,2.0,25.0,0,,,,0,full,,,,false,false,0,10초간 ATK+50% 받는뎀+30%
+20,basic_shot,기본 사격,archer,1,1,physical,1.0,0,15.0,,,,0,none,,,,false,false,0,원거리 기본 공격
+21,arrow_rain,화살비,archer,1,10,physical,1.2,10.0,18.0,circle,5.0,30,0.5,none,,,,false,false,0,범위 화살 폭격
+22,quick_shot,퀵샷,archer,1,10,physical,0.8,3.0,15.0,,,,0,none,,,,false,false,0.1,빠른 2연발
+23,evasion_shot,회피사격,archer,5,10,physical,1.0,8.0,12.0,,,,0,none,,,,false,false,0,뒤로 점프+사격
+24,trap,함정 설치,archer,5,10,physical,1.5,15.0,10.0,circle,2.0,25,1.0,none,bind,3.0,,false,false,0,바닥 함정 설치
+25,snipe,저격,archer,10,10,physical,3.5,16.0,25.0,,,,2.0,partial,,,,false,true,0,필중+필크리 원거리 사격
+26,multi_shot,다중 화살,archer,10,10,physical,0.6,12.0,15.0,cone,6.0,35,0,none,,,,false,false,0,전방 부채꼴 5발
+27,piercing_arrow,관통 화살,archer,20,10,physical,2.8,14.0,20.0,line,1.0,50,0.5,partial,,,,false,false,0.15,관통 직선 공격 (2차: 샤프슈터)
+28,arrow_storm,애로우 스톰,archer,20,10,physical,2.0,20.0,20.0,circle,8.0,70,1.0,partial,,,,false,false,0,대형 범위 화살비 (2차: 레인저)
+29,sylvan_trap,숲의 함정,archer,20,10,physical,1.8,18.0,12.0,circle,3.0,45,1.5,none,slow,5.0,nature,false,false,0,광역 이속 감소 (2차: 레인저)
+40,basic_cast,기본 시전,mage,1,1,magical,1.0,0,12.0,,,,0,none,,,,false,false,0,마법 탄환 발사
+41,fireball,파이어볼,mage,1,10,magical,2.0,8.0,15.0,circle,3.0,30,0.5,none,,,fire,false,false,0,화염구 폭발
+42,ice_bolt,아이스볼트,mage,1,10,magical,1.5,6.0,15.0,,,,0.3,none,slow,3.0,ice,false,false,0,빙결 탄환+이속감소
+43,mana_shield,마나 실드,mage,5,10,none,0,20.0,0,,,,0,none,,,,false,false,0,MP 소모로 실드 생성
+44,lightning,라이트닝,mage,5,10,magical,2.5,12.0,12.0,line,2.0,40,0.8,partial,stun,1.0,lightning,false,false,0,직선 번개+스턴
+45,blizzard,블리자드,mage,10,10,magical,1.8,18.0,15.0,circle,6.0,60,1.5,partial,freeze,2.0,ice,false,false,0,광역 빙결
+46,teleport,텔레포트,mage,10,10,none,0,15.0,10.0,,,,0,full,,,,false,false,0,즉시 이동 (10m)
+47,meteor,메테오,mage,20,10,magical,4.0,25.0,18.0,circle,5.0,80,2.0,full,knockdown,2.0,fire,false,false,0,거대 운석 낙하 (2차: 아크메이지)
+48,holy_light,홀리 라이트,mage,20,10,magical,0,10.0,15.0,circle,4.0,50,1.0,partial,,,holy,false,false,0,범위 힐 (2차: 프리스트)
+49,divine_shield,디바인 실드,mage,20,10,none,0,30.0,12.0,circle,5.0,70,0.5,full,,,,false,false,0,범위 실드 부여 (2차: 프리스트)
+100,ultimate_warrior,전사 궁극기,warrior,30,1,physical,10.0,120.0,6.0,circle,6.0,0,1.5,full,stun,3.0,,true,true,0,게이지 충전 필요 (10000dmg)
+101,ultimate_archer,궁수 궁극기,archer,30,1,physical,8.0,120.0,25.0,circle,8.0,0,2.0,full,,,,true,true,0,게이지 충전 필요 (10000dmg)
+102,ultimate_mage,마법사 궁극기,mage,30,1,magical,12.0,120.0,18.0,circle,10.0,0,3.0,full,knockdown,3.0,fire,true,true,0,게이지 충전 필요 (10000dmg)

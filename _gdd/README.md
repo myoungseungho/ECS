@@ -17,23 +17,36 @@
 
 ```
 _gdd/
-├── README.md              ← 이 파일
-├── game_design.yaml       ← 마스터 GDD (씬/태스크/에셋 전체)
-├── rules/                 ← 게임 규칙 상세 (밸런스, 공식 등)
-│   ├── combat.yaml        ← 전투 공식, 데미지 계산
-│   ├── progression.yaml   ← 레벨업 경험치 테이블, 스탯 성장
-│   ├── economy.yaml       ← 골드 획득/소비, 인플레이션 방지
-│   └── enhancement.yaml   ← 강화 확률, 비용, 재료
-├── data/                  ← 게임 데이터 시트
-│   ├── monsters.csv       ← 몬스터 스탯 테이블
-│   ├── items.csv          ← 아이템 목록
-│   ├── skills.csv         ← 스킬 데이터
-│   ├── quests.csv         ← 퀘스트 목록
-│   └── npcs.csv           ← NPC 배치/대사
-└── assets/                ← 에셋 소싱 가이드
-    ├── prompts.yaml       ← AI 이미지 생성 프롬프트 모음
-    └── sources.yaml       ← 에셋 소싱처 + URL
+├── README.md                        ← 이 파일
+├── game_design.yaml                 ← 마스터 GDD (씬/태스크/에셋 전체)
+├── rules/                           ← 게임 규칙 (공식, 행동, 시스템 로직)
+│   ├── combat.yaml                  ← 전투 공식, CC, 어그로, PvP 규칙
+│   ├── progression.yaml             ← 레벨/스킬/경험치/도감 규칙
+│   ├── economy.yaml                 ← 골드 유입/유출, 거래, 인플레이션 통제
+│   ├── enhancement.yaml             ← 강화/보석/각인/초월 규칙
+│   ├── items.yaml                   ← 장비 슬롯, 인벤토리, 내구도 규칙
+│   ├── ai_behavior.yaml             ← 몬스터/NPC AI 행동 트리
+│   ├── (+ 15개 더: animation, art_style, audio, camera, crafting,
+│   │     dungeon, flow, monetization, narrative, pvp,
+│   │     quests, social, ui, vfx, world)
+│   └── 총 21개 규칙 파일
+├── data/                            ← 게임 데이터 시트 (수치 테이블)
+│   ├── classes.yaml                 ← 직업 기본스탯, 성장, 전직
+│   ├── level_exp_table.yaml         ← 경험치 테이블, 마일스톤, 칭호, 도감
+│   ├── items_catalog.yaml           ← 아이템등급, 세트, 소모품, 루트, 원소상성
+│   ├── enhancement_tables.yaml      ← 강화확률/비용, 보석, 각인, 초월 수치
+│   ├── monsters_and_spawns.yaml     ← 공격패턴, 보스기믹, 스폰, 패스파인딩
+│   └── shops_and_economy.yaml       ← NPC상점, 보상 수치, 일일 상한
+└── assets/                          ← 에셋 소싱 가이드
+    ├── prompts.yaml                 ← AI 이미지 생성 프롬프트 모음
+    └── sources.yaml                 ← 에셋 소싱처 + URL
 ```
+
+### rules/ vs data/ 분리 원칙
+- **rules/**: 공식, 행동 로직, 시스템 규칙 (How it works)
+- **data/**: 구체적 수치 테이블 (What the values are)
+- 밸런스 조정 시 data/ 파일만 수정하면 됨
+- 각 rules 파일 헤더에 연관 data 파일 명시됨
 
 ## 에이전트 사용법
 
@@ -63,7 +76,7 @@ _gdd/
 
 1. **씬 추가**: phases 배열에 새 항목 추가
 2. **규칙 추가**: rules/ 폴더에 YAML 파일 추가
-3. **데이터 추가**: data/ 폴더에 CSV 추가
+3. **데이터 추가**: data/ 폴더에 YAML 파일 추가 (수치 테이블)
 4. **에셋 추가**: 해당 씬의 assets 배열에 추가
 
 ## rules/ 파일 예시 (향후 확장)

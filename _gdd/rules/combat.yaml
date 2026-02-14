@@ -1,6 +1,7 @@
 # ============================================================
 # COMBAT SYSTEM — 전투 규칙 완전 정의
 # Reference: Lost Ark / Diablo IV / WoW
+# Data Tables: data/items_catalog.yaml (원소 상성), data/monsters_and_spawns.yaml
 # ============================================================
 # 이 파일만으로 전투 시스템 전체를 구현할 수 있어야 한다.
 # 모든 공식은 서버 에이전트가 코드로 변환한다.

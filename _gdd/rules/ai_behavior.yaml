@@ -1,6 +1,7 @@
 # ============================================================
 # AI BEHAVIOR — 몬스터/NPC AI 행동 트리 완전 정의
 # Reference: Lost Ark / Dark Souls / Monster Hunter
+# Data Tables: data/monsters_and_spawns.yaml
 # ============================================================
 # Behavior Tree 기반 (Selector → Sequence → Action)
 # 모든 AI는 서버에서 연산, 클라이언트는 결과만 수신

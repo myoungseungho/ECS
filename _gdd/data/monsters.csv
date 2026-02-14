@@ -1,0 +1,21 @@
+monster_id,name,name_kr,tier,level,hp,atk,def,matk,mdef,element,detection_radius,attack_range,attack_cooldown,move_speed,nav_agent,exp_base,gold_base,respawn_min,respawn_max,zone,spawn_weight,spawn_count_min,spawn_count_max,enrage_hp_pct,special_attack_cd,leash_radius,notes
+1001,slime,슬라임,normal,1,50,5,2,0,1,nature,8.0,2.0,2.0,3.0,small,20,5,30,60,grass_plain,0.4,2,4,,,30.0,튜토리얼 첫 적
+1002,goblin,고블린,normal,3,120,12,5,0,3,,8.0,2.0,2.0,3.0,small,35,8,30,60,grass_plain,0.3,1,3,,,30.0,단검 공격
+1003,wolf,늑대,normal,5,180,20,8,0,4,,8.0,2.0,1.8,3.5,medium,50,12,30,60,grass_plain,0.2,1,2,,,30.0,빠른 이동
+1004,bear,곰,normal,7,350,30,15,0,6,,8.0,2.5,2.5,2.5,medium,80,18,30,60,grass_plain,0.1,1,1,,,30.0,높은 체력
+1005,skeleton,해골 전사,normal,8,200,25,20,0,15,dark,8.0,2.0,2.0,3.0,medium,65,15,30,60,dark_forest,0.3,2,3,,,30.0,높은 방어
+1006,orc,오크,normal,10,400,35,18,0,5,,8.0,2.5,2.0,3.0,medium,100,22,30,60,dark_forest,0.25,1,2,,,30.0,
+1007,bandit,산적,normal,12,300,40,12,0,8,,8.0,2.0,1.5,3.5,medium,90,25,30,60,mountain_pass,0.3,2,3,,,30.0,
+1008,ice_golem,얼음 골렘,normal,15,600,45,30,0,25,ice,8.0,2.5,2.5,2.0,large,150,30,30,60,frozen_peak,0.35,1,2,,,30.0,
+1009,frost_wolf,서리 늑대,normal,15,350,35,15,0,20,ice,8.0,2.0,1.8,4.0,medium,130,28,30,60,frozen_peak,0.35,2,3,,,30.0,
+1010,yeti,예티,normal,18,800,55,35,0,20,ice,8.0,3.0,2.5,2.5,large,200,40,30,60,frozen_peak,0.2,1,1,,,30.0,
+2001,elite_golem,정예 골렘,elite,20,3000,120,60,0,40,,12.0,3.0,1.5,4.0,large,500,200,300,600,dark_forest,0.08,1,1,30,8.0,30.0,광역 내려찍기+돌진
+2002,ice_queen_elite,얼음 여왕 정예,elite,18,2500,100,45,80,55,ice,12.0,3.0,1.5,4.0,large,450,180,300,600,frozen_peak,0.1,1,1,30,8.0,30.0,광역 빙결
+2003,elite_dragon_whelp,정예 와이번,elite,25,4000,150,70,100,50,fire,12.0,3.0,1.5,4.0,large,700,300,300,600,volcano,0.05,1,1,30,8.0,30.0,화염 브레스
+3001,ancient_golem,고대 골렘,boss,20,50000,300,150,0,100,,20.0,4.0,1.0,3.5,boss,5000,1000,3600,7200,goblin_cave,,,,,20.0,40.0,3페이즈 기믹 보스
+3002,dragon,드래곤,boss,40,150000,500,250,400,300,fire,25.0,5.0,0.8,3.0,boss,15000,5000,3600,7200,dragon_nest,,,,,20.0,40.0,3페이즈 레이드 보스
+3003,demon_king,마왕,boss,60,300000,800,400,700,500,dark,30.0,5.0,0.5,3.0,boss,30000,10000,-1,-1,demon_castle,,,,,20.0,40.0,최종 보스 수동 리셋(-1=manual)
+3004,goblin_chief,고블린 족장,boss,10,15000,150,80,0,40,,15.0,3.5,1.0,3.5,boss,2000,500,3600,7200,goblin_cave,,,,,20.0,40.0,챕터1 보스
+3005,ice_queen,얼음 여왕,boss,20,40000,250,120,200,150,ice,20.0,4.0,0.8,3.0,boss,4000,1000,3600,7200,frozen_peak,,,,,20.0,40.0,챕터2 보스
+9001,dummy_target,허수아비,normal,1,100,0,0,0,0,,0,0,0,0,medium,10,0,30,60,tutorial,,,,,,,공격 불가 훈련용
+9002,tutorial_slime,튜토리얼 슬라임,normal,1,50,5,0,0,0,,8.0,2.0,2.0,2.0,small,25,5,30,60,tutorial,,,,,,,AI=IDLE only

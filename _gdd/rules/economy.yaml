@@ -1,6 +1,7 @@
 # ============================================================
 # ECONOMY SYSTEM — 경제 규칙 완전 정의
 # Reference: Lost Ark / MapleStory / WoW
+# Data Tables: data/shops_and_economy.yaml
 # ============================================================
 # 핵심 원칙: 골드 유입(Faucet) = 골드 유출(Sink)
 # 인플레이션 통제가 게임 경제의 생명
