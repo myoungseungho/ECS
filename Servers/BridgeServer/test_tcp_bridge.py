@@ -14,7 +14,10 @@ import time
 sys.path.insert(0, os.path.dirname(__file__))
 from tcp_bridge import (
     BridgeServer, MsgType, build_packet, parse_header,
-    PACKET_HEADER_SIZE, MAX_PACKET_SIZE
+    PACKET_HEADER_SIZE, MAX_PACKET_SIZE,
+    CRAFTING_RECIPES, GATHER_TYPES, COOKING_RECIPES,
+    ENCHANT_ELEMENTS, ENCHANT_LEVELS,
+    GATHER_ENERGY_MAX, GATHER_ENERGY_COST
 )
 
 
@@ -1279,6 +1282,185 @@ async def run_tests(port: int):
             assert "id" in mech, f"Mechanic {name} missing 'id'"
 
     await test("RAID_MECHS: 기믹 6종 정의 확인", test_raid_mechanic_defs())
+
+    # ━━━ TASK 2: 제작/채집/요리/인챈트 테스트 (S042) ━━━
+
+    async def login_and_enter(port_num):
+        """헬퍼: 로그인 + 게임 진입 (골드 1000, 인벤 20칸)"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port_num)
+        await asyncio.sleep(0.1)
+        # 로그인
+        await c.send(MsgType.LOGIN, b'\x01\x00\x00\x00' + b'test\x00' + b'pass\x00')
+        await c.recv_expect(MsgType.LOGIN_RESULT)
+        # 캐릭터 선택 + 입장
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_expect(MsgType.ENTER_GAME)
+        # 스폰 패킷 소비
+        await c.recv_all_packets(timeout=0.5)
+        return c
+
+    # ━━━ Test: CRAFT_LIST — 레시피 목록 조회 ━━━
+    async def test_craft_list():
+        c = await login_and_enter(port)
+        # 모든 카테고리 (0xFF)
+        await c.send(MsgType.CRAFT_LIST_REQ, struct.pack('<B', 0xFF))
+        msg_type, resp = await c.recv_expect(MsgType.CRAFT_LIST)
+        assert msg_type == MsgType.CRAFT_LIST, f"Expected CRAFT_LIST, got {msg_type}"
+        count = resp[0]
+        # proficiency_level 1 기준 → iron_sword, hp_potion_s만 해당 (proficiency_required:1)
+        assert count >= 2, f"Expected at least 2 recipes for level 1, got {count}"
+        c.close()
+
+    await test("CRAFT_LIST: 레시피 목록 조회", test_craft_list())
+
+    # ━━━ Test: CRAFT_LIST — 카테고리 필터 ━━━
+    async def test_craft_list_filter():
+        c = await login_and_enter(port)
+        # 카테고리 2 = potion
+        await c.send(MsgType.CRAFT_LIST_REQ, struct.pack('<B', 2))
+        msg_type, resp = await c.recv_expect(MsgType.CRAFT_LIST)
+        assert msg_type == MsgType.CRAFT_LIST
+        count = resp[0]
+        assert count >= 1, f"Expected at least 1 potion recipe, got {count}"
+        c.close()
+
+    await test("CRAFT_LIST_FILTER: 포션 카테고리 필터", test_craft_list_filter())
+
+    # ━━━ Test: CRAFT_EXECUTE — 제작 성공 ━━━
+    async def test_craft_execute_success():
+        c = await login_and_enter(port)
+        # hp_potion_s 제작 (proficiency:1, gold:20, success:100%)
+        recipe_id = b"hp_potion_s"
+        await c.send(MsgType.CRAFT_EXECUTE, struct.pack('<B', len(recipe_id)) + recipe_id)
+        msg_type, resp = await c.recv_expect(MsgType.CRAFT_RESULT)
+        assert msg_type == MsgType.CRAFT_RESULT, f"Expected CRAFT_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        # item_id(u16) + count(u8) + has_bonus(u8)
+        item_id = struct.unpack_from('<H', resp, 1)[0]
+        count = resp[3]
+        assert item_id == 201, f"Expected item 201, got {item_id}"
+        assert count == 3, f"Expected 3 potions, got {count}"
+        c.close()
+
+    await test("CRAFT_EXECUTE: 제작 성공 (hp_potion_s)", test_craft_execute_success())
+
+    # ━━━ Test: CRAFT_EXECUTE — 골드 부족 실패 ━━━
+    async def test_craft_execute_no_gold():
+        c = await login_and_enter(port)
+        # Spend all 1000g: iron_sword costs 200g, 5x = 1000g
+        for _ in range(5):
+            rid = b"iron_sword"
+            await c.send(MsgType.CRAFT_EXECUTE, struct.pack('<B', len(rid)) + rid)
+            await c.recv_expect(MsgType.CRAFT_RESULT)
+        # Now gold=0, try iron_sword again (needs 200g)
+        rid = b"iron_sword"
+        await c.send(MsgType.CRAFT_EXECUTE, struct.pack('<B', len(rid)) + rid)
+        msg_type, resp = await c.recv_expect(MsgType.CRAFT_RESULT)
+        assert msg_type == MsgType.CRAFT_RESULT
+        result = resp[0]
+        assert result == 3, f"Expected NO_GOLD(3), got {result}"
+        c.close()
+
+    await test("CRAFT_FAIL: 골드 부족", test_craft_execute_no_gold())
+
+    # ━━━ Test: CRAFT_EXECUTE — 미지 레시피 ━━━
+    async def test_craft_execute_unknown():
+        c = await login_and_enter(port)
+        rid = b"nonexistent_recipe"
+        await c.send(MsgType.CRAFT_EXECUTE, struct.pack('<B', len(rid)) + rid)
+        msg_type, resp = await c.recv_expect(MsgType.CRAFT_RESULT)
+        assert msg_type == MsgType.CRAFT_RESULT
+        result = resp[0]
+        assert result == 1, f"Expected UNKNOWN_RECIPE(1), got {result}"
+        c.close()
+
+    await test("CRAFT_FAIL: 미지 레시피", test_craft_execute_unknown())
+
+    # ━━━ Test: GATHER — 채집 성공 + 에너지 차감 ━━━
+    async def test_gather_success():
+        c = await login_and_enter(port)
+        # 약초 채집 (type=1)
+        await c.send(MsgType.GATHER_START, struct.pack('<B', 1))
+        msg_type, resp = await c.recv_expect(MsgType.GATHER_RESULT)
+        assert msg_type == MsgType.GATHER_RESULT, f"Expected GATHER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        energy_left = resp[1]
+        assert energy_left == GATHER_ENERGY_MAX - GATHER_ENERGY_COST, f"Expected energy {GATHER_ENERGY_MAX - GATHER_ENERGY_COST}, got {energy_left}"
+        drop_count = resp[2]
+        assert drop_count >= 1, f"Expected at least 1 drop, got {drop_count}"
+        c.close()
+
+    await test("GATHER: 채집 성공 + 에너지 차감", test_gather_success())
+
+    # ━━━ Test: GATHER — 미지 타입 ━━━
+    async def test_gather_unknown_type():
+        c = await login_and_enter(port)
+        await c.send(MsgType.GATHER_START, struct.pack('<B', 99))
+        msg_type, resp = await c.recv_expect(MsgType.GATHER_RESULT)
+        assert msg_type == MsgType.GATHER_RESULT
+        result = resp[0]
+        assert result == 1, f"Expected UNKNOWN_TYPE(1), got {result}"
+        c.close()
+
+    await test("GATHER_FAIL: 미지 채집 타입", test_gather_unknown_type())
+
+    # ━━━ Test: COOK — 요리 성공 + 버프 적용 ━━━
+    async def test_cook_success():
+        c = await login_and_enter(port)
+        rid = b"grilled_meat"
+        await c.send(MsgType.COOK_EXECUTE, struct.pack('<B', len(rid)) + rid)
+        msg_type, resp = await c.recv_expect(MsgType.COOK_RESULT)
+        assert msg_type == MsgType.COOK_RESULT, f"Expected COOK_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        duration = struct.unpack_from('<H', resp, 1)[0]
+        assert duration == 1800, f"Expected 1800s duration, got {duration}"
+        c.close()
+
+    await test("COOK: 요리 성공 (grilled_meat)", test_cook_success())
+
+    # ━━━ Test: COOK — 이미 버프 있을 때 실패 ━━━
+    async def test_cook_already_buffed():
+        c = await login_and_enter(port)
+        rid = b"grilled_meat"
+        # 첫 번째 요리 — 성공
+        await c.send(MsgType.COOK_EXECUTE, struct.pack('<B', len(rid)) + rid)
+        msg_type, resp = await c.recv_expect(MsgType.COOK_RESULT)
+        assert resp[0] == 0, "First cook should succeed"
+        # 두 번째 요리 — 이미 버프 활성
+        await c.send(MsgType.COOK_EXECUTE, struct.pack('<B', len(rid)) + rid)
+        msg_type, resp = await c.recv_expect(MsgType.COOK_RESULT)
+        assert msg_type == MsgType.COOK_RESULT
+        result = resp[0]
+        assert result == 3, f"Expected ALREADY_BUFFED(3), got {result}"
+        c.close()
+
+    await test("COOK_FAIL: 이미 버프 있음", test_cook_already_buffed())
+
+    # ━━━ Test: ENCHANT — 인챈트 성공 ━━━
+    async def test_enchant_success():
+        c = await login_and_enter(port)
+        # 먼저 아이템 추가 (slot 0에)
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', 301, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        # fire(0) 인챈트 레벨1 — gold_cost:1000 (골드 1000이니 딱 맞음)
+        await c.send(MsgType.ENCHANT_REQ, struct.pack('<BBB', 0, 0, 1))
+        msg_type, resp = await c.recv_expect(MsgType.ENCHANT_RESULT)
+        assert msg_type == MsgType.ENCHANT_RESULT, f"Expected ENCHANT_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        element_id = resp[1]
+        assert element_id == 0, f"Expected fire(0), got {element_id}"
+        level = resp[2]
+        assert level == 1, f"Expected level 1, got {level}"
+        dmg_bonus = resp[3]
+        assert dmg_bonus == 5, f"Expected 5% bonus, got {dmg_bonus}"
+        c.close()
+
+    await test("ENCHANT: 인챈트 성공 (fire Lv1)", test_enchant_success())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

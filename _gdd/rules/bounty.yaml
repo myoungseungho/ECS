@@ -1,0 +1,171 @@
+# ============================================================
+# BOUNTY SYSTEM (강호 현상금) — 일일/주간 현상금 + PvP 현상금
+# Reference: Lost Ark 카오스게이트 / WoW 현상금 / 무협 현상수배
+# Synergy: quests.yaml(일일), pvp.yaml, economy.yaml, world.yaml(날씨)
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 일일 현상금 (PvE)
+# ──────────────────────────────────────────────────────────
+daily_bounty:
+  desc: |
+    매일 06:00에 갱신되는 현상금 3장.
+    마을 현상금 게시판 NPC 또는 HUD에서 확인.
+    수락 → 필드에서 해당 정예 몬스터 처치 → 보상 수령.
+
+  count: 3                       # 일일 3개
+  reset: "06:00"                 # DAILY_RESET 연동
+  accept_limit: 3                # 동시 수락 최대 3개
+  unlock_level: 15               # Lv.15부터 이용 가능
+
+  # 대상 선정 규칙
+  target_selection:
+    pool: "elite_monsters"       # data/monsters.csv에서 elite/boss 등급만
+    level_range: "player_level ± 5"  # 플레이어 레벨 근처
+    zone_variety: true           # 3개는 서로 다른 존에서
+    weather_bonus:
+      desc: "특정 날씨에만 출현하는 특수 현상금 (보너스 보상)"
+      enabled: true
+      conditions:
+        storm: { target: "thunder_elemental", bonus_reward: 1.5 }
+        fog: { target: "phantom_assassin", bonus_reward: 1.5 }
+        night: { target: "shadow_beast", bonus_reward: 1.3 }
+
+  # 보상 테이블
+  rewards:
+    base:
+      gold: [500, 2000]          # 레벨 비례
+      exp: [1000, 5000]
+      bounty_token: 1            # 현상금 토큰 (전용 상점)
+    completion_bonus:
+      all_3_complete:
+        desc: "일일 현상금 3개 전부 완료 시 추가 보상"
+        extra_gold: 1000
+        extra_token: 2
+        rare_material_chance: 0.2
+
+# ──────────────────────────────────────────────────────────
+# 2. 주간 대현상금 (PvE)
+# ──────────────────────────────────────────────────────────
+weekly_bounty:
+  desc: |
+    수요일 06:00에 갱신되는 대현상금 1장.
+    월드보스급 강적. 8인 파티 필요. 필드 특정 좌표에 출현.
+    처치 시 epic+ 등급 보상 확정.
+
+  count: 1
+  reset: "wednesday_06:00"       # WEEKLY_RESET 연동
+  party_required: true           # 파티 필수 (4인+)
+  recommended_party: 8           # 8인 권장
+  unlock_level: 30
+
+  # 월드보스 목록
+  world_bosses:
+    - id: "wb_crimson_drake"
+      name: "진홍의 드레이크"
+      level: 40
+      zone: 4                    # 불꽃 사막
+      hp: 5000000
+      mechanics: ["breath_cone", "tail_swipe", "summon_adds"]
+      spawn_time: "weather=storm AND time=evening"
+      loot: { epic_equipment: 1, gold: 10000, bounty_token: 10 }
+
+    - id: "wb_ice_titan"
+      name: "얼음 거인"
+      level: 35
+      zone: 3                    # 얼어붙은 봉우리
+      hp: 3000000
+      mechanics: ["freeze_aoe", "ground_slam", "ice_shield"]
+      spawn_time: "weather=snow"
+      loot: { epic_equipment: 1, gold: 8000, bounty_token: 8 }
+
+    - id: "wb_shadow_hydra"
+      name: "그림자 히드라"
+      level: 50
+      zone: 6                    # 마왕의 영지
+      hp: 8000000
+      mechanics: ["multi_head_attack", "poison_pool", "regeneration"]
+      spawn_time: "time=night"
+      loot: { legendary_material: 1, gold: 15000, bounty_token: 15 }
+
+  rewards:
+    first_kill_of_week:
+      desc: "주간 첫 킬 보너스"
+      equipment_box: { min_tier: "epic", count: 1 }
+      bounty_token: 10
+      guild_exp: 500
+
+# ──────────────────────────────────────────────────────────
+# 3. PvP 현상금
+# ──────────────────────────────────────────────────────────
+pvp_bounty:
+  desc: |
+    PvP 존에서 연속 3킬 이상 달성한 플레이어에게 현상금 자동 부여.
+    처치자에게 현상금 보상. 피살자는 현상금 해제.
+
+  trigger: "kill_streak >= 3"
+  pvp_zones_only: true           # PvP 가능 존(id: 4, 5, 6)에서만
+
+  bounty_tiers:
+    3_kills:
+      name: "위험인물"
+      reward_for_killer: { gold: 500, pvp_token: 3 }
+      marker: "yellow_skull"
+    5_kills:
+      name: "현상수배"
+      reward_for_killer: { gold: 1500, pvp_token: 5 }
+      marker: "orange_skull"
+    10_kills:
+      name: "대악인"
+      reward_for_killer: { gold: 5000, pvp_token: 10, title_temp: "현상금 사냥꾼" }
+      marker: "red_skull"
+    20_kills:
+      name: "마왕급 위협"
+      reward_for_killer: { gold: 15000, pvp_token: 20, title_perm: "마왕 사냥꾼" }
+      marker: "dark_skull_with_flames"
+
+  # 현상금 대상의 디버프
+  target_debuffs:
+    3_kills: { visibility: "미니맵에 위치 노출 (같은 존)" }
+    5_kills: { visibility: "모든 존에서 위치 노출" }
+    10_kills: { defense: -0.1, visibility: "전체 서버 공지" }
+
+  # 현상금 해제 조건
+  clear_conditions:
+    - "사망 (다른 플레이어에게)"
+    - "PvP 존 이탈 (5분 타이머 후)"
+    - "로그아웃 (즉시 해제, 보상 없음)"
+
+# ──────────────────────────────────────────────────────────
+# 4. 현상금 랭킹
+# ──────────────────────────────────────────────────────────
+ranking:
+  period: "weekly"               # 주간 랭킹
+  reset: "monday_06:00"
+  categories:
+    pve_bounty_hunter:
+      desc: "PvE 현상금 가장 많이 완료"
+      reward_top_10:
+        1: { gold: 50000, title: "주간 최고 사냥꾼", bounty_token: 50 }
+        2-3: { gold: 30000, bounty_token: 30 }
+        4-10: { gold: 10000, bounty_token: 15 }
+
+    pvp_bounty_hunter:
+      desc: "PvP 현상금 가장 많이 처치"
+      reward_top_10:
+        1: { gold: 50000, title: "주간 최고 현상금 사냥꾼", pvp_token: 50 }
+        2-3: { gold: 30000, pvp_token: 30 }
+        4-10: { gold: 10000, pvp_token: 15 }
+
+# ──────────────────────────────────────────────────────────
+# 5. 현상금 토큰 상점
+# ──────────────────────────────────────────────────────────
+bounty_shop:
+  desc: "현상금 토큰으로 전용 아이템 교환"
+  items:
+    - { name: "현상금 사냥꾼의 검", type: "weapon", tier: "epic", cost: 100 }
+    - { name: "현상금 사냥꾼의 갑옷", type: "armor", tier: "epic", cost: 100 }
+    - { name: "미확인 비급 (랜덤)", type: "scroll", tier: "rare+", cost: 50 }
+    - { name: "탈것: 현상금 사냥꾼의 말", type: "mount", cost: 200 }
+    - { name: "칭호 재료: 전설의 사냥꾼", type: "material", cost: 500 }
+    - { name: "HP 물약 (대)", type: "consumable", cost: 5, stack: 10 }

@@ -1,0 +1,179 @@
+# ============================================================
+# TRIPOD SYSTEM (비급 & 트라이포드) — 스킬 변형 완전 정의
+# Reference: Lost Ark Tripod / 무협 비급 수집
+# Synergy: progression.yaml(skills), combat.yaml, items.yaml, world.yaml
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 트라이포드 구조
+# ──────────────────────────────────────────────────────────
+tripod:
+  desc: |
+    모든 스킬에 3단계 트라이포드 슬롯이 있다.
+    각 단계에 2~3개의 선택지가 있으며, 비급 아이템으로 해금한다.
+    해금된 옵션 중 하나를 선택하여 스킬을 변형한다.
+
+  tiers:
+    tier_1:
+      name: "초식 (初式)"
+      desc: "기본 변형 — 수치 조정/소규모 효과 추가"
+      unlock_level: 10          # 캐릭터 Lv.10부터 1단계 슬롯 오픈
+      options_per_skill: 3      # 각 스킬에 3개 선택지
+      scroll_rarity: "uncommon" # 비급 등급: 고급
+
+    tier_2:
+      name: "절초 (絕招)"
+      desc: "고급 변형 — 스킬 성격 변경 (단일→광역, CC 추가 등)"
+      unlock_level: 20
+      options_per_skill: 3
+      scroll_rarity: "rare"
+      requires: "tier_1 선택 필수"
+
+    tier_3:
+      name: "오의 (奧義)"
+      desc: "궁극 변형 — 스킬 본질 변환 (원소 변경, 초월적 효과)"
+      unlock_level: 30
+      options_per_skill: 2
+      scroll_rarity: "epic"
+      requires: "tier_2 선택 필수"
+
+  # 트라이포드 프리셋
+  presets:
+    max_presets: 3              # 최대 3개 프리셋 저장
+    swap_in_town: true          # 마을에서만 프리셋 변경 가능
+    swap_cost: { gold: 500 }    # 변경 비용
+
+# ──────────────────────────────────────────────────────────
+# 2. 비급 아이템
+# ──────────────────────────────────────────────────────────
+scrolls:
+  desc: |
+    비급(秘笈)은 특정 트라이포드 옵션을 해금하는 소비 아이템.
+    사용 시 해당 스킬의 해당 단계 옵션이 영구 해금된다.
+    직업 전용 (전사 비급은 전사만 사용 가능).
+
+  format:
+    id: "scroll_{class}_{skill_id}_{tier}_{option}"
+    name: "비급: {스킬이름}의 {옵션이름}"
+    rarity: "uncommon / rare / epic"
+    class_restriction: "warrior / archer / mage"
+    tradeable: true              # 거래소 등록 가능
+    stacks: false                # 중첩 불가 (고유 아이템)
+
+  # 획득 경로
+  acquisition:
+    field_hidden:
+      desc: "필드 숨겨진 장소에서 발견"
+      chance: "100% (고정 위치, 1회성)"
+      tier: "tier_1"
+      notes: "미니맵에 표시되지 않음. 탐험으로만 발견."
+
+    boss_drop:
+      desc: "보스/정예 몬스터 드롭"
+      drop_rate:
+        elite: 0.05              # 5%
+        dungeon_boss: 0.15       # 15%
+        raid_boss: 0.30          # 30%
+      tier: "tier_1 ~ tier_2"
+
+    quest_reward:
+      desc: "메인 퀘스트/사이드 퀘스트 보상"
+      tier: "tier_1 ~ tier_2"
+      notes: "챕터 완료 보상에 비급 포함"
+
+    secret_realm:
+      desc: "비경 탐험 S등급 클리어 보상"
+      tier: "tier_2 ~ tier_3"
+      notes: "비경 수련의 방에서 주로 드롭"
+
+    collection_reward:
+      desc: "도감 완성 보상"
+      tier: "tier_3"
+      notes: "몬스터 도감/장비 도감 전체 완성 시"
+
+    crafting:
+      desc: "제작으로 획득 (미확인 비급 → 랜덤 해금)"
+      recipe: { materials: [{ item: "ancient_parchment", count: 5 }, { item: "rare_ink", count: 3 }], gold: 5000 }
+      tier: "tier_1 ~ tier_2 (랜덤)"
+      proficiency_required: 25
+
+    auction_house:
+      desc: "거래소에서 다른 플레이어에게 구매"
+      notes: "비급은 tradeable이므로 거래 가능"
+
+# ──────────────────────────────────────────────────────────
+# 3. 전사 트라이포드 예시 (스킬 2: 슬래시)
+# ──────────────────────────────────────────────────────────
+example_tripods:
+  skill_2_slash:
+    name: "슬래시"
+    class: "warrior"
+    base: "전방 넓은 범위 베기. 물리 데미지 150%."
+
+    tier_1:
+      - id: "slash_t1_1"
+        name: "넓은 검기"
+        effect: "범위 +30%"
+        scroll_id: "scroll_warrior_2_t1_1"
+
+      - id: "slash_t1_2"
+        name: "관통 참격"
+        effect: "적 관통 (최대 5체 히트)"
+        scroll_id: "scroll_warrior_2_t1_2"
+
+      - id: "slash_t1_3"
+        name: "빠른 발도"
+        effect: "시전 속도 +40%, 데미지 -10%"
+        scroll_id: "scroll_warrior_2_t1_3"
+
+    tier_2:
+      - id: "slash_t2_1"
+        name: "출혈 검기"
+        effect: "적중 시 출혈 DoT (ATK*20% 5초간)"
+        scroll_id: "scroll_warrior_2_t2_1"
+
+      - id: "slash_t2_2"
+        name: "파쇄 강타"
+        effect: "적중 시 30% 넉백 + DEF -10% 디버프(5초)"
+        scroll_id: "scroll_warrior_2_t2_2"
+
+      - id: "slash_t2_3"
+        name: "연속 베기"
+        effect: "2회 연속 시전 (각 80% 데미지)"
+        scroll_id: "scroll_warrior_2_t2_3"
+
+    tier_3:
+      - id: "slash_t3_1"
+        name: "화염 검무"
+        effect: "불 원소 변환 + 적중 시 화상(ATK*30% 8초) + 범위 내 폭발"
+        scroll_id: "scroll_warrior_2_t3_1"
+
+      - id: "slash_t3_2"
+        name: "무적의 일섬"
+        effect: "시전 중 무적 + 데미지 200% + 쿨다운 2배"
+        scroll_id: "scroll_warrior_2_t3_2"
+
+# ──────────────────────────────────────────────────────────
+# 4. 도감 연동
+# ──────────────────────────────────────────────────────────
+collection_synergy:
+  scroll_collection:
+    desc: "비급 도감 — 직업별 비급 수집 현황"
+    categories:
+      warrior_tier_1:
+        total: 24                # 8스킬 * 3옵션
+        completion_bonus: { atk: 10 }
+      warrior_tier_2:
+        total: 24
+        completion_bonus: { crit_rate: 0.03 }
+      warrior_tier_3:
+        total: 16                # 8스킬 * 2옵션
+        completion_bonus: { all_stats: 3 }
+      archer_tier_1:
+        total: 24
+        completion_bonus: { dex: 10 }
+      # ... 궁수/마법사도 동일 구조
+
+    all_complete_bonus:
+      desc: "모든 비급 수집 완료"
+      bonus: { title: "비급 완성자", all_stats: 10, cosmetic: "두루마리 아우라" }

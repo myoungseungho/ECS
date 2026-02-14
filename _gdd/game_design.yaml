@@ -1059,3 +1059,300 @@ phases:
         - id: "sfx_boss_roar"
           desc: "보스 등장 포효"
           source: "freesound"
+
+# ============================================================
+# PHASE 4: 심화 컨텐츠 (브레인스토밍 세션 신규)
+# 비급/트라이포드, 현상금, 비경, 사제 시스템
+# ============================================================
+- id: "P4"
+  name: "심화 컨텐츠 (브레인스토밍)"
+  description: "비급 트라이포드, 강호 현상금, 비경 탐험, 사제 시스템 — 장기 리텐션 + 시스템 시너지 강화"
+
+  scenes:
+    # ----------------------------------------------------------
+    - id: "P4_S01"
+      name: "비급 & 트라이포드 시스템"
+      reference: "로아: 트라이포드 / 무협: 비급 수집"
+      priority: P1
+      status: todo
+
+      description: |
+        스킬에 트라이포드(3단계 변형 옵션)를 적용하는 시스템.
+        비급(秘笈)은 월드 탐험/보스/퀘스트에서 획득.
+        스킬당 3개 트라이포드 슬롯, 각 2~3개 선택지.
+        빌드 다양성 + 탐험 동기 + 도감 시너지.
+
+      assets:
+        - type: texture
+          name: "tripod_panel_bg.png"
+          desc: "트라이포드 패널 배경"
+          source: "midjourney"
+          prompt: "ancient martial arts scroll UI panel, dark fantasy style, ornate golden frame, parchment texture"
+
+        - type: texture
+          name: "scroll_tier_icons.png"
+          desc: "비급 등급 아이콘 (초식/절초/오의)"
+          source: "midjourney"
+          prompt: "three tier martial arts scroll icons, bronze silver gold, dark fantasy RPG style"
+
+        - type: effect
+          name: "scroll_discover_effect"
+          desc: "비급 발견 이펙트 (빛 기둥 + 두루마리 회전)"
+          source: "unity_particle"
+
+        - type: audio
+          name: "sfx_scroll_discover.wav"
+          desc: "비급 발견 효과음 (동양 악기 징글)"
+          source: "suno_ai"
+          prompt: "mysterious ancient scroll discovery sound effect, oriental instruments, magical chime"
+
+      client_tasks:
+        - id: "P4_S01_C01"
+          task: "TripodUI 구현"
+          detail: |
+            스킬창(K키) 내 [트라이포드] 탭:
+            - 스킬 선택 → 3단계 트라이포드 트리 표시
+            - 각 단계: 2~3개 선택지 (아이콘 + 이름 + 설명)
+            - 미해금 선택지: 자물쇠 + "비급 필요" 표시
+            - 선택 시 프리뷰 + 스킬 설명 변경
+          status: todo
+
+        - id: "P4_S01_C02"
+          task: "비급 획득 연출"
+          detail: |
+            비급 아이템 획득 시:
+            - 화면 중앙 두루마리 펼쳐지는 연출 (2초)
+            - "비급 '화염 검기의 초식' 획득!" 텍스트
+            - 해당 스킬의 트라이포드 해금 알림
+            - 도감에 자동 등록
+          status: todo
+
+        - id: "P4_S01_C03"
+          task: "비급 도감 UI"
+          detail: |
+            도감(J키) 내 [비급 도감] 탭:
+            - 직업별 비급 목록 (획득/미획득)
+            - 카테고리별 완성도 % + 보너스 표시
+            - 비급 획득 위치 힌트 (미획득 시 "???" 표시)
+          status: todo
+
+      server_tasks:
+        - id: "P4_S01_S01"
+          task: "TRIPOD 패킷 + 비급 데이터 시스템"
+          detail: |
+            TRIPOD_LIST_REQ(520) → TRIPOD_LIST(521): 보유 비급 + 장착 현황
+            TRIPOD_EQUIP(522) → TRIPOD_EQUIP_RESULT(523): 트라이포드 적용
+            SCROLL_DISCOVER(524): 비급 획득 알림 (서버→클라)
+            data/tripod_table.yaml: 스킬별 트라이포드 옵션 전체 정의
+            data/scroll_locations.yaml: 비급 획득처 (보스/퀘스트/숨겨진 장소)
+          status: todo
+          priority: P1
+
+    # ----------------------------------------------------------
+    - id: "P4_S02"
+      name: "강호 현상금 시스템"
+      reference: "로아: 카오스 게이트 / 무협: 현상수배"
+      priority: P1
+      status: todo
+
+      description: |
+        매일 갱신되는 현상금 게시판. 정예 몬스터/월드보스 처치 보상.
+        PvP 존에서는 플레이어 현상금도 발생.
+        일일 콘텐츠 + PvP 시너지 + 파티 유도.
+
+      assets:
+        - type: texture
+          name: "bounty_board_bg.png"
+          desc: "현상금 게시판 UI 배경"
+          source: "midjourney"
+          prompt: "wanted poster board in dark fantasy tavern, wooden board with parchment notices, RPG style"
+
+        - type: texture
+          name: "bounty_poster.png"
+          desc: "현상수배서 포스터 템플릿"
+          source: "midjourney"
+          prompt: "fantasy wanted poster template, monster silhouette, 'BOUNTY' text, gold coins reward, parchment style"
+
+        - type: audio
+          name: "sfx_bounty_complete.wav"
+          desc: "현상금 처치 완료 징글"
+          source: "freesound"
+
+      client_tasks:
+        - id: "P4_S02_C01"
+          task: "BountyBoardUI 구현"
+          detail: |
+            마을 NPC 또는 HUD 퀘스트보드에서 접근:
+            - 일일 현상금 3장 (몬스터 초상화 + 위치 + 보상)
+            - 주간 대현상금 1장 (월드보스급, 파티 필요 뱃지)
+            - 수락 → 미니맵에 위치 표시
+            - 처치 시 현상금 랭킹 UI (주간 TOP 10)
+          status: todo
+
+        - id: "P4_S02_C02"
+          task: "PvP 현상금 UI"
+          detail: |
+            PvP 존 전용:
+            - 킬스트릭 3+ 플레이어에 빨간 해골 아이콘
+            - "현상수배: [이름] (현상금: N골드)" 알림
+            - 처치 시 보상 획득 연출
+          status: todo
+
+      server_tasks:
+        - id: "P4_S02_S01"
+          task: "현상금 시스템 패킷 + 로직"
+          detail: |
+            BOUNTY_LIST_REQ(530) → BOUNTY_LIST(531): 현상금 목록 (일일3+주간1)
+            BOUNTY_ACCEPT(532) → BOUNTY_ACCEPT_RESULT(533): 현상금 수락
+            BOUNTY_COMPLETE(534): 처치 완료 알림 (서버→클라)
+            BOUNTY_RANKING_REQ(535) → BOUNTY_RANKING(536): 주간 랭킹
+            PVP_BOUNTY_NOTIFY(537): PvP 현상금 발생 브로드캐스트
+            - 일일 06:00 리셋 (DAILY_RESET 연동)
+            - 현상금 대상: monsters.csv 정예/보스 중 랜덤 3체
+            - 주간 대현상금: 수요일 갱신, data/world_bosses.yaml 추가
+          status: todo
+          priority: P1
+
+    # ----------------------------------------------------------
+    - id: "P4_S03"
+      name: "비경 탐험 시스템"
+      reference: "겐신: 비경 / 로아: 카오스 게이트"
+      priority: P2
+      status: todo
+
+      description: |
+        월드 곳곳에 랜덤 출현하는 비경(秘境) 포탈.
+        솔로/2인 짧은 챌린지 던전 (3~5분).
+        시련/지혜/보물/수련/운명 5종. 일일 3회 제한.
+        날씨+시간 조합으로 특수 비경 출현.
+
+      assets:
+        - type: effect
+          name: "secret_portal_effect"
+          desc: "비경 포탈 이펙트 (회전하는 동양풍 문양 + 빛)"
+          source: "unity_particle"
+
+        - type: texture
+          name: "secret_realm_icons.png"
+          desc: "비경 5종 아이콘 (시련/지혜/보물/수련/운명)"
+          source: "midjourney"
+          prompt: "five mystical realm portal icons, combat wisdom treasure training fate, oriental fantasy style, dark background"
+
+        - type: audio
+          name: "sfx_portal_open.wav"
+          desc: "비경 포탈 출현 효과음 (신비로운 동양 사운드)"
+          source: "suno_ai"
+          prompt: "mystical portal opening sound, oriental bells and chimes, ethereal"
+
+        - type: audio
+          name: "bgm_secret_realm.mp3"
+          desc: "비경 내부 BGM (긴장감+신비)"
+          source: "suno_ai"
+          prompt: "mysterious dungeon challenge music, oriental fantasy, fast paced, loopable"
+
+      client_tasks:
+        - id: "P4_S03_C01"
+          task: "비경 포탈 월드 오브젝트"
+          detail: |
+            필드에 포탈 출현 시:
+            - 동양풍 회전 문양 이펙트 (ParticleSystem)
+            - 미니맵에 보라색 다이아몬드 아이콘
+            - 근접 시 "비경: [이름] (난이도: N)" 프롬프트
+            - F키 → 입장 확인 팝업 (남은 횟수 표시)
+          status: todo
+
+        - id: "P4_S03_C02"
+          task: "비경 내부 HUD"
+          detail: |
+            비경 진입 시:
+            - 상단 중앙: 제한 시간 카운트다운 (빨간색)
+            - 좌상단: 비경 유형 아이콘 + 이름
+            - 클리어 시: 보상 화면 (가운데 보상 아이템 + 등급 S/A/B/C)
+            - 실패 시: "시간 초과" + 위로 보상 (소량)
+          status: todo
+
+      server_tasks:
+        - id: "P4_S03_S01"
+          task: "비경 시스템 패킷 + 로직"
+          detail: |
+            SECRET_REALM_SPAWN(540): 비경 출현 알림 (존 브로드캐스트)
+            SECRET_REALM_ENTER(541) → SECRET_REALM_ENTER_RESULT(542): 입장
+            SECRET_REALM_COMPLETE(543): 클리어 결과 + 보상
+            SECRET_REALM_FAIL(544): 실패 결과
+            - 5~15분 주기 랜덤 스폰 (존당 최대 1개)
+            - 날씨+시간 조합 테이블: data/secret_realm_conditions.yaml
+            - 일일 3회 제한 (DAILY_RESET 연동)
+            - 등급 계산: 클리어 시간 + 피격 횟수 기반
+          status: todo
+          priority: P2
+
+    # ----------------------------------------------------------
+    - id: "P4_S04"
+      name: "사제(師弟) 시스템"
+      reference: "무협: 사부-제자 관계 / BDO: 길드 멘토"
+      priority: P2
+      status: todo
+
+      description: |
+        고레벨(Lv.40+)이 저레벨(Lv.1~20)의 사부가 되는 시스템.
+        제자 성장 시 사부도 보상. 사제 전용 퀘스트.
+        졸업(Lv.30) 시 양쪽 특별 보상 + 칭호.
+        소셜 유대감 + 신규 유저 리텐션.
+
+      assets:
+        - type: texture
+          name: "mentorship_ui_bg.png"
+          desc: "사제 UI 배경 (동양풍 사문 패널)"
+          source: "midjourney"
+          prompt: "oriental master-disciple relationship UI panel, martial arts school style, dark fantasy, golden border"
+
+        - type: effect
+          name: "graduation_effect"
+          desc: "사제 졸업 연출 이펙트 (꽃비+빛+텍스트)"
+          source: "unity_particle"
+
+        - type: audio
+          name: "sfx_graduation.wav"
+          desc: "사제 졸업 축하 효과음 (장엄한 동양 징글)"
+          source: "suno_ai"
+          prompt: "graduation celebration oriental music jingle, majestic drums and flute, short"
+
+      client_tasks:
+        - id: "P4_S04_C01"
+          task: "MentorshipUI 구현"
+          detail: |
+            소셜 패널 내 [사제] 탭:
+            - 사부/제자 프로필 (이름+레벨+직업)
+            - 사제 관계 진행도 바 (제자 레벨 기반)
+            - 사제 전용 퀘스트 목록 (3개/주)
+            - [사부 찾기] / [제자 모집] 버튼
+            - 사문 기여도 잔액 + [사문 상점] 버튼
+          status: todo
+
+        - id: "P4_S04_C02"
+          task: "사제 졸업 연출"
+          detail: |
+            제자 Lv.30 달성 시:
+            - 화면 전체 꽃비 이펙트
+            - "사제 졸업!" 대형 텍스트 (3초)
+            - 사부/제자 양쪽 보상 목록 팝업
+            - 칭호 획득: 사부→"명사(名師)" / 제자→"수제자(首弟子)"
+          status: todo
+
+      server_tasks:
+        - id: "P4_S04_S01"
+          task: "사제 시스템 패킷 + 로직"
+          detail: |
+            MENTOR_SEARCH(550) → MENTOR_LIST(551): 사부/제자 검색
+            MENTOR_REQUEST(552) → MENTOR_REQUEST_RESULT(553): 사제 요청
+            MENTOR_ACCEPT(554) → MENTOR_ACCEPT_RESULT(555): 수락
+            MENTOR_QUEST_LIST(556) → MENTOR_QUESTS(557): 사제 퀘스트
+            MENTOR_GRADUATE(558): 졸업 알림 (서버→양쪽)
+            MENTOR_SHOP_LIST(559) → MENTOR_SHOP(560): 사문 상점
+            - 사부 조건: Lv.40+, 현재 제자 3명 이하
+            - 제자 조건: Lv.1~20, 사부 없음
+            - 사문 기여도: 제자 레벨업당 10, 사제 퀘스트 완료당 50
+            - 졸업: 제자 Lv.30 달성 시 자동 트리거
+            - 사제 경험치 버프: 같이 사냥 시 +30%
+          status: todo
+          priority: P2

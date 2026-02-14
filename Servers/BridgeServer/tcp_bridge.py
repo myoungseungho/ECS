@@ -269,6 +269,18 @@ class MsgType(IntEnum):
     RAID_ATTACK = 378         # 레이드 공격
     RAID_ATTACK_RESULT = 379  # 레이드 공격 결과
 
+    # Crafting / Gathering / Cooking / Enchanting (TASK 2)
+    CRAFT_LIST_REQ = 380     # 제작 레시피 목록 요청
+    CRAFT_LIST = 381         # 제작 레시피 목록 응답
+    CRAFT_EXECUTE = 382      # 제작 실행
+    CRAFT_RESULT = 383       # 제작 결과
+    GATHER_START = 384       # 채집 시작
+    GATHER_RESULT = 385      # 채집 결과
+    COOK_EXECUTE = 386       # 요리 실행
+    COOK_RESULT = 387        # 요리 결과
+    ENCHANT_REQ = 388        # 인챈트 요청
+    ENCHANT_RESULT = 389     # 인챈트 결과
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -378,6 +390,15 @@ class PlayerSession:
     trade_gold: int = 0
     trade_confirmed: bool = False
     tutorial_steps: Set[int] = field(default_factory=set)  # completed step IDs
+    crafting_level: int = 1           # 제작 숙련도
+    crafting_exp: int = 0             # 제작 경험치
+    gathering_level: int = 1          # 채집 숙련도
+    gathering_exp: int = 0            # 채집 경험치
+    cooking_level: int = 1            # 요리 숙련도
+    energy: int = 200                 # 채집 에너지 (max:200)
+    energy_last_regen: float = 0.0    # 마지막 에너지 재생 시간
+    food_buff: dict = field(default_factory=dict)  # 현재 음식 버프
+    weapon_enchant: dict = field(default_factory=dict)  # {slot: {element, level}}
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -591,6 +612,111 @@ ENHANCE_TABLE = {
     10: 0.05,  # +10: 5%
 }
 ENHANCE_COST_BASE = 500  # 강화 비용 = base * level
+
+# ---- Crafting System Data (GDD crafting.yaml) ----
+CRAFTING_RECIPES = {
+    "iron_sword": {
+        "id": "iron_sword", "name": "Iron Sword", "category": "weapon",
+        "proficiency_required": 1,
+        "materials": [{"item": "iron_ore", "count": 5}, {"item": "wood", "count": 2}],
+        "gold_cost": 200, "craft_time": 5, "success_rate": 1.0,
+        "result": {"item_id": 301, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+    "steel_sword": {
+        "id": "steel_sword", "name": "Steel Sword", "category": "weapon",
+        "proficiency_required": 10,
+        "materials": [{"item": "steel_ingot", "count": 3}, {"item": "leather", "count": 2}, {"item": "iron_sword", "count": 1}],
+        "gold_cost": 1000, "craft_time": 10, "success_rate": 0.9,
+        "result": {"item_id": 302, "count": 1},
+        "bonus_option_chance": 0.2,
+    },
+    "hp_potion_s": {
+        "id": "hp_potion_s", "name": "HP Potion (S)", "category": "potion",
+        "proficiency_required": 1,
+        "materials": [{"item": "herb", "count": 3}],
+        "gold_cost": 20, "craft_time": 2, "success_rate": 1.0,
+        "result": {"item_id": 201, "count": 3},
+        "bonus_option_chance": 0.0,
+    },
+    "hp_potion_l": {
+        "id": "hp_potion_l", "name": "HP Potion (L)", "category": "potion",
+        "proficiency_required": 15,
+        "materials": [{"item": "rare_herb", "count": 5}, {"item": "crystal_water", "count": 1}],
+        "gold_cost": 200, "craft_time": 5, "success_rate": 0.8,
+        "result": {"item_id": 202, "count": 3},
+        "bonus_option_chance": 0.0,
+    },
+    "polished_ruby": {
+        "id": "polished_ruby", "name": "Polished Ruby", "category": "gem",
+        "proficiency_required": 10,
+        "materials": [{"item": "rough_ruby", "count": 3}],
+        "gold_cost": 100, "craft_time": 5, "success_rate": 1.0,
+        "result": {"item_id": 501, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+    "steel_ingot": {
+        "id": "steel_ingot", "name": "Steel Ingot", "category": "material",
+        "proficiency_required": 5,
+        "materials": [{"item": "iron_ore", "count": 3}, {"item": "coal", "count": 1}],
+        "gold_cost": 50, "craft_time": 3, "success_rate": 1.0,
+        "result": {"item_id": 601, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+}
+
+GATHER_TYPES = {
+    1: {"name": "herbalism", "gather_time": 3.0, "exp": 5, "loot": [
+        {"item_id": 701, "name": "herb", "chance": 0.80},
+        {"item_id": 702, "name": "rare_herb", "chance": 0.15},
+        {"item_id": 703, "name": "legendary_herb", "chance": 0.05},
+    ]},
+    2: {"name": "mining", "gather_time": 5.0, "exp": 8, "loot": [
+        {"item_id": 711, "name": "iron_ore", "chance": 0.70},
+        {"item_id": 712, "name": "gold_ore", "chance": 0.20},
+        {"item_id": 713, "name": "crystal", "chance": 0.08},
+        {"item_id": 714, "name": "diamond_ore", "chance": 0.02},
+    ]},
+    3: {"name": "logging", "gather_time": 4.0, "exp": 6, "loot": [
+        {"item_id": 721, "name": "wood", "chance": 0.80},
+        {"item_id": 722, "name": "hardwood", "chance": 0.15},
+        {"item_id": 723, "name": "world_tree_branch", "chance": 0.05},
+    ]},
+}
+GATHER_ENERGY_MAX = 200
+GATHER_ENERGY_COST = 5
+GATHER_ENERGY_REGEN = 1  # per minute
+
+COOKING_RECIPES = {
+    "grilled_meat": {
+        "id": "grilled_meat", "name": "Grilled Meat",
+        "materials": [{"item": "raw_meat", "count": 3}],
+        "effect": {"atk": 10}, "duration": 1800,
+        "proficiency_required": 1,
+        "result_item_id": 801,
+    },
+    "fish_stew": {
+        "id": "fish_stew", "name": "Fish Stew",
+        "materials": [{"item": "fish", "count": 2}, {"item": "herb", "count": 1}],
+        "effect": {"max_hp": 200, "hp_regen": 5}, "duration": 1800,
+        "proficiency_required": 5,
+        "result_item_id": 802,
+    },
+    "royal_feast": {
+        "id": "royal_feast", "name": "Royal Feast",
+        "materials": [{"item": "rare_meat", "count": 2}, {"item": "rare_herb", "count": 2}, {"item": "spice", "count": 1}],
+        "effect": {"all_stats": 5, "exp_bonus": 0.05}, "duration": 3600,
+        "proficiency_required": 20,
+        "result_item_id": 803,
+    },
+}
+
+ENCHANT_ELEMENTS = ["fire", "ice", "lightning", "dark", "holy", "nature"]
+ENCHANT_LEVELS = {
+    1: {"damage_bonus": 0.05, "material_cost": 5, "gold_cost": 1000},
+    2: {"damage_bonus": 0.10, "material_cost": 10, "gold_cost": 3000},
+    3: {"damage_bonus": 0.15, "material_cost": 20, "gold_cost": 10000},
+}
 
 # ──── 던전 목록 데이터 (P2_S03_S01) ────
 DUNGEON_LIST_DATA = [
@@ -917,6 +1043,11 @@ class BridgeServer:
             MsgType.PVP_MATCH_ACCEPT: self._on_pvp_match_accept,
             MsgType.PVP_ATTACK: self._on_pvp_attack,
             MsgType.RAID_ATTACK: self._on_raid_attack,
+            MsgType.CRAFT_LIST_REQ: self._on_craft_list_req,
+            MsgType.CRAFT_EXECUTE: self._on_craft_execute,
+            MsgType.GATHER_START: self._on_gather_start,
+            MsgType.COOK_EXECUTE: self._on_cook_execute,
+            MsgType.ENCHANT_REQ: self._on_enchant_req,
         }
 
         handler = handlers.get(msg_type)
@@ -3368,6 +3499,197 @@ class BridgeServer:
         self.log(f"Raid WIPE at phase {raid['phase']} in Instance#{inst_id}", "RAID")
 
     # ━━━ 몬스터 시스템 ━━━
+
+
+    # ---- Crafting/Gathering/Cooking/Enchanting System (TASK 2: MsgType 380-389) ----
+
+    def _regen_energy(self, session):
+        """Energy regen (1/min)"""
+        import time as _t
+        now = _t.time()
+        if session.energy_last_regen == 0.0:
+            session.energy_last_regen = now
+            return
+        elapsed_min = (now - session.energy_last_regen) / 60.0
+        regen = int(elapsed_min * GATHER_ENERGY_REGEN)
+        if regen > 0:
+            session.energy = min(GATHER_ENERGY_MAX, session.energy + regen)
+            session.energy_last_regen = now
+
+    async def _on_craft_list_req(self, session: PlayerSession, payload: bytes):
+        """CRAFT_LIST_REQ(380): category(u8). proficiency_level filtered recipe list."""
+        if not session.in_game:
+            return
+        category_filter = payload[0] if len(payload) >= 1 else 0xFF
+        cat_map = {0: "weapon", 1: "armor", 2: "potion", 3: "gem", 4: "material"}
+        filter_cat = cat_map.get(category_filter, None)
+        recipes = []
+        for rid, recipe in CRAFTING_RECIPES.items():
+            if recipe["proficiency_required"] > session.crafting_level:
+                continue
+            if filter_cat and recipe["category"] != filter_cat:
+                continue
+            recipes.append(recipe)
+        parts = [struct.pack("<B", len(recipes))]
+        for r in recipes:
+            rid_bytes = r["id"].encode("utf-8")
+            parts.append(struct.pack("<B", len(rid_bytes)))
+            parts.append(rid_bytes)
+            parts.append(struct.pack("<BHB", r["proficiency_required"],
+                                     r["gold_cost"], int(r["success_rate"] * 100)))
+            parts.append(struct.pack("<HB", r["result"]["item_id"], r["result"]["count"]))
+            parts.append(struct.pack("<B", len(r["materials"])))
+        resp = b"".join(parts)
+        self._send(session, MsgType.CRAFT_LIST, resp)
+        self.log(f"CraftList: {session.char_name} got {len(recipes)} recipes (cat={category_filter})", "GAME")
+
+    async def _on_craft_execute(self, session: PlayerSession, payload: bytes):
+        """CRAFT_EXECUTE(382): recipe_id_len(u8) + recipe_id(str). Execute crafting."""
+        if not session.in_game or len(payload) < 2:
+            return
+        rid_len = payload[0]
+        if len(payload) < 1 + rid_len:
+            return
+        recipe_id = payload[1:1 + rid_len].decode("utf-8")
+        recipe = CRAFTING_RECIPES.get(recipe_id)
+        if not recipe:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 1))
+            return
+        if session.crafting_level < recipe["proficiency_required"]:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 2))
+            return
+        if session.gold < recipe["gold_cost"]:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 3))
+            return
+        session.gold -= recipe["gold_cost"]
+        import random as _rng
+        if _rng.random() > recipe["success_rate"]:
+            self.log(f"Craft: {session.char_name} FAIL {recipe_id}", "GAME")
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 5))
+            return
+        result_item_id = recipe["result"]["item_id"]
+        result_count = recipe["result"]["count"]
+        for slot in session.inventory:
+            if slot.item_id == 0:
+                slot.item_id = result_item_id
+                slot.count = result_count
+                break
+        has_bonus = 0
+        if recipe.get("bonus_option_chance", 0) > 0 and _rng.random() < recipe["bonus_option_chance"]:
+            has_bonus = 1
+        session.crafting_exp += recipe["proficiency_required"] * 10
+        while session.crafting_exp >= session.crafting_level * 100 and session.crafting_level < 50:
+            session.crafting_exp -= session.crafting_level * 100
+            session.crafting_level += 1
+            self.log(f"Craft: {session.char_name} proficiency UP -> Lv{session.crafting_level}", "GAME")
+        self.log(f"Craft: {session.char_name} SUCCESS {recipe_id} -> item={result_item_id}x{result_count} bonus={has_bonus}", "GAME")
+        self._send(session, MsgType.CRAFT_RESULT, struct.pack("<BHBB", 0, result_item_id, result_count, has_bonus))
+
+    async def _on_gather_start(self, session: PlayerSession, payload: bytes):
+        """GATHER_START(384): gather_type(u8). Gather with energy cost + loot drop."""
+        if not session.in_game or len(payload) < 1:
+            return
+        gather_type = payload[0]
+        gtype = GATHER_TYPES.get(gather_type)
+        if not gtype:
+            self._send(session, MsgType.GATHER_RESULT, struct.pack("<BB", 1, 0))
+            return
+        self._regen_energy(session)
+        if session.energy < GATHER_ENERGY_COST:
+            self._send(session, MsgType.GATHER_RESULT, struct.pack("<BB", 2, 0))
+            return
+        session.energy -= GATHER_ENERGY_COST
+        import random as _rng
+        dropped_items = []
+        for loot in gtype["loot"]:
+            if _rng.random() < loot["chance"]:
+                dropped_items.append(loot)
+        if not dropped_items and gtype["loot"]:
+            dropped_items.append(gtype["loot"][0])
+        for item in dropped_items:
+            for slot in session.inventory:
+                if slot.item_id == 0:
+                    slot.item_id = item["item_id"]
+                    slot.count = 1
+                    break
+        session.gathering_exp += gtype["exp"]
+        while session.gathering_exp >= session.gathering_level * 50 and session.gathering_level < 30:
+            session.gathering_exp -= session.gathering_level * 50
+            session.gathering_level += 1
+            self.log(f"Gather: {session.char_name} level UP -> Lv{session.gathering_level}", "GAME")
+        self.log(f"Gather: {session.char_name} type={gtype['name']} got {len(dropped_items)} items, energy={session.energy}", "GAME")
+        parts = [struct.pack("<BBB", 0, session.energy, len(dropped_items))]
+        for item in dropped_items:
+            parts.append(struct.pack("<H", item["item_id"]))
+        self._send(session, MsgType.GATHER_RESULT, b"".join(parts))
+
+    async def _on_cook_execute(self, session: PlayerSession, payload: bytes):
+        """COOK_EXECUTE(386): recipe_id_len(u8) + recipe_id(str). Cook + apply buff."""
+        if not session.in_game or len(payload) < 2:
+            return
+        rid_len = payload[0]
+        if len(payload) < 1 + rid_len:
+            return
+        recipe_id = payload[1:1 + rid_len].decode("utf-8")
+        recipe = COOKING_RECIPES.get(recipe_id)
+        if not recipe:
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 1))
+            return
+        if session.cooking_level < recipe["proficiency_required"]:
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 2))
+            return
+        import time as _t
+        if session.food_buff and session.food_buff.get("expires", 0) > _t.time():
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 3))
+            return
+        session.food_buff = {
+            "recipe_id": recipe_id,
+            "effect": recipe["effect"],
+            "expires": _t.time() + recipe["duration"],
+            "duration": recipe["duration"],
+        }
+        self.log(f"Cook: {session.char_name} made {recipe_id}, buff={recipe['effect']} for {recipe['duration']}s", "GAME")
+        effects = recipe["effect"]
+        self._send(session, MsgType.COOK_RESULT, struct.pack("<BHB", 0, recipe["duration"], len(effects)))
+
+    async def _on_enchant_req(self, session: PlayerSession, payload: bytes):
+        """ENCHANT_REQ(388): slot_index(u8) + element_id(u8) + target_level(u8). Weapon enchant."""
+        if not session.in_game or len(payload) < 3:
+            return
+        slot_idx = payload[0]
+        element_id = payload[1]
+        target_level = payload[2]
+        if slot_idx >= len(session.inventory):
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 1, 0))
+            return
+        item = session.inventory[slot_idx]
+        if item.item_id == 0:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 2, 0))
+            return
+        if element_id >= len(ENCHANT_ELEMENTS):
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 3, 0))
+            return
+        level_data = ENCHANT_LEVELS.get(target_level)
+        if not level_data:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 4, 0))
+            return
+        gold_cost = level_data["gold_cost"]
+        existing = session.weapon_enchant.get(slot_idx)
+        if existing:
+            gold_cost = int(gold_cost * 1.5)
+        if session.gold < gold_cost:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 5, 0))
+            return
+        session.gold -= gold_cost
+        element_name = ENCHANT_ELEMENTS[element_id]
+        session.weapon_enchant[slot_idx] = {
+            "element": element_name,
+            "element_id": element_id,
+            "level": target_level,
+            "damage_bonus": level_data["damage_bonus"],
+        }
+        self.log(f"Enchant: {session.char_name} slot={slot_idx} -> {element_name} Lv{target_level} (cost={gold_cost}g)", "GAME")
+        self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BBBB", 0, element_id, target_level, int(level_data["damage_bonus"] * 100)))
 
     def _spawn_monsters(self):
         for spawn in MONSTER_SPAWNS:
