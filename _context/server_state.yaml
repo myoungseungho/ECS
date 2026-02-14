@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-15T13:30:00"
+last_session: "2026-02-15T18:00:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 3 ALL CLEAR! PvP/Raid TCP 연동 20/20 ALL PASS. 총 80/80(기존46+Guild14+PvPRaid20). test_phase3_pvp_raid_tcp.py 작성. GDD 심화 태스크 10개 영역 55개 서브태스크 분해 완료."
+current_status: "Phase 3 ALL CLEAR! 총 80/80 ALL PASS. GDD 심화 태스크 Phase 4~5 분해 완료 — 기존 10영역 55개 + 신규 4영역 25개 = 14영역 80서브태스크."
 
 # ── 완료된 작업 ──
 completed:
@@ -69,14 +69,13 @@ completed:
     files: ["_comms/server_to_client/S039_hub_v2_upgrade_event_driven.md"]
   - id: S040
     desc: "C021 응답: Phase 3 브릿지 호환성 패치 + Guild/Trade/Mail TCP 14/14 ALL PASS + GDD 심화 태스크 분해. _patch_s040.py 듀얼 포맷 5건 수정. 총 60/60 PASS."
-    files: ["Servers/BridgeServer/_patch_s040.py", "Servers/BridgeServer/test_phase3_tcp.py", "_comms/server_to_client/S040_c021_response_phase3_bridge_compat.md", "_comms/server_to_client/S040_c021_response_phase3_guild_trade_mail_test.md"]
+    files: ["Servers/BridgeServer/_patch_s040.py", "Servers/BridgeServer/test_phase3_tcp.py", "_comms/server_to_client/S040_c021_response_phase3_bridge_compat.md"]
   - id: S041
-    desc: "C022 응답: Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS. test_phase3_pvp_raid_tcp.py 작성. 총 80/80 ALL PASS."
+    desc: "C022 응답: Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS. test_phase3_pvp_raid_tcp.py 작성. 총 80/80 ALL PASS. Phase 3 완전 완료!"
     files: ["Servers/BridgeServer/test_phase3_pvp_raid_tcp.py", "_comms/server_to_client/S041_c022_response_phase3_pvp_raid_80_80.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
-  # Phase 3 ALL CLEAR — 80/80 ALL PASS
 
 # ── 다음 할 일 ──
 pending_tasks:
@@ -117,7 +116,7 @@ pending_tasks:
     estimated_minutes: 10
 
   - id: "crafting_sub06"
-    desc: "제작/채집/인챈트 테스트 케이스 5개 작성 — _patch_s041.py에 추가. 레시피 조회/제작 성공/재료부족 실패/채집/인챈트."
+    desc: "제작/채집/인챈트 테스트 케이스 5개 작성 — _patch_s042.py에 추가. 레시피 조회/제작 성공/재료부족 실패/채집/인챈트."
     priority: P1
     blocked: false
     estimated_minutes: 10
@@ -409,10 +408,196 @@ pending_tasks:
     estimated_minutes: 10
 
   # ============================================================
+  # ============================================================
+  # === 신규 Phase 5 태스크 (GDD 전수 스캔으로 발굴) ===
+  # ============================================================
+  # ============================================================
+
+  # ============================================================
+  # TASK 11: 캐시샵/배틀패스/이벤트 (GDD rules/monetization.yaml)
+  # 수익화 시스템 전체 미구현. Pay-to-Convenience 원칙.
+  # MsgType: 474-489
+  # ============================================================
+  - id: "shop_sub01"
+    desc: "CASH_SHOP_LIST_REQ(474)→CASH_SHOP_LIST(475) 핸들러 — 캐시샵 카테고리별 아이템 목록 반환. cosmetics/convenience 분류. crystal 화폐 시스템."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub02"
+    desc: "CASH_SHOP_BUY(476)→CASH_SHOP_BUY_RESULT(477) 핸들러 — 크리스탈 차감 + 아이템 지급. inventory_expansion(max:6회)/storage_expansion(max:15회)/exp_boost(24h)/auto_potion(30일)."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub03"
+    desc: "BATTLEPASS_INFO_REQ(478)→BATTLEPASS_INFO(479) 핸들러 — 배틀패스 현재 레벨/경험치/보상 상태 조회. season_duration:90일, max_level:50, exp_per_level:1000."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub04"
+    desc: "BATTLEPASS_CLAIM(480)→BATTLEPASS_CLAIM_RESULT(481) 핸들러 — 무료/프리미엄 트랙 보상 수령. 레벨별 보상 테이블(5/10/15.../50). 프리미엄 구매 상태 체크."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub05"
+    desc: "배틀패스 경험치 획득 로직 — 일퀘(200)/주퀘(800)/던전클리어(100)/PvP승리(50)/로그인(50). 기존 핸들러에 BP_EXP 추가 훅."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub06"
+    desc: "EVENT_LIST_REQ(482)→EVENT_LIST(483) + EVENT_CLAIM(484)→EVENT_CLAIM_RESULT(485) — 이벤트 시스템. login_event(14일 출석)/double_exp(72h)/boss_rush(48h). 이벤트 스케줄 관리."
+    priority: P2
+    blocked: false
+    estimated_minutes: 15
+
+  - id: "shop_sub07"
+    desc: "SUBSCRIPTION_INFO(486)→SUBSCRIPTION_STATUS(487) + SUBSCRIPTION_BUY(488)→SUBSCRIPTION_RESULT(489) — 월정액 '모험가의 축복'. exp+10%/gold+10%/daily_crystal:10/repair_discount:50%/teleport_free:3/extra_dungeon:1."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "shop_sub08"
+    desc: "캐시샵/배틀패스/이벤트 테스트 6개 — 캐시 구매/BP 레벨업/BP 보상수령/이벤트 출석/구독 구매/구독 혜택."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 12: 월드 시스템 — 날씨/시간/텔레포트/파괴오브젝트 (GDD rules/world.yaml)
+  # 존 이동은 구현됨. 날씨/시간/워프/오브젝트 미구현.
+  # MsgType: 490-501
+  # ============================================================
+  - id: "world_sub01"
+    desc: "WEATHER_INFO_REQ(490)→WEATHER_INFO(491) 핸들러 — 현재 날씨+시간 조회. weather_types 6종(clear/rain/snow/fog/storm/sandstorm). 5~15분 주기 자동 전환. 원소 데미지 보정(rain:fire-10%/lightning+10% 등)."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "world_sub02"
+    desc: "서버측 날씨/시간 틱 시스템 — 3600초=게임내 1일 사이클. time_of_day 6구간(dawn~night). 밤: visibility-40%/monster_spawn+20%/special_monsters. 날씨 확률 전환(clear:50%/rain:20%/snow:10%/fog:10%/storm:5%/sand:5%)."
+    priority: P2
+    blocked: false
+    estimated_minutes: 15
+
+  - id: "world_sub03"
+    desc: "TELEPORT_REQ(492)→TELEPORT_RESULT(493) 핸들러 — 워프 포인트 텔레포트. cost:silver500. cast_time:3초(피격취소). 발견한 포인트만 사용 가능. WAYPOINT_DISCOVER(494)→WAYPOINT_LIST(495) 워프 등록/목록."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "world_sub04"
+    desc: "DESTROY_OBJECT(496)→DESTROY_OBJECT_RESULT(497) + INTERACT_OBJECT(498)→INTERACT_RESULT(499) — 파괴/상호작용 오브젝트. barrel(HP:10,loot:gold1-10)/crate(HP:20)/crystal(HP:50,gem:30%). treasure_chest(open_time:2s,trapped:10%). respawn 타이머."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "world_sub05"
+    desc: "MOUNT_SUMMON(500)→MOUNT_RESULT(501) 핸들러 — 탈것 소환/해제. speed_multiplier:2.0, summon_cast:2초, 피격시/공격시 해제. available_from_level:20."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "world_sub06"
+    desc: "월드 시스템 테스트 5개 — 날씨 조회/전환, 텔레포트, 오브젝트 파괴, 탈것 소환."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 13: 출석/로그인 보상 + 일일 리셋 (GDD rules/flow.yaml + monetization.yaml)
+  # 엔드게임 일일 루틴의 서버 측 핵심 로직.
+  # MsgType: 502-509
+  # ============================================================
+  - id: "login_sub01"
+    desc: "LOGIN_REWARD_REQ(502)→LOGIN_REWARD_INFO(503) 핸들러 — 출석 보상 조회. 14일 주기 보상 테이블. 누적 일수 + 오늘 수령 여부 반환."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "login_sub02"
+    desc: "LOGIN_REWARD_CLAIM(504)→LOGIN_REWARD_CLAIM_RESULT(505) 핸들러 — 출석 보상 수령. day1:gold1000 → day7:rare_box → day14:epic_box+칭호. 중복 수령 방지."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "login_sub03"
+    desc: "DAILY_RESET 서버 로직 — 매일 06:00 자동 리셋: 일일퀘스트 초기화/던전 횟수 초기화/출석 카운트/골드캡 리셋/에너지 전체 회복. DAILY_RESET_NOTIFY(506) 브로드캐스트."
+    priority: P1
+    blocked: false
+    estimated_minutes: 15
+
+  - id: "login_sub04"
+    desc: "WEEKLY_RESET 서버 로직 — 수요일 06:00 자동 리셋: 주간퀘/레이드 입장횟수/길드전 일정/PvP 시즌 포인트. WEEKLY_RESET_NOTIFY(507) 브로드캐스트."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "login_sub05"
+    desc: "CONTENT_UNLOCK_NOTIFY(508) 핸들러 — 레벨 도달 시 컨텐츠 해금 알림. Lv5:일퀘/Lv10:강화+거래소/Lv15:던전/Lv20:전직+PvP+탈것/Lv25:보석/Lv30:길드+궁극기/Lv40:초월/Lv50:레이드+각인/Lv60:카오스+파라곤."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "login_sub06"
+    desc: "출석/리셋 테스트 4개 — 출석보상 조회/수령, 일일리셋 시뮬레이션, 컨텐츠 해금."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 14: 스토리/메인퀘 대화 시스템 (GDD rules/narrative.yaml)
+  # NPC 기본 대화(332-333)는 구현됨. 선택지 분기/컷씬 트리거/챕터 진행은 미구현.
+  # MsgType: 510-517
+  # ============================================================
+  - id: "narrative_sub01"
+    desc: "DIALOG_CHOICE(510)→DIALOG_CHOICE_RESULT(511) 핸들러 — NPC 대화 중 선택지 분기. player_choices 배열에서 선택 → next dialog_id 라우팅. quest_accept/lore_hint 분기 처리."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "narrative_sub02"
+    desc: "CUTSCENE_TRIGGER(512)→CUTSCENE_DATA(513) 핸들러 — 스토리 컷씬 트리거. 서버에서 진행 조건 체크(chapter/quest 완료 여부) → 컷씬 시퀀스 데이터 전송. opening/boss_intro/chapter_transition 3종."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "narrative_sub03"
+    desc: "CHAPTER_PROGRESS_REQ(514)→CHAPTER_PROGRESS(515) 핸들러 — 메인 스토리 챕터 진행 상태 조회. chapter 1~4 + 봉인석 파편 수집 현황(0~5). chapter_unlock 조건 체크."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "narrative_sub04"
+    desc: "메인 퀘스트 데이터 로드 — narrative.yaml의 MQ001~MQ045 대사 스크립트를 서버 메모리에 로드. npc_id→dialog_tree 매핑. quest_accept/quest_complete 자동 연동."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "narrative_sub05"
+    desc: "스토리/대화 테스트 4개 — 선택지 분기, 컷씬 트리거, 챕터 진행, 메인퀘 대사 로드."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
   # 기존 유지 태스크
   # ============================================================
+  - id: "respond_to_client"
+    desc: "클라이언트 새 메시지에 응답 (inbox 스캔 후 자동 처리)"
+    priority: P0
+    blocked: false
+
   - id: "entity_pipeline_review"
-    desc: "C016 엔티티 파이프라인 제안 상세 검토 (Phase 2 완료됨, 이제 검토 가능)"
+    desc: "C016 엔티티 파이프라인 제안 상세 검토 (Phase 3 완료됨, 이제 검토 가능)"
+    priority: P2
+    blocked: false
+
+  - id: "phase4_planning"
+    desc: "Phase 4 계획 수립 — Unity Play 모드 통합 테스트 / 밸런싱 / 추가 컨텐츠"
     priority: P2
     blocked: false
 
@@ -420,7 +605,7 @@ pending_tasks:
     desc: "GDD 서버 태스크 전부 done — 추후 밸런싱/폴리싱 대기"
     priority: P3
     blocked: true
-    blocked_reason: "클라이언트 구현 + 통합 테스트 후"
+    blocked_reason: "통합 테스트 + 대표님 피드백 후"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -434,8 +619,8 @@ recent_decisions:
   - "Phase 2 TCP 실연동 14/14 ALL PASS (2026-02-15) — 역사적인 첫 실연동"
   - "Phase 3 Guild/Trade/Mail TCP 연동 14/14 ALL PASS (2026-02-15) — 총 60/60"
   - "D013: GDD 심화 태스크 분해 — 10개 영역 55개 서브태스크 (제작/거래소/퀘스트심화/소셜/전장/칭호 + 보석각인초월/내구도수리/보조화폐)"
-  - "Phase 3 Dungeon/PvP/Raid 클라 연동 완료 — C022 확인 (25/25 + PvP/Raid 전용 패킷)"
-  - "Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS (2026-02-15) — 총 80/80 ALL PASS"
+  - "Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS (2026-02-15) — 총 80/80 ALL PASS. Phase 3 완전 완료!"
+  - "D014: GDD 신규 4영역 25서브태스크 추가 분해 — 캐시샵/배틀패스(474-489), 월드시스템(490-501), 출석/리셋(502-509), 스토리/대화(510-517)"
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
