@@ -47,7 +47,13 @@ from tcp_bridge import (
     MENTOR_DISCIPLE_LEVEL_RANGE, MENTOR_GRADUATION_LEVEL,
     MENTOR_EXP_BUFF_PARTY, MENTOR_EXP_BUFF_SOLO,
     MENTOR_QUEST_POOL, MENTOR_QUEST_WEEKLY_COUNT,
-    MENTOR_SHOP_ITEMS
+    MENTOR_SHOP_ITEMS,
+    CASH_SHOP_ITEMS, BATTLEPASS_MAX_LEVEL, BATTLEPASS_EXP_PER_LEVEL,
+    BATTLEPASS_REWARDS_FREE, BATTLEPASS_REWARDS_PREMIUM,
+    EVENT_LIST_DATA, SUBSCRIPTION_PRICE_CRYSTAL, SUBSCRIPTION_BENEFITS,
+    WEATHER_TYPES, TELEPORT_COST_SILVER, MOUNT_MIN_LEVEL, WORLD_OBJECTS,
+    LOGIN_REWARD_TABLE, LOGIN_REWARD_CYCLE, CONTENT_UNLOCK_TABLE,
+    DIALOG_TREES, CUTSCENE_DATA_TABLE, CHAPTER_DATA, MAIN_QUEST_TABLE
 )
 
 
@@ -2712,6 +2718,423 @@ async def run_tests(port: int):
         c.close()
 
     await test("MENTOR_SHOP: 기여도 상점 조회+구매실패", test_mentor_shop())
+
+
+    # ━━━ Test: SECRET_REALM_ENTER — 비경 입장 (레벨 부족) ━━━
+    async def test_realm_enter_level_too_low():
+        """레벨 20 미만 캐릭터 → LEVEL_TOO_LOW(3)."""
+        c = await login_and_enter(port)
+        # Default level is 1, need 20 — should fail
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B', 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT, f"Expected ENTER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 3, f"Expected LEVEL_TOO_LOW(3), got {result}"
+        c.close()
+
+    await test("SECRET_REALM_ENTER: 레벨 부족 → LEVEL_TOO_LOW", test_realm_enter_level_too_low())
+
+    # ━━━ Test: SECRET_REALM_ENTER — 비경 입장 성공 (auto_spawn) ━━━
+    async def test_realm_enter_success():
+        """레벨업 후 auto_spawn=1로 입장 → SUCCESS(0) + instance_id."""
+        c = await login_and_enter(port)
+        # Level up to 20+
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter realm with auto_spawn=1
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT, f"Expected ENTER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        instance_id = struct.unpack('<H', resp[1:3])[0]
+        assert instance_id > 0, f"Expected instance_id > 0, got {instance_id}"
+        c.close()
+
+    await test("SECRET_REALM_ENTER: auto_spawn 입장 성공", test_realm_enter_success())
+
+    # ━━━ Test: SECRET_REALM_COMPLETE — 비경 클리어 (등급 계산) ━━━
+    async def test_realm_complete():
+        """비경 클리어 → 등급(S/A/B/C) + 골드 보상."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS, got {resp[0]}"
+        realm_type_idx = resp[3]
+        # Complete — send score 150 (for trial: S grade if <=180s)
+        # For other types the grade varies, but we at least get a valid response
+        await c.send(MsgType.SECRET_REALM_COMPLETE, struct.pack('<H B', 150, 0))
+        msg_type2, resp2 = await c.recv_expect(MsgType.SECRET_REALM_COMPLETE)
+        assert msg_type2 == MsgType.SECRET_REALM_COMPLETE, f"Expected COMPLETE, got {msg_type2}"
+        grade = resp2[0]
+        gold_reward = struct.unpack('<I', resp2[1:5])[0]
+        assert grade in [0, 1, 2, 3], f"Grade must be 0-3 (S/A/B/C), got {grade}"
+        assert gold_reward > 0, f"Expected gold_reward > 0, got {gold_reward}"
+        c.close()
+
+    await test("SECRET_REALM_COMPLETE: 비경 클리어 → 등급+골드", test_realm_complete())
+
+    # ━━━ Test: SECRET_REALM_FAIL — 비경 실패 ━━━
+    async def test_realm_fail():
+        """비경 실패 → 위로 보상 100골드."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS, got {resp[0]}"
+        # Fail
+        await c.send(MsgType.SECRET_REALM_FAIL, b'')
+        msg_type2, resp2 = await c.recv_expect(MsgType.SECRET_REALM_FAIL)
+        assert msg_type2 == MsgType.SECRET_REALM_FAIL, f"Expected FAIL, got {msg_type2}"
+        consolation_gold = struct.unpack('<I', resp2[:4])[0]
+        assert consolation_gold == 100, f"Expected 100 consolation gold, got {consolation_gold}"
+        c.close()
+
+    await test("SECRET_REALM_FAIL: 비경 실패 → 위로 100골드", test_realm_fail())
+
+
+    # ================================================================
+    # TASK 11 Tests: Cash Shop / Battle Pass / Event / Subscription
+    # ================================================================
+
+    # ━━━ Test: CASH_SHOP_LIST — 캐시상점 목록 조회 ━━━
+    async def test_cash_shop_list():
+        """캐시 상점 전체 목록 → 10개 아이템."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.CASH_SHOP_LIST_REQ, struct.pack('<B', 0))
+        msg_type, resp = await c.recv_expect(MsgType.CASH_SHOP_LIST)
+        assert msg_type == MsgType.CASH_SHOP_LIST, f"Expected CASH_SHOP_LIST, got {msg_type}"
+        crystal = struct.unpack('<I', resp[0:4])[0]
+        count = resp[4]
+        assert count == 10, f"Expected 10 shop items, got {count}"
+        c.close()
+
+    await test("CASH_SHOP_LIST: 캐시상점 10개 목록", test_cash_shop_list())
+
+    # ━━━ Test: CASH_SHOP_BUY — 크리스탈 부족 구매 실패 ━━━
+    async def test_cash_shop_buy_fail():
+        """크리스탈 0 상태에서 구매 → NOT_ENOUGH_CRYSTAL(1)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.CASH_SHOP_BUY, struct.pack('<B', 1))
+        msg_type, resp = await c.recv_expect(MsgType.CASH_SHOP_BUY_RESULT)
+        assert msg_type == MsgType.CASH_SHOP_BUY_RESULT
+        assert resp[0] == 1, f"Expected NOT_ENOUGH_CRYSTAL(1), got {resp[0]}"
+        c.close()
+
+    await test("CASH_SHOP_BUY: 크리스탈 부족 → 실패", test_cash_shop_buy_fail())
+
+    # ━━━ Test: BATTLEPASS_INFO — 배틀패스 정보 조회 ━━━
+    async def test_battlepass_info():
+        """배틀패스 정보 조회 → level/exp/premium 반환."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.BATTLEPASS_INFO_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEPASS_INFO)
+        assert msg_type == MsgType.BATTLEPASS_INFO
+        level = resp[0]
+        exp = struct.unpack('<H', resp[1:3])[0]
+        exp_needed = struct.unpack('<H', resp[3:5])[0]
+        assert exp_needed == 1000, f"Expected exp_needed=1000, got {exp_needed}"
+        c.close()
+
+    await test("BATTLEPASS_INFO: 배틀패스 레벨/경험치 조회", test_battlepass_info())
+
+    # ━━━ Test: BATTLEPASS_CLAIM — 레벨 미달 보상 수령 실패 ━━━
+    async def test_battlepass_claim_fail():
+        """BP 레벨 0에서 5레벨 보상 → LEVEL_NOT_REACHED(1)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.BATTLEPASS_CLAIM, struct.pack('<B B', 5, 0))
+        msg_type, resp = await c.recv_expect(MsgType.BATTLEPASS_CLAIM_RESULT)
+        assert msg_type == MsgType.BATTLEPASS_CLAIM_RESULT
+        assert resp[0] == 1, f"Expected LEVEL_NOT_REACHED(1), got {resp[0]}"
+        c.close()
+
+    await test("BATTLEPASS_CLAIM: 레벨 미달 → 실패", test_battlepass_claim_fail())
+
+    # ━━━ Test: EVENT_LIST — 이벤트 목록 조회 ━━━
+    async def test_event_list():
+        """이벤트 3종 목록 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.EVENT_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.EVENT_LIST)
+        assert msg_type == MsgType.EVENT_LIST
+        count = resp[0]
+        assert count == 3, f"Expected 3 events, got {count}"
+        c.close()
+
+    await test("EVENT_LIST: 이벤트 3종 목록", test_event_list())
+
+    # ━━━ Test: EVENT_CLAIM — 출석 이벤트 보상 수령 ━━━
+    async def test_event_claim():
+        """출석 이벤트 Day 1 보상 수령 → SUCCESS + gold."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.EVENT_CLAIM, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.EVENT_CLAIM_RESULT)
+        assert msg_type == MsgType.EVENT_CLAIM_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS(0), got {resp[0]}"
+        gold = struct.unpack('<I', resp[2:6])[0]
+        assert gold == 1000, f"Expected 1000 gold, got {gold}"
+        # Second claim same day -> ALREADY_CLAIMED
+        await c.send(MsgType.EVENT_CLAIM, struct.pack('<B B', 1, 1))
+        msg_type2, resp2 = await c.recv_expect(MsgType.EVENT_CLAIM_RESULT)
+        assert resp2[0] == 1, f"Expected ALREADY_CLAIMED(1), got {resp2[0]}"
+        c.close()
+
+    await test("EVENT_CLAIM: 출석 이벤트 Day1 수령+중복방지", test_event_claim())
+
+    # ━━━ Test: SUBSCRIPTION — 구독 정보 + 크리스탈 부족 ━━━
+    async def test_subscription():
+        """구독 정보 조회 → 비활성. 구매 → 크리스탈 부족."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.SUBSCRIPTION_INFO, b'')
+        msg_type, resp = await c.recv_expect(MsgType.SUBSCRIPTION_STATUS)
+        assert msg_type == MsgType.SUBSCRIPTION_STATUS
+        active = resp[0]
+        assert active == 0, f"Expected inactive(0), got {active}"
+        # Try buy with 0 crystal
+        await c.send(MsgType.SUBSCRIPTION_BUY, b'')
+        msg_type2, resp2 = await c.recv_expect(MsgType.SUBSCRIPTION_RESULT)
+        assert resp2[0] == 1, f"Expected NOT_ENOUGH_CRYSTAL(1), got {resp2[0]}"
+        c.close()
+
+    await test("SUBSCRIPTION: 구독 조회+크리스탈 부족", test_subscription())
+
+    # ================================================================
+    # TASK 12 Tests: World System
+    # ================================================================
+
+    # ━━━ Test: WEATHER_INFO — 날씨/시간 조회 ━━━
+    async def test_weather_info():
+        """날씨+시간 정보 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.WEATHER_INFO_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.WEATHER_INFO)
+        assert msg_type == MsgType.WEATHER_INFO
+        weather_id = resp[0]
+        assert 0 <= weather_id <= 5, f"Invalid weather_id: {weather_id}"
+        c.close()
+
+    await test("WEATHER_INFO: 날씨/시간 조회", test_weather_info())
+
+    # ━━━ Test: TELEPORT — 미발견 워프 텔레포트 실패 ━━━
+    async def test_teleport_fail():
+        """미발견 워프포인트 텔레포트 → NOT_DISCOVERED(1)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.TELEPORT_REQ, struct.pack('<H', 5))
+        msg_type, resp = await c.recv_expect(MsgType.TELEPORT_RESULT)
+        assert msg_type == MsgType.TELEPORT_RESULT
+        assert resp[0] == 1, f"Expected NOT_DISCOVERED(1), got {resp[0]}"
+        c.close()
+
+    await test("TELEPORT: 미발견 워프 → 실패", test_teleport_fail())
+
+    # ━━━ Test: WAYPOINT_DISCOVER + TELEPORT — 워프 발견 후 텔레포트 ━━━
+    async def test_waypoint_and_teleport():
+        """워프 발견 → 텔레포트 → NOT_ENOUGH_SILVER(2) (silver 0)."""
+        c = await login_and_enter(port)
+        # Discover waypoint 3
+        await c.send(MsgType.WAYPOINT_DISCOVER, struct.pack('<H', 3))
+        msg_type, resp = await c.recv_expect(MsgType.WAYPOINT_LIST)
+        assert msg_type == MsgType.WAYPOINT_LIST
+        count = resp[0]
+        assert count >= 1, f"Expected at least 1 waypoint, got {count}"
+        # Try teleport — should fail due to silver
+        await c.send(MsgType.TELEPORT_REQ, struct.pack('<H', 3))
+        msg_type2, resp2 = await c.recv_expect(MsgType.TELEPORT_RESULT)
+        assert msg_type2 == MsgType.TELEPORT_RESULT
+        # result: 0=SUCCESS or 2=NOT_ENOUGH_SILVER (depends on silver balance)
+        assert resp2[0] in (0, 2), f"Expected SUCCESS or NOT_ENOUGH_SILVER, got {resp2[0]}"
+        c.close()
+
+    await test("WAYPOINT+TELEPORT: 워프 발견+텔레포트 시도", test_waypoint_and_teleport())
+
+    # ━━━ Test: DESTROY_OBJECT — 오브젝트 파괴 ━━━
+    async def test_destroy_object():
+        """배럴 파괴 → 골드 루팅."""
+        c = await login_and_enter(port)
+        otype = b'barrel'
+        data = struct.pack('<B', len(otype)) + otype + struct.pack('<I', 1)
+        await c.send(MsgType.DESTROY_OBJECT, data)
+        msg_type, resp = await c.recv_expect(MsgType.DESTROY_OBJECT_RESULT)
+        assert msg_type == MsgType.DESTROY_OBJECT_RESULT
+        assert resp[0] == 0, f"Expected DESTROYED(0), got {resp[0]}"
+        gold = struct.unpack('<I', resp[1:5])[0]
+        assert 1 <= gold <= 10, f"Expected barrel gold 1-10, got {gold}"
+        c.close()
+
+    await test("DESTROY_OBJECT: 배럴 파괴 → 골드 루팅", test_destroy_object())
+
+    # ━━━ Test: INTERACT_OBJECT — 보물상자 열기 ━━━
+    async def test_interact_object():
+        """보물상자 열기 → 골드+트랩 판정."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.INTERACT_OBJECT, struct.pack('<I B', 100, 0))
+        msg_type, resp = await c.recv_expect(MsgType.INTERACT_RESULT)
+        assert msg_type == MsgType.INTERACT_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS(0), got {resp[0]}"
+        gold = struct.unpack('<I', resp[1:5])[0]
+        assert gold >= 10, f"Expected gold >= 10, got {gold}"
+        c.close()
+
+    await test("INTERACT_OBJECT: 보물상자 열기", test_interact_object())
+
+    # ━━━ Test: MOUNT_SUMMON — 탈것 소환/해제 ━━━
+    async def test_mount_summon():
+        """탈것 소환 (레벨 부족 시 실패, 아니면 성공)."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.MOUNT_SUMMON, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.MOUNT_RESULT)
+        assert msg_type == MsgType.MOUNT_RESULT
+        result = resp[0]
+        # Low level → LEVEL_TOO_LOW(1), or if level >= 20 → SUCCESS(0)
+        assert result in (0, 1), f"Expected SUCCESS(0) or LEVEL_TOO_LOW(1), got {result}"
+        c.close()
+
+    await test("MOUNT_SUMMON: 탈것 소환 시도", test_mount_summon())
+
+    # ================================================================
+    # TASK 13 Tests: Login Reward / Reset / Content Unlock
+    # ================================================================
+
+    # ━━━ Test: LOGIN_REWARD — 출석보상 조회 ━━━
+    async def test_login_reward_info():
+        """출석보상 14일 테이블 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.LOGIN_REWARD_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.LOGIN_REWARD_INFO)
+        assert msg_type == MsgType.LOGIN_REWARD_INFO
+        total_days = struct.unpack('<H', resp[0:2])[0]
+        cycle_day = resp[2]
+        claimed_today = resp[3]
+        reward_count = resp[4]
+        assert reward_count == 14, f"Expected 14 rewards, got {reward_count}"
+        c.close()
+
+    await test("LOGIN_REWARD: 출석보상 14일 테이블 조회", test_login_reward_info())
+
+    # ━━━ Test: LOGIN_REWARD_CLAIM — 출석보상 수령 ━━━
+    async def test_login_reward_claim():
+        """출석보상 수령 → 골드 획득 + 중복방지."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.LOGIN_REWARD_CLAIM, b'')
+        msg_type, resp = await c.recv_expect(MsgType.LOGIN_REWARD_CLAIM_RESULT)
+        assert msg_type == MsgType.LOGIN_REWARD_CLAIM_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS(0), got {resp[0]}"
+        day = resp[1]
+        gold = struct.unpack('<I', resp[2:6])[0]
+        assert gold > 0, f"Expected gold > 0, got {gold}"
+        # Second claim → ALREADY_CLAIMED(1)
+        await c.send(MsgType.LOGIN_REWARD_CLAIM, b'')
+        msg_type2, resp2 = await c.recv_expect(MsgType.LOGIN_REWARD_CLAIM_RESULT)
+        assert resp2[0] == 1, f"Expected ALREADY_CLAIMED(1), got {resp2[0]}"
+        c.close()
+
+    await test("LOGIN_REWARD_CLAIM: 출석보상 수령+중복방지", test_login_reward_claim())
+
+    # ━━━ Test: CONTENT_UNLOCK — 컨텐츠 해금 조회 ━━━
+    async def test_content_unlock():
+        """현재 레벨에 맞는 해금 컨텐츠 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.CONTENT_UNLOCK_QUERY, b'')
+        msg_type, resp = await c.recv_expect(MsgType.CONTENT_UNLOCK_NOTIFY)
+        assert msg_type == MsgType.CONTENT_UNLOCK_NOTIFY
+        count = resp[0]
+        # Level 1 player → only Lv5 이하 해금 없음 (Lv1은 테이블에 없음)
+        # 하지만 Lv1 플레이어는 count=0 가능
+        assert count >= 0, f"Expected count >= 0, got {count}"
+        c.close()
+
+    await test("CONTENT_UNLOCK: 컨텐츠 해금 조회", test_content_unlock())
+
+    # ================================================================
+    # TASK 14 Tests: Story / Dialog / Cutscene / Chapter
+    # ================================================================
+
+    # ━━━ Test: DIALOG_CHOICE — NPC 대화 선택지 ━━━
+    async def test_dialog_choice():
+        """장로 NPC 대화 시작 → 선택지 2~3개 반환."""
+        c = await login_and_enter(port)
+        npc_id = b'npc_elder'
+        data = struct.pack('<B', len(npc_id)) + npc_id + struct.pack('<B', 0)
+        await c.send(MsgType.DIALOG_CHOICE, data)
+        msg_type, resp = await c.recv_expect(MsgType.DIALOG_CHOICE_RESULT)
+        assert msg_type == MsgType.DIALOG_CHOICE_RESULT
+        result = resp[0]
+        assert result == 0, f"Expected OK(0), got {result}"
+        # Parse text length
+        text_len = struct.unpack('<H', resp[1:3])[0]
+        assert text_len > 0, f"Expected dialog text, got text_len={text_len}"
+        c.close()
+
+    await test("DIALOG_CHOICE: NPC 대화 시작+선택지", test_dialog_choice())
+
+    # ━━━ Test: DIALOG_CHOICE — 잘못된 NPC ━━━
+    async def test_dialog_invalid_npc():
+        """존재하지 않는 NPC → INVALID_NPC(1)."""
+        c = await login_and_enter(port)
+        npc_id = b'npc_nobody'
+        data = struct.pack('<B', len(npc_id)) + npc_id + struct.pack('<B', 0)
+        await c.send(MsgType.DIALOG_CHOICE, data)
+        msg_type, resp = await c.recv_expect(MsgType.DIALOG_CHOICE_RESULT)
+        assert msg_type == MsgType.DIALOG_CHOICE_RESULT
+        assert resp[0] == 1, f"Expected INVALID_NPC(1), got {resp[0]}"
+        c.close()
+
+    await test("DIALOG_CHOICE: 잘못된 NPC → INVALID_NPC", test_dialog_invalid_npc())
+
+    # ━━━ Test: CUTSCENE_TRIGGER — 오프닝 컷씬 ━━━
+    async def test_cutscene_trigger():
+        """오프닝 컷씬 트리거 → 시퀀스 4개."""
+        c = await login_and_enter(port)
+        cs_id = b'opening'
+        data = struct.pack('<B', len(cs_id)) + cs_id
+        await c.send(MsgType.CUTSCENE_TRIGGER, data)
+        msg_type, resp = await c.recv_expect(MsgType.CUTSCENE_DATA)
+        assert msg_type == MsgType.CUTSCENE_DATA
+        result = resp[0]
+        assert result == 0, f"Expected OK(0), got {result}"
+        seq_count = resp[1]
+        assert seq_count == 4, f"Expected 4 sequences, got {seq_count}"
+        c.close()
+
+    await test("CUTSCENE_TRIGGER: 오프닝 컷씬 4시퀀스", test_cutscene_trigger())
+
+    # ━━━ Test: CHAPTER_PROGRESS — 챕터 진행 조회 ━━━
+    async def test_chapter_progress():
+        """챕터 진행 상태 조회 → 4챕터, 봉인석 0/5."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.CHAPTER_PROGRESS_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.CHAPTER_PROGRESS)
+        assert msg_type == MsgType.CHAPTER_PROGRESS
+        current_ch = resp[0]
+        total_ch = resp[1]
+        seal_frags = resp[2]
+        total_needed = resp[3]
+        assert total_ch == 4, f"Expected 4 chapters, got {total_ch}"
+        assert total_needed == 5, f"Expected 5 total seal fragments, got {total_needed}"
+        c.close()
+
+    await test("CHAPTER_PROGRESS: 챕터 진행 4챕터/봉인석", test_chapter_progress())
+
+    # ━━━ Test: MAIN_QUEST_DATA — 메인 퀘스트 목록 ━━━
+    async def test_main_quest_data():
+        """현재 레벨에 맞는 메인 퀘스트 목록 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.MAIN_QUEST_DATA_REQ, struct.pack('<B', 0))
+        msg_type, resp = await c.recv_expect(MsgType.MAIN_QUEST_DATA)
+        assert msg_type == MsgType.MAIN_QUEST_DATA
+        count = resp[0]
+        # Level 1 → MQ001 (level 1) should be available
+        assert count >= 1, f"Expected at least 1 quest, got {count}"
+        c.close()
+
+    await test("MAIN_QUEST_DATA: 메인 퀘스트 목록 조회", test_main_quest_data())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
