@@ -17,7 +17,9 @@ from tcp_bridge import (
     PACKET_HEADER_SIZE, MAX_PACKET_SIZE,
     CRAFTING_RECIPES, GATHER_TYPES, COOKING_RECIPES,
     ENCHANT_ELEMENTS, ENCHANT_LEVELS,
-    GATHER_ENERGY_MAX, GATHER_ENERGY_COST
+    GATHER_ENERGY_MAX, GATHER_ENERGY_COST,
+    AUCTION_TAX_RATE, AUCTION_LISTING_FEE,
+    AUCTION_MAX_LISTINGS, DAILY_GOLD_CAPS
 )
 
 
@@ -1461,6 +1463,103 @@ async def run_tests(port: int):
         c.close()
 
     await test("ENCHANT: 인챈트 성공 (fire Lv1)", test_enchant_success())
+
+
+    # ---- TASK 3: Auction House Tests (S044) ----
+
+    async def test_auction_register():
+        """거래소 등록: 아이템 추가 후 등록. listing_fee 100g 차감."""
+        c = await login_and_enter(port)
+        # 아이템 추가 (slot 0: item_id=301, count=1)
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', 301, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        # 등록: slot=0, count=1, buyout=5000g, category=0(weapon)
+        await c.send(MsgType.AUCTION_REGISTER, struct.pack('<BBIB', 0, 1, 5000, 0))
+        msg_type, resp = await c.recv_expect(MsgType.AUCTION_REGISTER_RESULT)
+        assert msg_type == MsgType.AUCTION_REGISTER_RESULT, f"Expected AUCTION_REGISTER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        auction_id = struct.unpack_from('<I', resp, 1)[0]
+        assert auction_id > 0, f"Expected valid auction_id, got {auction_id}"
+        c.close()
+
+    await test("AUCTION_REGISTER: 아이템 등록 성공", test_auction_register())
+
+    async def test_auction_register_no_fee():
+        """거래소 등록 실패: 골드 부족 (listing fee)."""
+        c = await login_and_enter(port)
+        # 골드 소진: SHOP_BUY (npc_id:u32 + item_id:u32 + count:u16)
+        # shop 2 = WeaponShop, item 202 = 1000g (한 번에 전액 소진)
+        await c.send(MsgType.SHOP_BUY, struct.pack('<IIH', 2, 202, 1))
+        await c.recv_expect(MsgType.SHOP_RESULT)
+        await asyncio.sleep(0.1)
+        # gold=0 now. 아이템 추가 (별도 슬롯에)
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', 301, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        # 등록 시도 — slot 1 (ITEM_ADD가 빈 슬롯에 넣음), gold=0, listing_fee=100 필요
+        await c.send(MsgType.AUCTION_REGISTER, struct.pack('<BBIB', 1, 1, 5000, 0))
+        msg_type, resp = await c.recv_expect(MsgType.AUCTION_REGISTER_RESULT)
+        assert msg_type == MsgType.AUCTION_REGISTER_RESULT
+        result = resp[0]
+        assert result == 4, f"Expected NO_FEE_GOLD(4), got {result}"
+        c.close()
+
+    await test("AUCTION_REGISTER_FAIL: 골드 부족", test_auction_register_no_fee())
+
+    async def test_auction_list():
+        """거래소 목록 조회."""
+        # 먼저 등록 1건
+        c1 = await login_and_enter(port)
+        await c1.send(MsgType.ITEM_ADD, struct.pack('<IH', 301, 1))
+        await c1.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c1.send(MsgType.AUCTION_REGISTER, struct.pack('<BBIB', 0, 1, 3000, 0))
+        await c1.recv_expect(MsgType.AUCTION_REGISTER_RESULT)
+        # 목록 조회: category=0xFF(all), page=0, sort=0(price_asc)
+        await c1.send(MsgType.AUCTION_LIST_REQ, struct.pack('<BBB', 0xFF, 0, 0))
+        msg_type, resp = await c1.recv_expect(MsgType.AUCTION_LIST)
+        assert msg_type == MsgType.AUCTION_LIST, f"Expected AUCTION_LIST, got {msg_type}"
+        total_count = struct.unpack_from('<H', resp, 0)[0]
+        assert total_count >= 1, f"Expected at least 1 listing, got {total_count}"
+        item_count = resp[4]
+        assert item_count >= 1, f"Expected at least 1 item in page, got {item_count}"
+        c1.close()
+
+    await test("AUCTION_LIST: 목록 조회", test_auction_list())
+
+    async def test_auction_buy():
+        """거래소 즉시 구매: 등록 후 다른 계정으로 구매."""
+        # 판매자: 아이템 등록
+        c_seller = await login_and_enter(port)
+        await c_seller.send(MsgType.ITEM_ADD, struct.pack('<IH', 501, 1))
+        await c_seller.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c_seller.send(MsgType.AUCTION_REGISTER, struct.pack('<BBIB', 0, 1, 500, 3))
+        msg_type, resp = await c_seller.recv_expect(MsgType.AUCTION_REGISTER_RESULT)
+        assert resp[0] == 0, "Seller register should succeed"
+        auction_id = struct.unpack_from('<I', resp, 1)[0]
+        # 구매자 (같은 계정이지만 테스트 용도)
+        # 같은 계정은 self_buy 에러이므로, 목록 조회 후 검증만
+        # 대신 self_buy 에러를 확인
+        await c_seller.send(MsgType.AUCTION_BUY, struct.pack('<I', auction_id))
+        msg_type, resp = await c_seller.recv_expect(MsgType.AUCTION_BUY_RESULT)
+        assert msg_type == MsgType.AUCTION_BUY_RESULT
+        result = resp[0]
+        assert result == 2, f"Expected SELF_BUY(2), got {result}"
+        c_seller.close()
+
+    await test("AUCTION_BUY: 본인 구매 차단", test_auction_buy())
+
+    async def test_auction_bid():
+        """거래소 입찰: 존재하지 않는 경매 입찰 시 NOT_FOUND."""
+        c = await login_and_enter(port)
+        # 존재하지 않는 경매에 입찰
+        await c.send(MsgType.AUCTION_BID, struct.pack('<II', 99999, 100))
+        msg_type, resp = await c.recv_expect(MsgType.AUCTION_BID_RESULT)
+        assert msg_type == MsgType.AUCTION_BID_RESULT, f"Expected AUCTION_BID_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 1, f"Expected NOT_FOUND(1), got {result}"
+        c.close()
+
+    await test("AUCTION_BID: 존재하지 않는 경매 입찰", test_auction_bid())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

@@ -280,6 +280,16 @@ class MsgType(IntEnum):
     ENCHANT_REQ = 388
     ENCHANT_RESULT = 389  # 레이드 공격 결과
 
+    # Auction House / Economy (TASK 3)
+    AUCTION_LIST_REQ = 390
+    AUCTION_LIST = 391
+    AUCTION_REGISTER = 392
+    AUCTION_REGISTER_RESULT = 393
+    AUCTION_BUY = 394
+    AUCTION_BUY_RESULT = 395
+    AUCTION_BID = 396
+    AUCTION_BID_RESULT = 397
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -389,6 +399,19 @@ class PlayerSession:
     trade_gold: int = 0
     trade_confirmed: bool = False
     tutorial_steps: Set[int] = field(default_factory=set)  # completed step IDs
+    crafting_level: int = 1           # crafting proficiency
+    crafting_exp: int = 0             # crafting exp
+    gathering_level: int = 1          # gathering proficiency
+    gathering_exp: int = 0            # gathering exp
+    cooking_level: int = 1            # cooking proficiency
+    energy: int = 200                 # gathering energy (max:200)
+    energy_last_regen: float = 0.0    # last energy regen time
+    food_buff: dict = field(default_factory=dict)  # current food buff
+    weapon_enchant: dict = field(default_factory=dict)  # {slot: {element, level}}
+    # Auction House & Economy (TASK 3)
+    auction_listings: int = 0             # current listing count
+    daily_gold_earned: dict = field(default_factory=lambda: {"monster": 0, "dungeon": 0, "quest": 0, "total": 0})  # daily gold tracking
+    daily_gold_reset_date: str = ""       # last reset date (YYYY-MM-DD)
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -603,6 +626,127 @@ ENHANCE_TABLE = {
 }
 ENHANCE_COST_BASE = 500  # 강화 비용 = base * level
 
+# ---- Crafting System Data (GDD crafting.yaml) ----
+CRAFTING_RECIPES = {
+    "iron_sword": {
+        "id": "iron_sword", "name": "Iron Sword", "category": "weapon",
+        "proficiency_required": 1,
+        "materials": [{"item": "iron_ore", "count": 5}, {"item": "wood", "count": 2}],
+        "gold_cost": 200, "craft_time": 5, "success_rate": 1.0,
+        "result": {"item_id": 301, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+    "steel_sword": {
+        "id": "steel_sword", "name": "Steel Sword", "category": "weapon",
+        "proficiency_required": 10,
+        "materials": [{"item": "steel_ingot", "count": 3}, {"item": "leather", "count": 2}, {"item": "iron_sword", "count": 1}],
+        "gold_cost": 1000, "craft_time": 10, "success_rate": 0.9,
+        "result": {"item_id": 302, "count": 1},
+        "bonus_option_chance": 0.2,
+    },
+    "hp_potion_s": {
+        "id": "hp_potion_s", "name": "HP Potion (S)", "category": "potion",
+        "proficiency_required": 1,
+        "materials": [{"item": "herb", "count": 3}],
+        "gold_cost": 20, "craft_time": 2, "success_rate": 1.0,
+        "result": {"item_id": 201, "count": 3},
+        "bonus_option_chance": 0.0,
+    },
+    "hp_potion_l": {
+        "id": "hp_potion_l", "name": "HP Potion (L)", "category": "potion",
+        "proficiency_required": 15,
+        "materials": [{"item": "rare_herb", "count": 5}, {"item": "crystal_water", "count": 1}],
+        "gold_cost": 200, "craft_time": 5, "success_rate": 0.8,
+        "result": {"item_id": 202, "count": 3},
+        "bonus_option_chance": 0.0,
+    },
+    "polished_ruby": {
+        "id": "polished_ruby", "name": "Polished Ruby", "category": "gem",
+        "proficiency_required": 10,
+        "materials": [{"item": "rough_ruby", "count": 3}],
+        "gold_cost": 100, "craft_time": 5, "success_rate": 1.0,
+        "result": {"item_id": 501, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+    "steel_ingot": {
+        "id": "steel_ingot", "name": "Steel Ingot", "category": "material",
+        "proficiency_required": 5,
+        "materials": [{"item": "iron_ore", "count": 3}, {"item": "coal", "count": 1}],
+        "gold_cost": 50, "craft_time": 3, "success_rate": 1.0,
+        "result": {"item_id": 601, "count": 1},
+        "bonus_option_chance": 0.0,
+    },
+}
+
+GATHER_TYPES = {
+    1: {"name": "herbalism", "gather_time": 3.0, "exp": 5, "loot": [
+        {"item_id": 701, "name": "herb", "chance": 0.80},
+        {"item_id": 702, "name": "rare_herb", "chance": 0.15},
+        {"item_id": 703, "name": "legendary_herb", "chance": 0.05},
+    ]},
+    2: {"name": "mining", "gather_time": 5.0, "exp": 8, "loot": [
+        {"item_id": 711, "name": "iron_ore", "chance": 0.70},
+        {"item_id": 712, "name": "gold_ore", "chance": 0.20},
+        {"item_id": 713, "name": "crystal", "chance": 0.08},
+        {"item_id": 714, "name": "diamond_ore", "chance": 0.02},
+    ]},
+    3: {"name": "logging", "gather_time": 4.0, "exp": 6, "loot": [
+        {"item_id": 721, "name": "wood", "chance": 0.80},
+        {"item_id": 722, "name": "hardwood", "chance": 0.15},
+        {"item_id": 723, "name": "world_tree_branch", "chance": 0.05},
+    ]},
+}
+GATHER_ENERGY_MAX = 200
+GATHER_ENERGY_COST = 5
+GATHER_ENERGY_REGEN = 1  # per minute
+
+COOKING_RECIPES = {
+    "grilled_meat": {
+        "id": "grilled_meat", "name": "Grilled Meat",
+        "materials": [{"item": "raw_meat", "count": 3}],
+        "effect": {"atk": 10}, "duration": 1800,
+        "proficiency_required": 1,
+        "result_item_id": 801,
+    },
+    "fish_stew": {
+        "id": "fish_stew", "name": "Fish Stew",
+        "materials": [{"item": "fish", "count": 2}, {"item": "herb", "count": 1}],
+        "effect": {"max_hp": 200, "hp_regen": 5}, "duration": 1800,
+        "proficiency_required": 5,
+        "result_item_id": 802,
+    },
+    "royal_feast": {
+        "id": "royal_feast", "name": "Royal Feast",
+        "materials": [{"item": "rare_meat", "count": 2}, {"item": "rare_herb", "count": 2}, {"item": "spice", "count": 1}],
+        "effect": {"all_stats": 5, "exp_bonus": 0.05}, "duration": 3600,
+        "proficiency_required": 20,
+        "result_item_id": 803,
+    },
+}
+
+ENCHANT_ELEMENTS = ["fire", "ice", "lightning", "dark", "holy", "nature"]
+ENCHANT_LEVELS = {
+    1: {"damage_bonus": 0.05, "material_cost": 5, "gold_cost": 1000},
+    2: {"damage_bonus": 0.10, "material_cost": 10, "gold_cost": 3000},
+    3: {"damage_bonus": 0.15, "material_cost": 20, "gold_cost": 10000},
+}
+
+# ---- Auction House Constants (GDD economy.yaml) ----
+AUCTION_TAX_RATE = 0.05       # 5% seller tax
+AUCTION_LISTING_FEE = 100     # 100 gold listing fee (non-refundable)
+AUCTION_MAX_LISTINGS = 20     # max concurrent listings per player
+AUCTION_DURATION_HOURS = 48   # 48h auto-expire
+AUCTION_MIN_PRICE = 1
+AUCTION_MAX_PRICE = 99999999
+
+# Daily gold caps (economy.yaml inflation_control)
+DAILY_GOLD_CAPS = {
+    "monster": 50000,
+    "dungeon": 30000,
+    "quest": 20000,
+    "total": 100000,
+}
+
 # ──── 던전 목록 데이터 (P2_S03_S01) ────
 DUNGEON_LIST_DATA = [
     {"id": 1, "name": "고블린 동굴",    "type": "party", "min_level": 15, "stages": 3, "zone_id": 100, "party_size": 4, "boss_id": 3004, "boss_hp": 30000},
@@ -709,6 +853,8 @@ class BridgeServer:
         self.trades: Dict[int, dict] = {}  # entity_id -> trade session
         self.mails: Dict[int, List[dict]] = {}  # account_id -> mail list
         self.next_mail_id = 1
+        self.auction_listings: list = []   # [{id, seller_account, seller_name, item_id, item_count, buyout_price, bid_price, highest_bidder, highest_bidder_name, bid_account, category, listed_at, expires_at}]
+        self.next_auction_id: int = 1
         self.characters: Dict[int, List[dict]] = {}  # account_id -> character list
         self.next_char_id = 1
         self.npcs: Dict[int, dict] = {}  # entity_id -> npc data
@@ -940,7 +1086,11 @@ class BridgeServer:
             MsgType.GATHER_START: self._on_gather_start,
             MsgType.COOK_EXECUTE: self._on_cook_execute,
             MsgType.ENCHANT_REQ: self._on_enchant_req,
-        }
+
+            MsgType.AUCTION_LIST_REQ: self._on_auction_list_req,
+            MsgType.AUCTION_REGISTER: self._on_auction_register,
+            MsgType.AUCTION_BUY: self._on_auction_buy,
+            MsgType.AUCTION_BID: self._on_auction_bid,        }
 
         handler = handlers.get(msg_type)
         if handler:
@@ -3392,6 +3542,577 @@ class BridgeServer:
 
     # ━━━ 몬스터 시스템 ━━━
 
+
+
+    # ---- Auction House System (TASK 3: MsgType 390-397) ----
+
+    def _clean_expired_auctions(self):
+        """Remove expired auctions, return items/gold via mail."""
+        import time as _t
+        now = _t.time()
+        still_active = []
+        for listing in self.auction_listings:
+            if now >= listing["expires_at"]:
+                # Expired: return item to seller via mail
+                seller_acc = listing["seller_account"]
+                mail_id = self.next_mail_id
+                self.next_mail_id += 1
+                mail = {
+                    "id": mail_id,
+                    "sender_name": "Auction House",
+                    "sender_account": 0,
+                    "subject": "Expired Listing",
+                    "body": f"Your listing has expired.",
+                    "gold": 0,
+                    "item_id": listing["item_id"],
+                    "item_count": listing["item_count"],
+                    "read": False,
+                    "claimed": False,
+                    "sent_time": now,
+                    "expires": now + 7 * 86400,
+                }
+                if seller_acc not in self.mails:
+                    self.mails[seller_acc] = []
+                self.mails[seller_acc].append(mail)
+                # If there was a highest bidder, refund them
+                if listing.get("bid_account", 0) > 0:
+                    bid_acc = listing["bid_account"]
+                    refund_mail_id = self.next_mail_id
+                    self.next_mail_id += 1
+                    refund_mail = {
+                        "id": refund_mail_id,
+                        "sender_name": "Auction House",
+                        "sender_account": 0,
+                        "subject": "Bid Refund",
+                        "body": "Auction expired. Your bid has been refunded.",
+                        "gold": listing["bid_price"],
+                        "item_id": 0,
+                        "item_count": 0,
+                        "read": False,
+                        "claimed": False,
+                        "sent_time": now,
+                        "expires": now + 7 * 86400,
+                    }
+                    if bid_acc not in self.mails:
+                        self.mails[bid_acc] = []
+                    self.mails[bid_acc].append(refund_mail)
+                # Decrement seller listing count
+                for s in self.sessions.values():
+                    if s.account_id == seller_acc:
+                        s.auction_listings = max(0, s.auction_listings - 1)
+                self.log(f"Auction: expired listing #{listing['id']} ({listing['item_id']})", "ECON")
+            else:
+                still_active.append(listing)
+        self.auction_listings = still_active
+
+    async def _on_auction_list_req(self, session: PlayerSession, payload: bytes):
+        """AUCTION_LIST_REQ(390): category(u8) + page(u8) + sort_by(u8).
+        category: 0xFF=all, 0=weapon, 1=armor, 2=potion, 3=gem, 4=material, 5=etc
+        sort_by: 0=price_asc, 1=price_desc, 2=newest
+        Returns page of 20 items."""
+        if not session.in_game:
+            return
+        if len(payload) < 3:
+            return
+        category = payload[0]
+        page = payload[1]
+        sort_by = payload[2]
+
+        self._clean_expired_auctions()
+
+        # Filter by category
+        filtered = []
+        for listing in self.auction_listings:
+            if category != 0xFF and listing.get("category", 0xFF) != category:
+                continue
+            filtered.append(listing)
+
+        # Sort
+        if sort_by == 0:  # price asc
+            filtered.sort(key=lambda x: x["buyout_price"])
+        elif sort_by == 1:  # price desc
+            filtered.sort(key=lambda x: x["buyout_price"], reverse=True)
+        elif sort_by == 2:  # newest
+            filtered.sort(key=lambda x: x["listed_at"], reverse=True)
+
+        # Paginate (20 per page)
+        page_size = 20
+        total_count = len(filtered)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start = page * page_size
+        end = min(start + page_size, total_count)
+        page_items = filtered[start:end] if start < total_count else []
+
+        # Build response: total_count(u16) + total_pages(u8) + current_page(u8) + item_count(u8) + items
+        parts = [struct.pack("<HBBB", total_count, total_pages, page, len(page_items))]
+        for item in page_items:
+            # auction_id(u32) + item_id(u16) + item_count(u8) + buyout_price(u32) + bid_price(u32) + seller_name_len(u8) + seller_name
+            seller_bytes = item["seller_name"].encode("utf-8")[:20]
+            parts.append(struct.pack("<IHBIIB", item["id"], item["item_id"], item["item_count"],
+                                     item["buyout_price"], item["bid_price"], len(seller_bytes)))
+            parts.append(seller_bytes)
+
+        self._send(session, MsgType.AUCTION_LIST, b"".join(parts))
+        self.log(f"AuctionList: {session.char_name} cat={category} page={page} sort={sort_by} -> {len(page_items)} items", "ECON")
+
+    async def _on_auction_register(self, session: PlayerSession, payload: bytes):
+        """AUCTION_REGISTER(392): slot_index(u8) + count(u8) + buyout_price(u32) + category(u8).
+        Result codes: 0=ok, 1=not_in_game, 2=no_item, 3=max_listings, 4=no_fee_gold, 5=invalid_price"""
+        if not session.in_game:
+            self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 1, 0))
+            return
+        if len(payload) < 7:
+            return
+        slot_idx = payload[0]
+        count = payload[1]
+        buyout_price = struct.unpack_from("<I", payload, 2)[0]
+        category = payload[6]
+
+        # Validate
+        if slot_idx >= len(session.inventory) or session.inventory[slot_idx].item_id == 0:
+            self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 2, 0))
+            return
+        if session.auction_listings >= AUCTION_MAX_LISTINGS:
+            self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 3, 0))
+            return
+        if session.gold < AUCTION_LISTING_FEE:
+            self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 4, 0))
+            return
+        if buyout_price < AUCTION_MIN_PRICE or buyout_price > AUCTION_MAX_PRICE:
+            self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 5, 0))
+            return
+
+        # Deduct listing fee
+        session.gold -= AUCTION_LISTING_FEE
+
+        # Remove item from inventory
+        item_id = session.inventory[slot_idx].item_id
+        item_count = min(count, session.inventory[slot_idx].count)
+        session.inventory[slot_idx].count -= item_count
+        if session.inventory[slot_idx].count <= 0:
+            session.inventory[slot_idx].item_id = 0
+            session.inventory[slot_idx].count = 0
+
+        import time as _t
+        now = _t.time()
+        auction_id = self.next_auction_id
+        self.next_auction_id += 1
+
+        listing = {
+            "id": auction_id,
+            "seller_account": session.account_id,
+            "seller_name": session.char_name,
+            "item_id": item_id,
+            "item_count": item_count,
+            "buyout_price": buyout_price,
+            "bid_price": 0,
+            "highest_bidder": 0,
+            "highest_bidder_name": "",
+            "bid_account": 0,
+            "category": category,
+            "listed_at": now,
+            "expires_at": now + AUCTION_DURATION_HOURS * 3600,
+        }
+        self.auction_listings.append(listing)
+        session.auction_listings += 1
+
+        self._send(session, MsgType.AUCTION_REGISTER_RESULT, struct.pack("<BI", 0, auction_id))
+        self.log(f"AuctionReg: {session.char_name} listed item={item_id}x{item_count} buyout={buyout_price}g (id={auction_id})", "ECON")
+
+    async def _on_auction_buy(self, session: PlayerSession, payload: bytes):
+        """AUCTION_BUY(394): auction_id(u32).
+        Instant buyout. Result: 0=ok, 1=not_found, 2=self_buy, 3=no_gold"""
+        if not session.in_game:
+            return
+        if len(payload) < 4:
+            return
+        auction_id = struct.unpack_from("<I", payload, 0)[0]
+
+        self._clean_expired_auctions()
+
+        # Find listing
+        listing = None
+        listing_idx = -1
+        for i, l in enumerate(self.auction_listings):
+            if l["id"] == auction_id:
+                listing = l
+                listing_idx = i
+                break
+
+        if listing is None:
+            self._send(session, MsgType.AUCTION_BUY_RESULT, struct.pack("<BI", 1, 0))
+            return
+
+        # Can't buy own listing
+        if listing["seller_account"] == session.account_id:
+            self._send(session, MsgType.AUCTION_BUY_RESULT, struct.pack("<BI", 2, 0))
+            return
+
+        price = listing["buyout_price"]
+        if session.gold < price:
+            self._send(session, MsgType.AUCTION_BUY_RESULT, struct.pack("<BI", 3, 0))
+            return
+
+        # Deduct gold from buyer
+        session.gold -= price
+
+        # Give item to buyer
+        for slot in session.inventory:
+            if slot.item_id == 0:
+                slot.item_id = listing["item_id"]
+                slot.count = listing["item_count"]
+                break
+
+        # Calculate seller proceeds (5% tax)
+        tax = int(price * AUCTION_TAX_RATE)
+        proceeds = price - tax
+
+        # Send gold to seller via mail
+        import time as _t
+        seller_acc = listing["seller_account"]
+        mail_id = self.next_mail_id
+        self.next_mail_id += 1
+        mail = {
+            "id": mail_id,
+            "sender_name": "Auction House",
+            "sender_account": 0,
+            "subject": "Item Sold",
+            "body": f"Your item sold for {price}g (tax: {tax}g).",
+            "gold": proceeds,
+            "item_id": 0,
+            "item_count": 0,
+            "read": False,
+            "claimed": False,
+            "sent_time": _t.time(),
+            "expires": _t.time() + 7 * 86400,
+        }
+        if seller_acc not in self.mails:
+            self.mails[seller_acc] = []
+        self.mails[seller_acc].append(mail)
+
+        # If there was a previous bidder, refund them
+        if listing.get("bid_account", 0) > 0:
+            bid_acc = listing["bid_account"]
+            refund_id = self.next_mail_id
+            self.next_mail_id += 1
+            refund_mail = {
+                "id": refund_id,
+                "sender_name": "Auction House",
+                "sender_account": 0,
+                "subject": "Bid Refund",
+                "body": "Item was bought out. Your bid has been refunded.",
+                "gold": listing["bid_price"],
+                "item_id": 0,
+                "item_count": 0,
+                "read": False,
+                "claimed": False,
+                "sent_time": _t.time(),
+                "expires": _t.time() + 7 * 86400,
+            }
+            if bid_acc not in self.mails:
+                self.mails[bid_acc] = []
+            self.mails[bid_acc].append(refund_mail)
+
+        # Remove listing
+        self.auction_listings.pop(listing_idx)
+        # Decrement seller listing count
+        for s in self.sessions.values():
+            if s.account_id == seller_acc:
+                s.auction_listings = max(0, s.auction_listings - 1)
+
+        self._send(session, MsgType.AUCTION_BUY_RESULT, struct.pack("<BI", 0, auction_id))
+        self.log(f"AuctionBuy: {session.char_name} bought #{auction_id} for {price}g (tax={tax}g, seller gets {proceeds}g)", "ECON")
+
+    async def _on_auction_bid(self, session: PlayerSession, payload: bytes):
+        """AUCTION_BID(396): auction_id(u32) + bid_amount(u32).
+        Result: 0=ok, 1=not_found, 2=self_bid, 3=no_gold, 4=bid_too_low"""
+        if not session.in_game:
+            return
+        if len(payload) < 8:
+            return
+        auction_id = struct.unpack_from("<I", payload, 0)[0]
+        bid_amount = struct.unpack_from("<I", payload, 4)[0]
+
+        self._clean_expired_auctions()
+
+        # Find listing
+        listing = None
+        for l in self.auction_listings:
+            if l["id"] == auction_id:
+                listing = l
+                break
+
+        if listing is None:
+            self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 1, 0))
+            return
+
+        if listing["seller_account"] == session.account_id:
+            self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 2, 0))
+            return
+
+        if session.gold < bid_amount:
+            self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 3, 0))
+            return
+
+        # Must be higher than current bid (or at least 1 if no bids)
+        min_bid = max(listing["bid_price"] + 1, 1)
+        if bid_amount < min_bid:
+            self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 4, 0))
+            return
+
+        # Can't bid more than buyout price
+        if bid_amount >= listing["buyout_price"]:
+            self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 4, 0))
+            return
+
+        # Refund previous bidder
+        import time as _t
+        if listing.get("bid_account", 0) > 0 and listing["bid_account"] != session.account_id:
+            old_bid_acc = listing["bid_account"]
+            refund_id = self.next_mail_id
+            self.next_mail_id += 1
+            refund_mail = {
+                "id": refund_id,
+                "sender_name": "Auction House",
+                "sender_account": 0,
+                "subject": "Outbid Refund",
+                "body": f"You were outbid. Your {listing['bid_price']}g has been refunded.",
+                "gold": listing["bid_price"],
+                "item_id": 0,
+                "item_count": 0,
+                "read": False,
+                "claimed": False,
+                "sent_time": _t.time(),
+                "expires": _t.time() + 7 * 86400,
+            }
+            if old_bid_acc not in self.mails:
+                self.mails[old_bid_acc] = []
+            self.mails[old_bid_acc].append(refund_mail)
+
+        # Deduct gold from new bidder
+        session.gold -= bid_amount
+
+        # Update listing
+        listing["bid_price"] = bid_amount
+        listing["bid_account"] = session.account_id
+        listing["highest_bidder"] = session.entity_id
+        listing["highest_bidder_name"] = session.char_name
+
+        self._send(session, MsgType.AUCTION_BID_RESULT, struct.pack("<BI", 0, auction_id))
+        self.log(f"AuctionBid: {session.char_name} bid {bid_amount}g on #{auction_id}", "ECON")
+
+    def _check_daily_gold_cap(self, session, source, amount):
+        """Check and apply daily gold cap. Returns actual gold to give."""
+        import time as _t, datetime as _dt
+        today = _dt.date.today().isoformat()
+        if session.daily_gold_reset_date != today:
+            session.daily_gold_earned = {"monster": 0, "dungeon": 0, "quest": 0, "total": 0}
+            session.daily_gold_reset_date = today
+
+        # Check source cap
+        source_cap = DAILY_GOLD_CAPS.get(source, 999999999)
+        total_cap = DAILY_GOLD_CAPS["total"]
+
+        source_remaining = max(0, source_cap - session.daily_gold_earned.get(source, 0))
+        total_remaining = max(0, total_cap - session.daily_gold_earned.get("total", 0))
+
+        actual = min(amount, source_remaining, total_remaining)
+        if actual > 0:
+            session.daily_gold_earned[source] = session.daily_gold_earned.get(source, 0) + actual
+            session.daily_gold_earned["total"] = session.daily_gold_earned.get("total", 0) + actual
+        return actual
+
+
+    # ---- Crafting/Gathering/Cooking/Enchanting System (TASK 2: MsgType 380-389) ----
+
+    def _regen_energy(self, session):
+        """Energy regen (1/min)"""
+        import time as _t
+        now = _t.time()
+        if session.energy_last_regen == 0.0:
+            session.energy_last_regen = now
+            return
+        elapsed_min = (now - session.energy_last_regen) / 60.0
+        regen = int(elapsed_min * GATHER_ENERGY_REGEN)
+        if regen > 0:
+            session.energy = min(GATHER_ENERGY_MAX, session.energy + regen)
+            session.energy_last_regen = now
+
+    async def _on_craft_list_req(self, session: PlayerSession, payload: bytes):
+        """CRAFT_LIST_REQ(380): category(u8). proficiency_level filtered recipe list."""
+        if not session.in_game:
+            return
+        category_filter = payload[0] if len(payload) >= 1 else 0xFF
+        cat_map = {0: "weapon", 1: "armor", 2: "potion", 3: "gem", 4: "material"}
+        filter_cat = cat_map.get(category_filter, None)
+        recipes = []
+        for rid, recipe in CRAFTING_RECIPES.items():
+            if recipe["proficiency_required"] > session.crafting_level:
+                continue
+            if filter_cat and recipe["category"] != filter_cat:
+                continue
+            recipes.append(recipe)
+        parts = [struct.pack("<B", len(recipes))]
+        for r in recipes:
+            rid_bytes = r["id"].encode("utf-8")
+            parts.append(struct.pack("<B", len(rid_bytes)))
+            parts.append(rid_bytes)
+            parts.append(struct.pack("<BHB", r["proficiency_required"],
+                                     r["gold_cost"], int(r["success_rate"] * 100)))
+            parts.append(struct.pack("<HB", r["result"]["item_id"], r["result"]["count"]))
+            parts.append(struct.pack("<B", len(r["materials"])))
+        resp = b"".join(parts)
+        self._send(session, MsgType.CRAFT_LIST, resp)
+        self.log(f"CraftList: {session.char_name} got {len(recipes)} recipes (cat={category_filter})", "GAME")
+
+    async def _on_craft_execute(self, session: PlayerSession, payload: bytes):
+        """CRAFT_EXECUTE(382): recipe_id_len(u8) + recipe_id(str). Execute crafting."""
+        if not session.in_game or len(payload) < 2:
+            return
+        rid_len = payload[0]
+        if len(payload) < 1 + rid_len:
+            return
+        recipe_id = payload[1:1 + rid_len].decode("utf-8")
+        recipe = CRAFTING_RECIPES.get(recipe_id)
+        if not recipe:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 1))
+            return
+        if session.crafting_level < recipe["proficiency_required"]:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 2))
+            return
+        if session.gold < recipe["gold_cost"]:
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 3))
+            return
+        session.gold -= recipe["gold_cost"]
+        import random as _rng
+        if _rng.random() > recipe["success_rate"]:
+            self.log(f"Craft: {session.char_name} FAIL {recipe_id}", "GAME")
+            self._send(session, MsgType.CRAFT_RESULT, struct.pack("<B", 5))
+            return
+        result_item_id = recipe["result"]["item_id"]
+        result_count = recipe["result"]["count"]
+        for slot in session.inventory:
+            if slot.item_id == 0:
+                slot.item_id = result_item_id
+                slot.count = result_count
+                break
+        has_bonus = 0
+        if recipe.get("bonus_option_chance", 0) > 0 and _rng.random() < recipe["bonus_option_chance"]:
+            has_bonus = 1
+        session.crafting_exp += recipe["proficiency_required"] * 10
+        while session.crafting_exp >= session.crafting_level * 100 and session.crafting_level < 50:
+            session.crafting_exp -= session.crafting_level * 100
+            session.crafting_level += 1
+            self.log(f"Craft: {session.char_name} proficiency UP -> Lv{session.crafting_level}", "GAME")
+        self.log(f"Craft: {session.char_name} SUCCESS {recipe_id} -> item={result_item_id}x{result_count} bonus={has_bonus}", "GAME")
+        self._send(session, MsgType.CRAFT_RESULT, struct.pack("<BHBB", 0, result_item_id, result_count, has_bonus))
+
+    async def _on_gather_start(self, session: PlayerSession, payload: bytes):
+        """GATHER_START(384): gather_type(u8). Gather with energy cost + loot drop."""
+        if not session.in_game or len(payload) < 1:
+            return
+        gather_type = payload[0]
+        gtype = GATHER_TYPES.get(gather_type)
+        if not gtype:
+            self._send(session, MsgType.GATHER_RESULT, struct.pack("<BB", 1, 0))
+            return
+        self._regen_energy(session)
+        if session.energy < GATHER_ENERGY_COST:
+            self._send(session, MsgType.GATHER_RESULT, struct.pack("<BB", 2, 0))
+            return
+        session.energy -= GATHER_ENERGY_COST
+        import random as _rng
+        dropped_items = []
+        for loot in gtype["loot"]:
+            if _rng.random() < loot["chance"]:
+                dropped_items.append(loot)
+        if not dropped_items and gtype["loot"]:
+            dropped_items.append(gtype["loot"][0])
+        for item in dropped_items:
+            for slot in session.inventory:
+                if slot.item_id == 0:
+                    slot.item_id = item["item_id"]
+                    slot.count = 1
+                    break
+        session.gathering_exp += gtype["exp"]
+        while session.gathering_exp >= session.gathering_level * 50 and session.gathering_level < 30:
+            session.gathering_exp -= session.gathering_level * 50
+            session.gathering_level += 1
+            self.log(f"Gather: {session.char_name} level UP -> Lv{session.gathering_level}", "GAME")
+        self.log(f"Gather: {session.char_name} type={gtype['name']} got {len(dropped_items)} items, energy={session.energy}", "GAME")
+        parts = [struct.pack("<BBB", 0, session.energy, len(dropped_items))]
+        for item in dropped_items:
+            parts.append(struct.pack("<H", item["item_id"]))
+        self._send(session, MsgType.GATHER_RESULT, b"".join(parts))
+
+    async def _on_cook_execute(self, session: PlayerSession, payload: bytes):
+        """COOK_EXECUTE(386): recipe_id_len(u8) + recipe_id(str). Cook + apply buff."""
+        if not session.in_game or len(payload) < 2:
+            return
+        rid_len = payload[0]
+        if len(payload) < 1 + rid_len:
+            return
+        recipe_id = payload[1:1 + rid_len].decode("utf-8")
+        recipe = COOKING_RECIPES.get(recipe_id)
+        if not recipe:
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 1))
+            return
+        if session.cooking_level < recipe["proficiency_required"]:
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 2))
+            return
+        import time as _t
+        if session.food_buff and session.food_buff.get("expires", 0) > _t.time():
+            self._send(session, MsgType.COOK_RESULT, struct.pack("<B", 3))
+            return
+        session.food_buff = {
+            "recipe_id": recipe_id,
+            "effect": recipe["effect"],
+            "expires": _t.time() + recipe["duration"],
+            "duration": recipe["duration"],
+        }
+        self.log(f"Cook: {session.char_name} made {recipe_id}, buff={recipe['effect']} for {recipe['duration']}s", "GAME")
+        effects = recipe["effect"]
+        self._send(session, MsgType.COOK_RESULT, struct.pack("<BHB", 0, recipe["duration"], len(effects)))
+
+    async def _on_enchant_req(self, session: PlayerSession, payload: bytes):
+        """ENCHANT_REQ(388): slot_index(u8) + element_id(u8) + target_level(u8). Weapon enchant."""
+        if not session.in_game or len(payload) < 3:
+            return
+        slot_idx = payload[0]
+        element_id = payload[1]
+        target_level = payload[2]
+        if slot_idx >= len(session.inventory):
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 1, 0))
+            return
+        item = session.inventory[slot_idx]
+        if item.item_id == 0:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 2, 0))
+            return
+        if element_id >= len(ENCHANT_ELEMENTS):
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 3, 0))
+            return
+        level_data = ENCHANT_LEVELS.get(target_level)
+        if not level_data:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 4, 0))
+            return
+        gold_cost = level_data["gold_cost"]
+        existing = session.weapon_enchant.get(slot_idx)
+        if existing:
+            gold_cost = int(gold_cost * 1.5)
+        if session.gold < gold_cost:
+            self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BB", 5, 0))
+            return
+        session.gold -= gold_cost
+        element_name = ENCHANT_ELEMENTS[element_id]
+        session.weapon_enchant[slot_idx] = {
+            "element": element_name,
+            "element_id": element_id,
+            "level": target_level,
+            "damage_bonus": level_data["damage_bonus"],
+        }
+        self.log(f"Enchant: {session.char_name} slot={slot_idx} -> {element_name} Lv{target_level} (cost={gold_cost}g)", "GAME")
+        self._send(session, MsgType.ENCHANT_RESULT, struct.pack("<BBBB", 0, element_id, target_level, int(level_data["damage_bonus"] * 100)))
+
     def _spawn_monsters(self):
         for spawn in MONSTER_SPAWNS:
             eid = new_entity()
@@ -3579,216 +4300,6 @@ def main():
         asyncio.run(server.start())
     except KeyboardInterrupt:
         print("\nServer stopped.")
-
-
-
-# ============================================================
-# S041: Crafting / Gathering / Cooking / Enchant System
-# ============================================================
-# --- S041 PATCHED ---
-
-import random as _rng_crafting
-
-CRAFT_RECIPES = {
-    1: {"name": "Iron Sword", "category": "weapon", "proficiency": 1,
-        "materials": [(1001, 5), (1002, 2)], "gold": 200, "time": 5,
-        "success_rate": 1.0, "result_item": 2001, "result_count": 1, "bonus_chance": 0.0},
-    2: {"name": "Steel Sword", "category": "weapon", "proficiency": 10,
-        "materials": [(1003, 3), (1004, 2), (2001, 1)], "gold": 1000, "time": 10,
-        "success_rate": 0.9, "result_item": 2002, "result_count": 1, "bonus_chance": 0.2},
-    3: {"name": "HP Potion (S)", "category": "potion", "proficiency": 1,
-        "materials": [(1005, 3)], "gold": 20, "time": 2,
-        "success_rate": 1.0, "result_item": 3001, "result_count": 3, "bonus_chance": 0.0},
-    4: {"name": "HP Potion (L)", "category": "potion", "proficiency": 15,
-        "materials": [(1006, 5), (1007, 1)], "gold": 200, "time": 5,
-        "success_rate": 0.8, "result_item": 3002, "result_count": 3, "bonus_chance": 0.0},
-    5: {"name": "Polished Ruby", "category": "gem", "proficiency": 10,
-        "materials": [(1008, 3)], "gold": 100, "time": 5,
-        "success_rate": 1.0, "result_item": 4001, "result_count": 1, "bonus_chance": 0.0},
-    6: {"name": "Iron Armor", "category": "armor", "proficiency": 1,
-        "materials": [(1001, 8), (1004, 3)], "gold": 300, "time": 8,
-        "success_rate": 1.0, "result_item": 2101, "result_count": 1, "bonus_chance": 0.0},
-    7: {"name": "MP Potion (S)", "category": "potion", "proficiency": 1,
-        "materials": [(1005, 2), (1007, 1)], "gold": 30, "time": 2,
-        "success_rate": 1.0, "result_item": 3003, "result_count": 3, "bonus_chance": 0.0},
-    8: {"name": "Mithril Sword", "category": "weapon", "proficiency": 20,
-        "materials": [(1009, 5), (1004, 3), (2002, 1)], "gold": 5000, "time": 15,
-        "success_rate": 0.7, "result_item": 2003, "result_count": 1, "bonus_chance": 0.3},
-}
-
-GATHER_NODES = {
-    1: {"name": "Herb", "type": "herb", "energy": 5, "time": 3.0, "exp": 5,
-        "loot": [(1005, 0.8), (1006, 0.15), (1010, 0.05)]},
-    2: {"name": "Ore", "type": "mining", "energy": 5, "time": 5.0, "exp": 8,
-        "loot": [(1001, 0.7), (1011, 0.2), (1012, 0.08), (1013, 0.02)]},
-    3: {"name": "Wood", "type": "logging", "energy": 5, "time": 4.0, "exp": 6,
-        "loot": [(1002, 0.8), (1014, 0.15), (1015, 0.05)]},
-    4: {"name": "Fishing", "type": "fishing", "energy": 5, "time": 6.0, "exp": 7,
-        "loot": [(1016, 0.6), (1017, 0.25), (1018, 0.1), (1019, 0.05)]},
-}
-
-COOK_RECIPES = {
-    1: {"name": "Grilled Meat", "proficiency": 1,
-        "materials": [(1020, 3)], "gold": 0,
-        "buff_type": "atk", "buff_value": 10, "buff_duration": 1800},
-    2: {"name": "Fish Stew", "proficiency": 5,
-        "materials": [(1016, 2), (1005, 1)], "gold": 0,
-        "buff_type": "hp", "buff_value": 200, "buff_duration": 1800},
-    3: {"name": "Royal Feast", "proficiency": 20,
-        "materials": [(1021, 2), (1006, 2), (1022, 1)], "gold": 50,
-        "buff_type": "all", "buff_value": 5, "buff_duration": 3600},
-}
-
-ENCHANT_ELEMENTS = {1: 'fire', 2: 'ice', 3: 'lightning', 4: 'dark', 5: 'holy', 6: 'nature'}
-ENCHANT_LEVELS = {
-    1: {"damage_bonus": 0.05, "material_count": 5, "gold": 1000},
-    2: {"damage_bonus": 0.10, "material_count": 10, "gold": 3000},
-    3: {"damage_bonus": 0.15, "material_count": 20, "gold": 10000},
-}
-
-
-async def _s041_craft_list(self, session, payload):
-    import struct
-    acct = session.account_id
-    prof_level = self.craft_proficiency.get(acct, 1)
-    buf = bytearray()
-    recipes = [(rid, r) for rid, r in CRAFT_RECIPES.items() if r['proficiency'] <= prof_level]
-    buf.append(len(recipes))
-    for rid, r in recipes:
-        buf += struct.pack('<H', rid)
-        name_b = r["name"].encode("utf-8")[:32].ljust(32, b"\x00")
-        buf += name_b
-        cat_map = {"weapon": 1, "armor": 2, "potion": 3, "gem": 4, "material": 5}
-        buf.append(cat_map.get(r["category"], 0))
-        buf.append(r["proficiency"])
-        buf.append(len(r["materials"]))
-        buf.append(int(r["success_rate"] * 100))
-        buf += struct.pack('<I', r['gold'])
-    self._send(session, MsgType.CRAFT_LIST, bytes(buf))
-    print(f"    CraftList: {len(recipes)} recipes for {session.char_name} (prof={prof_level})")
-
-async def _s041_craft_execute(self, session, payload):
-    import struct
-    if len(payload) < 2: return
-    recipe_id = struct.unpack_from('<H', payload, 0)[0]
-    acct = session.account_id
-    recipe = CRAFT_RECIPES.get(recipe_id)
-    if not recipe:
-        self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 1, recipe_id, 0, 0, 0)); return
-    prof = self.craft_proficiency.get(acct, 1)
-    if prof < recipe["proficiency"]:
-        self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 2, recipe_id, 0, 0, 0)); return
-    inv = self.inventories.get(acct, {})
-    for mat_id, mat_count in recipe["materials"]:
-        found = sum(1 for sd in inv.values() if sd.get("item_id") == mat_id)
-        if found < mat_count:
-            self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 3, recipe_id, 0, 0, 0)); return
-    gold = getattr(session, "gold", 1000)
-    if gold < recipe["gold"]:
-        self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 4, recipe_id, 0, 0, 0)); return
-    for mat_id, mat_count in recipe["materials"]:
-        removed = 0
-        for slot, sd in list(inv.items()):
-            if sd.get("item_id") == mat_id and removed < mat_count: del inv[slot]; removed += 1
-    session.gold = gold - recipe["gold"]
-    if _rng_crafting.random() > recipe["success_rate"]:
-        self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 5, recipe_id, 0, 0, 0))
-        return
-    bonus = 1 if recipe["bonus_chance"] > 0 and _rng_crafting.random() < recipe["bonus_chance"] else 0
-    result_item = recipe["result_item"]
-    result_count = recipe["result_count"]
-    next_slot = max(inv.keys(), default=-1) + 1
-    inv[next_slot] = {"item_id": result_item, "count": result_count, "enhance_level": 0}
-    self.inventories[acct] = inv
-    self._send(session, MsgType.CRAFT_RESULT, struct.pack('<BHIHB', 0, recipe_id, result_item, result_count, bonus))
-    print(f"    Craft: {recipe['name']} x{result_count} ({session.char_name})")
-
-async def _s041_gather(self, session, payload):
-    import struct
-    if len(payload) < 1: return
-    node_type = payload[0]
-    acct = session.account_id
-    node = GATHER_NODES.get(node_type)
-    if not node:
-        self._send(session, MsgType.GATHER_RESULT, struct.pack('<BBIHH', 1, node_type, 0, 0, 0)); return
-    energy = self.gather_energy.get(acct, 200)
-    if energy < node["energy"]:
-        self._send(session, MsgType.GATHER_RESULT, struct.pack('<BBIHH', 2, node_type, 0, 0, energy)); return
-    energy -= node["energy"]
-    self.gather_energy[acct] = energy
-    roll = _rng_crafting.random()
-    cumulative = 0.0
-    dropped_item = 0
-    for item_id, chance in node["loot"]:
-        cumulative += chance
-        if roll <= cumulative: dropped_item = item_id; break
-    if dropped_item == 0:
-        self._send(session, MsgType.GATHER_RESULT, struct.pack('<BBIHH', 3, node_type, 0, 0, energy)); return
-    inv = self.inventories.get(acct, {})
-    next_slot = max(inv.keys(), default=-1) + 1
-    inv[next_slot] = {"item_id": dropped_item, "count": 1, "enhance_level": 0}
-    self.inventories[acct] = inv
-    self._send(session, MsgType.GATHER_RESULT, struct.pack('<BBIHH', 0, node_type, dropped_item, 1, energy))
-    print(f"    Gather: {node['name']} -> item {dropped_item} (energy={energy}) ({session.char_name})")
-
-async def _s041_cook(self, session, payload):
-    import struct, time as _time
-    if len(payload) < 1: return
-    recipe_id = payload[0]
-    acct = session.account_id
-    recipe = COOK_RECIPES.get(recipe_id)
-    if not recipe:
-        self._send(session, MsgType.COOK_RESULT, struct.pack('<BBBHH', 1, recipe_id, 0, 0, 0)); return
-    existing = self.food_buffs.get(acct)
-    if existing and existing.get("expires", 0) > _time.time():
-        self._send(session, MsgType.COOK_RESULT, struct.pack('<BBBHH', 3, recipe_id, 0, 0, 0)); return
-    inv = self.inventories.get(acct, {})
-    for mat_id, mat_count in recipe["materials"]:
-        found = sum(1 for sd in inv.values() if sd.get("item_id") == mat_id)
-        if found < mat_count:
-            self._send(session, MsgType.COOK_RESULT, struct.pack('<BBBHH', 2, recipe_id, 0, 0, 0)); return
-    for mat_id, mat_count in recipe["materials"]:
-        removed = 0
-        for slot, sd in list(inv.items()):
-            if sd.get("item_id") == mat_id and removed < mat_count: del inv[slot]; removed += 1
-    buff_type_map = {"atk": 1, "hp": 2, "all": 3}
-    bt = buff_type_map.get(recipe["buff_type"], 0)
-    self.food_buffs[acct] = {
-        "type": recipe["buff_type"], "value": recipe["buff_value"],
-        "expires": _time.time() + recipe["buff_duration"]}
-    self._send(session, MsgType.COOK_RESULT, struct.pack("<BBBHH", 0, recipe_id, bt, recipe["buff_value"], recipe["buff_duration"]))
-    print(f"    Cook: {recipe['name']} buff={recipe['buff_type']}+{recipe['buff_value']} ({session.char_name})")
-
-async def _s041_enchant(self, session, payload):
-    import struct
-    if len(payload) < 3: return
-    slot, element, level = payload[0], payload[1], payload[2]
-    acct = session.account_id
-    if element not in ENCHANT_ELEMENTS:
-        self._send(session, MsgType.ENCHANT_RESULT, struct.pack('<BBBBB', 1, slot, element, level, 0)); return
-    if level not in ENCHANT_LEVELS:
-        self._send(session, MsgType.ENCHANT_RESULT, struct.pack('<BBBBB', 2, slot, element, level, 0)); return
-    inv = self.inventories.get(acct, {})
-    if slot not in inv:
-        self._send(session, MsgType.ENCHANT_RESULT, struct.pack('<BBBBB', 5, slot, element, level, 0)); return
-    ench_data = ENCHANT_LEVELS[level]
-    gold = getattr(session, "gold", 1000)
-    cost = ench_data["gold"]
-    existing = self.enchantments.get((acct, slot))
-    if existing: cost = int(cost * 1.5)
-    if gold < cost:
-        self._send(session, MsgType.ENCHANT_RESULT, struct.pack('<BBBBB', 4, slot, element, level, 0)); return
-    session.gold = gold - cost
-    self.enchantments[(acct, slot)] = {"element": element, "level": level}
-    dmg_pct = int(ench_data["damage_bonus"] * 100)
-    self._send(session, MsgType.ENCHANT_RESULT, struct.pack('<BBBBB', 0, slot, element, level, dmg_pct))
-    print(f"    Enchant: slot={slot} {ENCHANT_ELEMENTS[element]} Lv{level} (+{dmg_pct}%) ({session.char_name})")
-
-BridgeServer._on_craft_list_req = _s041_craft_list
-BridgeServer._on_craft_execute = _s041_craft_execute
-BridgeServer._on_gather_start = _s041_gather
-BridgeServer._on_cook_execute = _s041_cook
-BridgeServer._on_enchant_req = _s041_enchant
 
 
 if __name__ == "__main__":
