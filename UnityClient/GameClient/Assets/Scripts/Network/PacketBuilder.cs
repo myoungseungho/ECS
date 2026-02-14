@@ -2938,5 +2938,161 @@ namespace Network
 
             return d;
         }
+
+        // ━━━ S051: 소셜 심화 (TASK 5, MsgType 410-422) ━━━
+
+        /// <summary>FRIEND_REQUEST 빌더: target_name_len(1) + target_name(N)</summary>
+        public static byte[] FriendRequest(string targetName)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(targetName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.FRIEND_REQUEST, payload);
+        }
+
+        /// <summary>FRIEND_ACCEPT 빌더: from_name_len(1) + from_name(N)</summary>
+        public static byte[] FriendAccept(string fromName)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(fromName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.FRIEND_ACCEPT, payload);
+        }
+
+        /// <summary>FRIEND_REJECT 빌더: from_name_len(1) + from_name(N)</summary>
+        public static byte[] FriendReject(string fromName)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(fromName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.FRIEND_REJECT, payload);
+        }
+
+        /// <summary>FRIEND_LIST_REQ 빌더: empty</summary>
+        public static byte[] FriendListReq()
+        {
+            return Build(MsgType.FRIEND_LIST_REQ);
+        }
+
+        /// <summary>BLOCK_PLAYER 빌더: action(1) + name_len(1) + name(N)</summary>
+        public static byte[] BlockPlayer(byte action, string name)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(name);
+            byte[] payload = new byte[2 + nameBytes.Length];
+            payload[0] = action;
+            payload[1] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 2, nameBytes.Length);
+            return Build(MsgType.BLOCK_PLAYER, payload);
+        }
+
+        /// <summary>BLOCK_LIST_REQ 빌더: empty</summary>
+        public static byte[] BlockListReq()
+        {
+            return Build(MsgType.BLOCK_LIST_REQ);
+        }
+
+        /// <summary>PARTY_FINDER_LIST_REQ 빌더: category(1)</summary>
+        public static byte[] PartyFinderListReq(byte category)
+        {
+            return Build(MsgType.PARTY_FINDER_LIST_REQ, new byte[] { category });
+        }
+
+        /// <summary>PARTY_FINDER_CREATE 빌더: title_len(1) + title(N) + category(1) + min_level(1) + role(1)</summary>
+        public static byte[] PartyFinderCreate(string title, byte category, byte minLevel, byte role)
+        {
+            byte[] titleBytes = Encoding.UTF8.GetBytes(title);
+            byte[] payload = new byte[1 + titleBytes.Length + 3];
+            payload[0] = (byte)titleBytes.Length;
+            if (titleBytes.Length > 0)
+                Buffer.BlockCopy(titleBytes, 0, payload, 1, titleBytes.Length);
+            int off = 1 + titleBytes.Length;
+            payload[off] = category;
+            payload[off + 1] = minLevel;
+            payload[off + 2] = role;
+            return Build(MsgType.PARTY_FINDER_CREATE, payload);
+        }
+
+        /// <summary>FRIEND_REQUEST_RESULT 파싱: result(1)</summary>
+        public static FriendRequestResult ParseFriendRequestResult(byte[] payload)
+        {
+            return (FriendRequestResult)payload[0];
+        }
+
+        /// <summary>FRIEND_LIST 파싱: count(1) {name_len(1) name(N) is_online(1) zone_id(4)}*N</summary>
+        public static FriendListData ParseFriendList(byte[] payload)
+        {
+            var d = new FriendListData();
+            int off = 0;
+            byte count = payload[off]; off += 1;
+            d.Friends = new FriendInfo[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var f = new FriendInfo();
+                byte nameLen = payload[off]; off += 1;
+                f.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                f.IsOnline = payload[off] != 0; off += 1;
+                f.ZoneId = BitConverter.ToUInt32(payload, off); off += 4;
+                d.Friends[i] = f;
+            }
+            return d;
+        }
+
+        /// <summary>BLOCK_RESULT 파싱: result(1)</summary>
+        public static BlockPlayerResult ParseBlockResult(byte[] payload)
+        {
+            return (BlockPlayerResult)payload[0];
+        }
+
+        /// <summary>BLOCK_LIST 파싱: count(1) {name_len(1) name(N)}*N</summary>
+        public static BlockListData ParseBlockList(byte[] payload)
+        {
+            var d = new BlockListData();
+            int off = 0;
+            byte count = payload[off]; off += 1;
+            d.Names = new string[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                byte nameLen = payload[off]; off += 1;
+                d.Names[i] = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+            }
+            return d;
+        }
+
+        /// <summary>PARTY_FINDER_LIST 파싱: count(1) {listing_id(4) owner_len(1) owner(N) title_len(1) title(N) category(1) min_level(1) role(1)}*N</summary>
+        public static PartyFinderListData ParsePartyFinderList(byte[] payload)
+        {
+            var d = new PartyFinderListData();
+            int off = 0;
+            byte count = payload[off]; off += 1;
+            d.Listings = new PartyFinderListingInfo[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                var l = new PartyFinderListingInfo();
+                l.ListingId = BitConverter.ToUInt32(payload, off); off += 4;
+
+                byte ownerLen = payload[off]; off += 1;
+                l.OwnerName = Encoding.UTF8.GetString(payload, off, ownerLen); off += ownerLen;
+
+                byte titleLen = payload[off]; off += 1;
+                l.Title = Encoding.UTF8.GetString(payload, off, titleLen); off += titleLen;
+
+                l.Category = (PartyFinderCategory)payload[off]; off += 1;
+                l.MinLevel = payload[off]; off += 1;
+                l.Role = (PartyFinderRole)payload[off]; off += 1;
+
+                d.Listings[i] = l;
+            }
+            return d;
+        }
     }
 }

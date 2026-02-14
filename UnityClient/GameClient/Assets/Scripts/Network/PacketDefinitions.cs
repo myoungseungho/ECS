@@ -378,6 +378,21 @@ namespace Network
         JOB_CHANGE_REQ          = 446,  // C→S: job_name_len(u8) + job_name(utf8)
         JOB_CHANGE_RESULT       = 447,  // S→C: result(u8) + job_name_len(u8) + job_name(utf8) + bonus_count(u8) + [...] + new_skill_count(u8) + [skill_id(u16)] * M
 
+        // ━━━ S051: 소셜 심화 (TASK 5, MsgType 410-422) ━━━
+        FRIEND_REQUEST          = 410,  // C→S: target_name_len(1) target_name(N)
+        FRIEND_REQUEST_RESULT   = 411,  // S→C: result(1) (SUCCESS/NOT_FOUND/ALREADY/BLOCKED/FULL/SELF)
+        FRIEND_ACCEPT           = 412,  // C→S: from_name_len(1) from_name(N)
+        FRIEND_REJECT           = 413,  // C→S: from_name_len(1) from_name(N)
+        FRIEND_LIST_REQ         = 414,  // C→S: empty
+        FRIEND_LIST             = 415,  // S→C: count(1) {name_len(1) name(N) is_online(1) zone_id(4)}*N
+        BLOCK_PLAYER            = 416,  // C→S: action(1) name_len(1) name(N) — action: 0=block, 1=unblock
+        BLOCK_RESULT            = 417,  // S→C: result(1) (SUCCESS/ALREADY/NOT_BLOCKED/FULL/SELF)
+        BLOCK_LIST_REQ          = 418,  // C→S: empty
+        BLOCK_LIST              = 419,  // S→C: count(1) {name_len(1) name(N)}*N
+        PARTY_FINDER_LIST_REQ   = 420,  // C→S: category(1) (0xFF=전체)
+        PARTY_FINDER_LIST       = 421,  // S→C: count(1) {listing_id(4) owner_len(1) owner(N) title_len(1) title(N) category(1) min_level(1) role(1)}*N
+        PARTY_FINDER_CREATE     = 422,  // C→S: title_len(1) title(N) category(1) min_level(1) role(1)
+
         // ━━━ S048: Phase 9 — 퀘스트 심화 (TASK 4, MsgType 400-405) ━━━
         DAILY_QUEST_LIST_REQ    = 400,  // C→S: empty
         DAILY_QUEST_LIST        = 401,  // S→C: quest_count(1) + [dq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
@@ -2250,5 +2265,87 @@ namespace Network
         public byte NewLevel;
         public uint GoldCost;
         public bool Success;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S051: 소셜 심화 (TASK 5, MsgType 410-422)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>친구 요청 결과 코드</summary>
+    public enum FriendRequestResult : byte
+    {
+        SUCCESS     = 0,
+        NOT_FOUND   = 1,
+        ALREADY     = 2,
+        BLOCKED     = 3,
+        FULL        = 4,
+        SELF        = 5,
+    }
+
+    /// <summary>차단 결과 코드</summary>
+    public enum BlockPlayerResult : byte
+    {
+        SUCCESS      = 0,
+        ALREADY      = 1,
+        NOT_BLOCKED  = 2,
+        FULL         = 3,
+        SELF         = 4,
+    }
+
+    /// <summary>친구 정보 (FRIEND_LIST 파싱용)</summary>
+    public class FriendInfo
+    {
+        public string Name;
+        public bool IsOnline;
+        public uint ZoneId;
+    }
+
+    /// <summary>친구 목록 데이터 (FRIEND_LIST 파싱용)</summary>
+    public class FriendListData
+    {
+        public FriendInfo[] Friends;
+    }
+
+    /// <summary>차단 목록 데이터 (BLOCK_LIST 파싱용)</summary>
+    public class BlockListData
+    {
+        public string[] Names;
+    }
+
+    /// <summary>파티 찾기 카테고리</summary>
+    public enum PartyFinderCategory : byte
+    {
+        ALL           = 0xFF,
+        DUNGEON       = 0,
+        RAID          = 1,
+        FIELD_HUNTING = 2,
+        QUEST         = 3,
+        OTHER         = 4,
+    }
+
+    /// <summary>파티 찾기 역할</summary>
+    public enum PartyFinderRole : byte
+    {
+        ANY     = 0,
+        TANK    = 1,
+        DPS     = 2,
+        SUPPORT = 3,
+    }
+
+    /// <summary>파티 찾기 항목 (PARTY_FINDER_LIST 파싱용)</summary>
+    public class PartyFinderListingInfo
+    {
+        public uint ListingId;
+        public string OwnerName;
+        public string Title;
+        public PartyFinderCategory Category;
+        public byte MinLevel;
+        public PartyFinderRole Role;
+    }
+
+    /// <summary>파티 찾기 목록 데이터 (PARTY_FINDER_LIST 파싱용)</summary>
+    public class PartyFinderListData
+    {
+        public PartyFinderListingInfo[] Listings;
     }
 }

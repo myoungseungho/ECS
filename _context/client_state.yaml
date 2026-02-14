@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T15:00:00"
+last_session: "2026-02-15T18:20:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 11 각인/초월 구현 완료 — EngravingManager + EngravingUI + TranscendUI + 패킷 6종(454-459) + TCP 테스트 10건 | 95 PASS 0 FAIL"
+current_status: "Phase 12 소셜 심화 구현 완료 — FriendManager + BlockManager + PartyFinderManager + FriendUI + BlockUI + PartyFinderUI + 패킷 13종(410-422) + TCP 테스트 10건 | 101 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -227,6 +227,22 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase11_engraving_tcp.py"
+  - id: A26
+    desc: "S051 Phase 12 소셜 심화 — FriendManager + BlockManager + PartyFinderManager + FriendUI + BlockUI + PartyFinderUI + 패킷 13종(410-422) + TCP 테스트 10건"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/FriendManager.cs"
+      - "Assets/Scripts/Managers/BlockManager.cs"
+      - "Assets/Scripts/Managers/PartyFinderManager.cs"
+      - "Assets/Scripts/UI/FriendUI.cs"
+      - "Assets/Scripts/UI/BlockUI.cs"
+      - "Assets/Scripts/UI/PartyFinderUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase12_social_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -314,10 +330,11 @@ pending_tasks:
     blocked: true
     blocked_reason: "서버 TASK 9 (내구도 핸들러) 구현 대기 — Batch 3"
   - id: "gdd_task5_social_ui"
-    desc: "소셜 UI — FriendUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
+    desc: "소셜 UI — FriendUI + BlockUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
     priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5 (친구/차단/파티찾기 핸들러) 구현 대기 — Batch 4"
+    blocked: false
+    blocked_reason: "완료 (A26)"
+    status: done
   - id: "gdd_task6_pvp_extended_ui"
     desc: "전장/길드전 UI — BattlegroundUI + GuildWarUI (서버 TASK 6 MsgType 430-435)"
     priority: P2
@@ -377,6 +394,9 @@ recent_decisions:
   - "Phase 11: 각인/초월(454-459) EngravingManager+EngravingUI+TranscendUI 클라 구현 완료 — S050 응답"
   - "S050 TASK 8 Enhancement: 각인 9종(원한/저주받은인형/예리한둔기/정면승부/아드레날린/정기흡수/중갑/전문가/각성) + 초월 5단계"
   - "TranscendUI는 매니저 없이 NetworkManager 직접 구독 (JobChangeUI/ContentUnlockUI 패턴)"
+  - "Phase 12: 소셜 심화(410-422) FriendManager+BlockManager+PartyFinderManager+FriendUI+BlockUI+PartyFinderUI 클라 구현 완료 — S051 응답"
+  - "소셜 UI 단축키: O=친구, Shift+B=차단, Y=파티찾기"
+  - "S051 TASK 5: 친구 max100/차단 max100/파티찾기 5카테고리(dungeon/raid/field/quest/other) 4역할(tank/dps/support/any)"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -427,6 +447,7 @@ processed_messages:
   - "S048"
   - "S049"
   - "S050"
+  - "S051"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

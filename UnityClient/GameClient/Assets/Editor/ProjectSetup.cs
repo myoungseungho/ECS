@@ -613,6 +613,12 @@ public static class ProjectSetup
         var jobChangeUIGo = CreateManagerObject("JobChangeUI", typeof(JobChangeUI));
         var engravingManagerGo = CreateManagerObject("EngravingManager", typeof(EngravingManager));
         var transcendUIGo = CreateManagerObject("TranscendUI", typeof(TranscendUI));
+        var friendManagerGo = CreateManagerObject("FriendManager", typeof(FriendManager));
+        var blockManagerGo = CreateManagerObject("BlockManager", typeof(BlockManager));
+        var partyFinderManagerGo = CreateManagerObject("PartyFinderManager", typeof(PartyFinderManager));
+        var friendUIGo = CreateManagerObject("FriendUI", typeof(FriendUI));
+        var blockUIGo = CreateManagerObject("BlockUI", typeof(BlockUI));
+        var partyFinderUIGo = CreateManagerObject("PartyFinderUI", typeof(PartyFinderUI));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

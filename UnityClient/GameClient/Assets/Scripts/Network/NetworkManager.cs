@@ -199,6 +199,12 @@ namespace Network
         public event Action<EngravingListData> OnEngravingList;
         public event Action<EngravingResultData> OnEngravingResult;
         public event Action<TranscendResultData> OnTranscendResult;
+        // S051: 소셜 심화
+        public event Action<FriendRequestResult> OnFriendRequestResult;
+        public event Action<FriendListData> OnFriendList;
+        public event Action<BlockPlayerResult> OnBlockResult;
+        public event Action<BlockListData> OnBlockList;
+        public event Action<PartyFinderListData> OnPartyFinderList;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1037,6 +1043,56 @@ namespace Network
         public void RequestTranscend(string slot)
         {
             _field?.Send(PacketBuilder.TranscendReq(slot));
+        }
+
+        // ━━━ S051: 소셜 심화 API ━━━
+
+        /// <summary>친구 요청</summary>
+        public void RequestFriend(string targetName)
+        {
+            _field?.Send(PacketBuilder.FriendRequest(targetName));
+        }
+
+        /// <summary>친구 수락</summary>
+        public void AcceptFriend(string fromName)
+        {
+            _field?.Send(PacketBuilder.FriendAccept(fromName));
+        }
+
+        /// <summary>친구 거절</summary>
+        public void RejectFriend(string fromName)
+        {
+            _field?.Send(PacketBuilder.FriendReject(fromName));
+        }
+
+        /// <summary>친구 목록 요청</summary>
+        public void RequestFriendList()
+        {
+            _field?.Send(PacketBuilder.FriendListReq());
+        }
+
+        /// <summary>차단/해제 (action: 0=block, 1=unblock)</summary>
+        public void BlockPlayer(byte action, string name)
+        {
+            _field?.Send(PacketBuilder.BlockPlayer(action, name));
+        }
+
+        /// <summary>차단 목록 요청</summary>
+        public void RequestBlockList()
+        {
+            _field?.Send(PacketBuilder.BlockListReq());
+        }
+
+        /// <summary>파티 찾기 목록 요청</summary>
+        public void RequestPartyFinderList(byte category)
+        {
+            _field?.Send(PacketBuilder.PartyFinderListReq(category));
+        }
+
+        /// <summary>파티 찾기 등록</summary>
+        public void CreatePartyFinderListing(string title, byte category, byte minLevel, byte role)
+        {
+            _field?.Send(PacketBuilder.PartyFinderCreate(title, category, minLevel, role));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2241,6 +2297,44 @@ namespace Network
                     var data = PacketBuilder.ParseTranscendResult(payload);
                     Debug.Log($"[Net] TranscendResult: result={data.Result}, slot={data.Slot}, level={data.NewLevel}, cost={data.GoldCost}, success={data.Success}");
                     OnTranscendResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S051: 소셜 심화 (TASK 5) ━━━
+
+                case MsgType.FRIEND_REQUEST_RESULT:
+                {
+                    var result = PacketBuilder.ParseFriendRequestResult(payload);
+                    Debug.Log($"[Net] FriendRequestResult: {result}");
+                    OnFriendRequestResult?.Invoke(result);
+                    break;
+                }
+                case MsgType.FRIEND_LIST:
+                {
+                    var data = PacketBuilder.ParseFriendList(payload);
+                    Debug.Log($"[Net] FriendList: count={data.Friends.Length}");
+                    OnFriendList?.Invoke(data);
+                    break;
+                }
+                case MsgType.BLOCK_RESULT:
+                {
+                    var result = PacketBuilder.ParseBlockResult(payload);
+                    Debug.Log($"[Net] BlockResult: {result}");
+                    OnBlockResult?.Invoke(result);
+                    break;
+                }
+                case MsgType.BLOCK_LIST:
+                {
+                    var data = PacketBuilder.ParseBlockList(payload);
+                    Debug.Log($"[Net] BlockList: count={data.Names.Length}");
+                    OnBlockList?.Invoke(data);
+                    break;
+                }
+                case MsgType.PARTY_FINDER_LIST:
+                {
+                    var data = PacketBuilder.ParsePartyFinderList(payload);
+                    Debug.Log($"[Net] PartyFinderList: count={data.Listings.Length}");
+                    OnPartyFinderList?.Invoke(data);
                     break;
                 }
 

@@ -1257,6 +1257,137 @@ managers:
     computed_properties:
       - IsPanelOpen (bool)
 
+  - name: FriendManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "친구 시스템 관리 — S051 TASK 5 (MsgType 410-415) 친구 요청/수락/거절/목록"
+    reads: []
+    writes:
+      - _friends (List<FriendInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnFriendListChanged()
+      - OnFriendRequestResult(FriendRequestResult)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnFriendList → 친구 목록 수신
+      - NetworkManager.OnFriendRequestResult → 친구 요청 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshList()
+      - SendFriendRequest(string)
+      - AcceptFriend(string)
+      - RejectFriend(string)
+      - GetFriend(string) → FriendInfo
+    computed_properties:
+      - Friends (IReadOnlyList<FriendInfo>)
+      - IsPanelOpen (bool)
+      - OnlineCount (int)
+
+  - name: BlockManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "차단 시스템 관리 — S051 TASK 5 (MsgType 416-419) 차단/해제/목록"
+    reads: []
+    writes:
+      - _blockedNames (List<string>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnBlockListChanged()
+      - OnBlockResultReceived(BlockPlayerResult)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnBlockList → 차단 목록 수신
+      - NetworkManager.OnBlockResult → 차단 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshList()
+      - BlockPlayer(string)
+      - UnblockPlayer(string)
+      - IsBlocked(string) → bool
+    computed_properties:
+      - BlockedNames (IReadOnlyList<string>)
+      - IsPanelOpen (bool)
+
+  - name: PartyFinderManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "파티 찾기 시스템 관리 — S051 TASK 5 (MsgType 420-422) 파티 찾기 등록/목록/카테고리 필터"
+    reads: []
+    writes:
+      - _listings (List<PartyFinderListingInfo>)
+      - _isPanelOpen (bool)
+      - _currentCategoryFilter (byte)
+    fires_events:
+      - OnListingsChanged()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnPartyFinderList → 파티 찾기 목록 수신
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshList(byte)
+      - CreateListing(string, PartyFinderCategory, byte, PartyFinderRole)
+    computed_properties:
+      - Listings (IReadOnlyList<PartyFinderListingInfo>)
+      - IsPanelOpen (bool)
+      - CurrentCategoryFilter (byte)
+
+  - name: FriendUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "친구 목록 UI — S051 TASK 5 (O키 토글) 온라인 상태 표시 + 친구 요청 알림"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - FriendManager.OnFriendListChanged → 목록 갱신
+      - FriendManager.OnFriendRequestResult → 요청 결과
+      - FriendManager.OnPanelOpened → 패널 표시
+      - FriendManager.OnPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
+  - name: BlockUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "차단 목록 UI — S051 TASK 5 (Shift+B키 토글) 차단/해제 관리"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - BlockManager.OnBlockListChanged → 목록 갱신
+      - BlockManager.OnBlockResultReceived → 차단 결과
+      - BlockManager.OnPanelOpened → 패널 표시
+      - BlockManager.OnPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
+  - name: PartyFinderUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "파티 찾기 UI — S051 TASK 5 (Y키 토글) 카테고리 필터 + 등록 + 목록"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - PartyFinderManager.OnListingsChanged → 목록 갱신
+      - PartyFinderManager.OnPanelOpened → 패널 표시
+      - PartyFinderManager.OnPanelClosed → 패널 숨김
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1758,6 +1889,36 @@ data_flows:
     to: TranscendUI
     via: "C# event (OnTranscendResult)"
     description: "초월 결과 수신 (458-459, 매니저 없이 직접 구독)"
+
+  - from: NetworkManager
+    to: FriendManager
+    via: "C# events (OnFriendList, OnFriendRequestResult)"
+    description: "친구 목록/요청 결과 수신 (410-415)"
+
+  - from: FriendManager
+    to: FriendUI
+    via: "C# events (OnFriendListChanged, OnFriendRequestResult, OnPanelOpened, OnPanelClosed)"
+    description: "친구 UI 갱신 (O키 토글)"
+
+  - from: NetworkManager
+    to: BlockManager
+    via: "C# events (OnBlockList, OnBlockResult)"
+    description: "차단 목록/결과 수신 (416-419)"
+
+  - from: BlockManager
+    to: BlockUI
+    via: "C# events (OnBlockListChanged, OnBlockResultReceived, OnPanelOpened, OnPanelClosed)"
+    description: "차단 UI 갱신 (Shift+B키 토글)"
+
+  - from: NetworkManager
+    to: PartyFinderManager
+    via: "C# event (OnPartyFinderList)"
+    description: "파티 찾기 목록 수신 (420-422)"
+
+  - from: PartyFinderManager
+    to: PartyFinderUI
+    via: "C# events (OnListingsChanged, OnPanelOpened, OnPanelClosed)"
+    description: "파티 찾기 UI 갱신 (Y키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 
