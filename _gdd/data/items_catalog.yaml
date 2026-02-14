@@ -1,0 +1,156 @@
+# ============================================================
+# ITEM DATA — 등급, 장비슬롯, 랜덤옵션, 세트, 소모품, 루트 테이블
+# Source: rules/items.yaml
+# 규칙/공식은 rules/items.yaml 참조
+# ============================================================
+
+# ── 아이템 등급 정의 ──
+rarity:
+  common:
+    name: "일반"
+    color: "#FFFFFF"
+    drop_weight: 60
+    sell_multiplier: 1.0
+    max_enhancement: 0
+    bonus_stats: 0
+  uncommon:
+    name: "고급"
+    color: "#1EFF00"
+    drop_weight: 25
+    sell_multiplier: 2.0
+    max_enhancement: 10
+    bonus_stats: 1
+  rare:
+    name: "희귀"
+    color: "#0080FF"
+    drop_weight: 10
+    sell_multiplier: 5.0
+    max_enhancement: 15
+    bonus_stats: 2
+  epic:
+    name: "영웅"
+    color: "#A020F0"
+    drop_weight: 4
+    sell_multiplier: 15.0
+    max_enhancement: 20
+    bonus_stats: 3
+    set_bonus: true
+  legendary:
+    name: "전설"
+    color: "#FF8C00"
+    drop_weight: 1
+    sell_multiplier: 50.0
+    max_enhancement: 20
+    bonus_stats: 4
+    set_bonus: true
+    unique_effect: true
+
+# ── 랜덤 옵션 풀 ──
+random_options:
+  - { stat: "ATK",        range: [5, 50],       weight: 10 }
+  - { stat: "MATK",       range: [5, 50],       weight: 10 }
+  - { stat: "DEF",        range: [3, 30],       weight: 10 }
+  - { stat: "MDEF",       range: [3, 30],       weight: 8 }
+  - { stat: "MAX_HP",     range: [20, 500],     weight: 12 }
+  - { stat: "MAX_MP",     range: [10, 300],     weight: 8 }
+  - { stat: "CRIT_RATE",  range: [0.005, 0.03], weight: 6 }
+  - { stat: "CRIT_DMG",   range: [0.01, 0.05],  weight: 6 }
+  - { stat: "DODGE",      range: [0.003, 0.02], weight: 4 }
+  - { stat: "MOVE_SPEED", range: [3, 20],       weight: 5 }
+  - { stat: "ATK_SPEED",  range: [0.01, 0.05],  weight: 5 }
+  - { stat: "CDR",        range: [0.005, 0.03], weight: 5 }
+  - { stat: "LIFE_STEAL", range: [0.005, 0.02], weight: 3 }
+  - { stat: "EXP_BONUS",  range: [0.01, 0.05],  weight: 2 }
+  - { stat: "GOLD_BONUS", range: [0.01, 0.05],  weight: 2 }
+
+# ── 세트 장비 ──
+set_bonuses:
+  flame_guardian:
+    name: "화염 수호자"
+    tier: "epic"
+    pieces: ["helmet", "armor", "pants", "gloves", "boots"]
+    bonuses:
+      2_set: { def: 30, fire_resist: 0.10 }
+      3_set: { max_hp: 300, fire_damage: 0.05 }
+      5_set: { atk: 50, special: "피격 시 10% 확률로 화염 방벽 (3초간 데미지 30% 감소)" }
+  shadow_assassin:
+    name: "그림자 암살자"
+    tier: "epic"
+    pieces: ["helmet", "armor", "pants", "gloves", "boots"]
+    bonuses:
+      2_set: { crit_rate: 0.03 }
+      3_set: { atk: 30, move_speed: 10 }
+      5_set: { crit_dmg: 0.20, special: "치명타 시 2초간 투명화 (5초 쿨)" }
+  holy_priest:
+    name: "신성한 사제"
+    tier: "legendary"
+    pieces: ["weapon", "helmet", "armor", "necklace", "ring"]
+    bonuses:
+      2_set: { healing_power: 0.10 }
+      3_set: { max_mp: 200, cdr: 0.05 }
+      5_set: { special: "힐 시 20% 확률로 추가 실드 부여 (HP의 10%)" }
+
+# ── 소비 아이템 ──
+consumables:
+  potions:
+    hp_potion_s:  { name: "HP 포션 (소)", heal: 300, cooldown: 15, stack: 99 }
+    hp_potion_m:  { name: "HP 포션 (중)", heal: 800, cooldown: 15, stack: 99 }
+    hp_potion_l:  { name: "HP 포션 (대)", heal: 2000, cooldown: 15, stack: 99 }
+    mp_potion_s:  { name: "MP 포션 (소)", restore: 200, cooldown: 15, stack: 99 }
+    mp_potion_m:  { name: "MP 포션 (중)", restore: 500, cooldown: 15, stack: 99 }
+    elixir:       { name: "엘릭서", heal: 1000, restore: 500, cooldown: 60, stack: 20 }
+  buffs:
+    atk_scroll:   { name: "공격력 주문서", buff: { atk: 30 }, duration: 1800, stack: 20 }
+    def_scroll:   { name: "방어력 주문서", buff: { def: 20 }, duration: 1800, stack: 20 }
+    exp_scroll:   { name: "경험치 주문서", buff: { exp_bonus: 0.5 }, duration: 3600, stack: 10 }
+    crit_potion:  { name: "치명타 물약", buff: { crit_rate: 0.10 }, duration: 1800, stack: 20 }
+  utility:
+    return_scroll: { name: "귀환 주문서", effect: "마을로 즉시 귀환", cast_time: 5.0, stack: 99 }
+    repair_kit:    { name: "수리 키트", effect: "장비 내구도 전체 회복", stack: 20 }
+    torch:         { name: "횃불", effect: "던전 시야 확장 (10분)", duration: 600, stack: 50 }
+    megaphone:     { name: "확성기", effect: "전체 채팅 1회", stack: 10 }
+  materials:
+    enhance_stone:   { name: "강화석", desc: "장비 강화 재료", stack: 999 }
+    transcend_stone: { name: "초월석", desc: "장비 초월 재료", stack: 99 }
+    gem_rough:       { name: "원석", desc: "보석 합성 기본 재료", stack: 999 }
+    reappraisal:     { name: "재감정서", desc: "장비 랜덤옵션 리롤", stack: 99 }
+
+# ── 루트 드롭 테이블 ──
+drop_rates_by_monster_tier:
+  normal:
+    equipment_drop: 0.05
+    material_drop: 0.30
+    gold_drop: 0.80
+    potion_drop: 0.10
+  elite:
+    equipment_drop: 0.30
+    material_drop: 0.60
+    gold_drop: 1.0
+    guaranteed_uncommon: true
+  boss:
+    equipment_drop: 1.0
+    material_drop: 1.0
+    gold_drop: 1.0
+    guaranteed_rare: true
+    epic_chance: 0.20
+  raid_boss:
+    equipment_drop: 1.0
+    guaranteed_epic: true
+    legendary_chance: 0.05
+    bonus_materials: 5
+
+# ── 드롭 시 등급 결정 ──
+rarity_roll:
+  normal_monster: { common: 0.60, uncommon: 0.30, rare: 0.09, epic: 0.01 }
+  elite_monster:  { uncommon: 0.50, rare: 0.35, epic: 0.14, legendary: 0.01 }
+  boss:           { rare: 0.50, epic: 0.40, legendary: 0.10 }
+  raid_boss:      { epic: 0.60, legendary: 0.40 }
+
+# ── 원소 상성 테이블 ──
+element_affinity:
+  fire:      { fire: 0.5, ice: 1.3, lightning: 1.0, dark: 1.0, holy: 0.7, nature: 1.3 }
+  ice:       { fire: 0.7, ice: 0.5, lightning: 1.3, dark: 1.0, holy: 1.0, nature: 0.7 }
+  lightning: { fire: 1.0, ice: 0.7, lightning: 0.5, dark: 1.3, holy: 1.0, nature: 1.0 }
+  dark:      { fire: 1.0, ice: 1.0, lightning: 0.7, dark: 0.5, holy: 0.7, nature: 1.3 }
+  holy:      { fire: 1.3, ice: 1.0, lightning: 1.0, dark: 1.3, holy: 0.5, nature: 0.7 }
+  nature:    { fire: 0.7, ice: 1.3, lightning: 1.0, dark: 0.7, holy: 1.3, nature: 0.5 }

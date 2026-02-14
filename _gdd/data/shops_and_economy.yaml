@@ -1,0 +1,83 @@
+# ============================================================
+# SHOP & ECONOMY DATA — NPC 상점 가격표, 퀘스트 보상, 화폐, 제한
+# Source: rules/economy.yaml
+# 규칙/공식은 rules/economy.yaml 참조
+# ============================================================
+
+# ── NPC 상점 ──
+npc_shops:
+  general_store:
+    name: "잡화상점"
+    items:
+      - { id: "hp_potion_s",    price: 50,  currency: "silver", stock: -1 }
+      - { id: "hp_potion_m",    price: 150, currency: "silver", stock: -1 }
+      - { id: "hp_potion_l",    price: 500, currency: "silver", stock: -1 }
+      - { id: "mp_potion_s",    price: 50,  currency: "silver", stock: -1 }
+      - { id: "mp_potion_m",    price: 150, currency: "silver", stock: -1 }
+      - { id: "return_scroll",  price: 100, currency: "silver", stock: -1 }
+      - { id: "repair_kit",     price: 200, currency: "silver", stock: -1 }
+      - { id: "torch",          price: 30,  currency: "silver", stock: -1 }
+
+  weapon_shop:
+    name: "무기상점"
+    items:
+      - { id: "iron_sword",    price: 500,  currency: "gold", stock: -1 }
+      - { id: "iron_bow",      price: 500,  currency: "gold", stock: -1 }
+      - { id: "wooden_staff",  price: 500,  currency: "gold", stock: -1 }
+      - { id: "steel_sword",   price: 2000, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "steel_bow",     price: 2000, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "crystal_staff", price: 2000, currency: "gold", stock: -1, min_level: 10 }
+
+  armor_shop:
+    name: "방어구상점"
+    items:
+      - { id: "leather_armor", price: 400,  currency: "gold", stock: -1 }
+      - { id: "leather_boots", price: 200,  currency: "gold", stock: -1 }
+      - { id: "iron_armor",    price: 1500, currency: "gold", stock: -1, min_level: 10 }
+      - { id: "iron_boots",    price: 800,  currency: "gold", stock: -1, min_level: 10 }
+
+  dungeon_shop:
+    name: "던전 보상 상점"
+    items:
+      - { id: "epic_weapon_box",  price: 500, currency: "dungeon_token" }
+      - { id: "epic_armor_box",   price: 400, currency: "dungeon_token" }
+      - { id: "skill_book_rare",  price: 200, currency: "dungeon_token" }
+
+  pvp_shop:
+    name: "투기장 상점"
+    items:
+      - { id: "pvp_weapon",   price: 1000, currency: "pvp_token" }
+      - { id: "pvp_armor",    price: 800,  currency: "pvp_token" }
+      - { id: "pvp_cosmetic", price: 500,  currency: "pvp_token" }
+
+# ── 퀘스트 골드 보상 범위 ──
+quest_gold_ranges:
+  tutorial:     "50~200"
+  main_story:   "500~5000"
+  side_quest:   "200~2000"
+  daily_quest:  "300~1000"
+  weekly_quest: "3000~10000"
+
+# ── 던전 보상 (난이도별) ──
+dungeon_gold_rewards:
+  normal: 2000
+  hard: 5000
+  hell: 10000
+  chaos: 3000
+
+# ── 일일/주간 골드 상한 ──
+daily_caps:
+  monster_gold: 50000
+  dungeon_gold: 30000
+  quest_gold: 20000
+  total_daily_cap: 100000
+
+weekly_caps:
+  raid_gold: 50000
+  weekly_quest_gold: 30000
+
+# ── 투기장 기본 스탯 (정규화) ──
+pvp_arena_stats:
+  warrior: { hp: 12000, atk: 350, def: 250, speed: 200 }
+  archer:  { hp: 8000,  atk: 400, def: 150, speed: 220 }
+  mage:    { hp: 7000,  matk: 450, mdef: 220, speed: 200 }

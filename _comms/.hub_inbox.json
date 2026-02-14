@@ -1,0 +1,51 @@
+{
+  "scan_time": "2026-02-13T14:22:10.696915",
+  "hub_active": true,
+  "new_messages": [
+    {
+      "id": "C011",
+      "from": "client-agent",
+      "to_role": "server",
+      "to": "server-agent",
+      "type": "question",
+      "priority": "P2",
+      "subject": "이거 어떻게 해?",
+      "file": "test.md"
+    },
+    {
+      "id": "D001",
+      "from": "db-agent",
+      "to_role": "server",
+      "to": "server-agent",
+      "type": "spec",
+      "priority": "P1",
+      "subject": "스키마 완성",
+      "file": "test2.md"
+    }
+  ],
+  "total_pending": 2,
+  "by_agent": {
+    "server": [
+      {
+        "id": "C011",
+        "from": "client-agent",
+        "to_role": "server",
+        "to": "server-agent",
+        "type": "question",
+        "priority": "P2",
+        "subject": "이거 어떻게 해?",
+        "file": "test.md"
+      },
+      {
+        "id": "D001",
+        "from": "db-agent",
+        "to_role": "server",
+        "to": "server-agent",
+        "type": "spec",
+        "priority": "P1",
+        "subject": "스키마 완성",
+        "file": "test2.md"
+      }
+    ]
+  }
+}

@@ -1,0 +1,152 @@
+# ============================================================
+# ENHANCEMENT DATA — 강화확률, 비용, 보석, 각인, 초월 수치
+# Source: rules/enhancement.yaml
+# 규칙/공식은 rules/enhancement.yaml 참조
+# ============================================================
+
+# ── 강화 성공률 테이블 ──
+enhancement_success_rate:
+  1:  0.95
+  2:  0.90
+  3:  0.85
+  4:  0.80
+  5:  0.75
+  6:  0.70
+  7:  0.60
+  8:  0.50
+  9:  0.40
+  10: 0.30
+  11: 0.25
+  12: 0.20
+  13: 0.15
+  14: 0.10
+  15: 0.07
+  16: 0.05
+  17: 0.03
+  18: 0.02
+  19: 0.01
+  20: 0.005
+
+# ── 강화 기본 비용 (등급별) ──
+enhancement_base_cost:
+  uncommon: 100
+  rare: 500
+  epic: 2000
+  legendary: 10000
+
+# ── 강화석 소요량 (단계별) ──
+enhancement_material_count:
+  "1-5": 1
+  "6-10": 2
+  "11-15": 5
+  "16-20": 10
+
+# ── 강화 스탯 증가량 ──
+enhancement_stat_bonus:
+  weapon:
+    atk: 5
+    matk: 5
+  armor:
+    def: 3
+    max_hp: 20
+  accessory:
+    crit_rate: 0.002
+    crit_dmg: 0.005
+
+# ── 보석 등급 ──
+gem_tiers:
+  rough:    { level: 1, stat_bonus: 1.0, color: "회색" }
+  polished: { level: 2, stat_bonus: 2.0, color: "초록" }
+  refined:  { level: 3, stat_bonus: 3.5, color: "파랑" }
+  flawless: { level: 4, stat_bonus: 5.0, color: "보라" }
+  perfect:  { level: 5, stat_bonus: 8.0, color: "주황" }
+
+# ── 보석 종류 ──
+gem_types:
+  ruby:     { name: "루비",       stat: "ATK",       bonus_per_tier: [5, 10, 18, 25, 40] }
+  sapphire: { name: "사파이어",   stat: "MATK",      bonus_per_tier: [5, 10, 18, 25, 40] }
+  emerald:  { name: "에메랄드",   stat: "DEF",       bonus_per_tier: [3, 6, 10, 15, 25] }
+  diamond:  { name: "다이아몬드", stat: "MAX_HP",    bonus_per_tier: [30, 60, 100, 150, 250] }
+  topaz:    { name: "토파즈",     stat: "CRIT_RATE", bonus_per_tier: [0.005, 0.01, 0.015, 0.02, 0.03] }
+  amethyst: { name: "자수정",     stat: "CRIT_DMG",  bonus_per_tier: [0.01, 0.02, 0.035, 0.05, 0.08] }
+
+# ── 보석 합성 비용 ──
+gem_fusion_gold: [100, 500, 2000, 10000]
+
+# ── 각인 목록 ──
+engravings:
+  grudge:
+    name: "원한"
+    desc: "보스 몬스터에게 주는 피해 증가 / 받는 피해도 증가"
+    effects:
+      1: { boss_damage: +0.04, damage_taken: +0.20 }
+      2: { boss_damage: +0.10, damage_taken: +0.20 }
+      3: { boss_damage: +0.20, damage_taken: +0.20 }
+  cursed_doll:
+    name: "저주받은 인형"
+    desc: "ATK 증가 / 회복 효율 감소"
+    effects:
+      1: { atk_bonus: +0.03, healing_received: -0.25 }
+      2: { atk_bonus: +0.08, healing_received: -0.25 }
+      3: { atk_bonus: +0.16, healing_received: -0.25 }
+  keen_blunt:
+    name: "예리한 둔기"
+    desc: "치명타 데미지 증가 / 일반 데미지 감소"
+    effects:
+      1: { crit_dmg: +0.10, non_crit_dmg: -0.02 }
+      2: { crit_dmg: +0.25, non_crit_dmg: -0.02 }
+      3: { crit_dmg: +0.50, non_crit_dmg: -0.02 }
+  master_brawler:
+    name: "정면승부"
+    desc: "정면 공격 시 피해 증가"
+    effects:
+      1: { front_attack_bonus: +0.05 }
+      2: { front_attack_bonus: +0.12 }
+      3: { front_attack_bonus: +0.25 }
+  adrenaline:
+    name: "아드레날린"
+    desc: "스킬 사용 시 ATK 스택 누적 (최대 6)"
+    effects:
+      1: { atk_per_stack: +0.003, crit_at_max: +0.05, stacks: 6 }
+      2: { atk_per_stack: +0.006, crit_at_max: +0.10, stacks: 6 }
+      3: { atk_per_stack: +0.01,  crit_at_max: +0.15, stacks: 6 }
+  spirit_absorption:
+    name: "정기 흡수"
+    desc: "공격 속도 / 이동 속도 증가"
+    effects:
+      1: { attack_speed: +0.03, move_speed: +0.03 }
+      2: { attack_speed: +0.08, move_speed: +0.08 }
+      3: { attack_speed: +0.15, move_speed: +0.15 }
+  heavy_armor:
+    name: "중갑"
+    desc: "방어력 대폭 증가"
+    effects:
+      1: { def_bonus: +0.20 }
+      2: { def_bonus: +0.50 }
+      3: { def_bonus: +1.00 }
+  expert:
+    name: "전문가"
+    desc: "실드/회복 효과 증가 (서포터용)"
+    effects:
+      1: { healing_bonus: +0.06, shield_bonus: +0.06 }
+      2: { healing_bonus: +0.14, shield_bonus: +0.14 }
+      3: { healing_bonus: +0.24, shield_bonus: +0.24 }
+  awakening_engraving:
+    name: "각성"
+    desc: "궁극기 쿨다운 감소"
+    effects:
+      1: { ultimate_cdr: -0.10 }
+      2: { ultimate_cdr: -0.25 }
+      3: { ultimate_cdr: -0.50 }
+
+# ── 초월 (파라곤) 마일스톤 ──
+paragon_milestones:
+  10: { title: "초월자 I", bonus: { atk: 20 } }
+  25: { title: "초월자 II", bonus: { all_stats: 5 } }
+  50: { title: "초월자 III", bonus: { atk: 50, def: 50 } }
+  100: { title: "궁극의 초월자", cosmetic: "황금 날개 이펙트" }
+
+# ── 장비 초월 비용/확률 ──
+equipment_transcend:
+  gold: [50000, 100000, 200000, 500000, 1000000]
+  success_rate: [0.50, 0.30, 0.20, 0.10, 0.05]

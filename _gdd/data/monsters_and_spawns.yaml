@@ -1,0 +1,141 @@
+# ============================================================
+# MONSTER DATA — 공격패턴, 보스 기믹, 스폰 테이블, 패스파인딩
+# Source: rules/ai_behavior.yaml (Section 3, 4, 5)
+# AI 행동 규칙/BT는 rules/ai_behavior.yaml 참조
+# ============================================================
+
+# ── 공격 패턴 템플릿 ──
+attack_patterns:
+  basic_attack:
+    animation: "attack_1"
+    damage: "atk * 1.0"
+    range: 2.0
+    aoe: false
+    cast_time: 0.0
+    cooldown: 1.5
+
+  aoe_slam:
+    animation: "aoe_attack"
+    damage: "atk * 1.5"
+    range: 0.0
+    aoe: { shape: "circle", radius: 4.0 }
+    cast_time: 1.0
+    warning_indicator: true
+    warning_color: "#FF000044"
+    cooldown: 8.0
+
+  charge_rush:
+    animation: "charge"
+    damage: "atk * 2.0"
+    range: 12.0
+    aoe: { shape: "line", width: 2.0, length: 12.0 }
+    cast_time: 0.5
+    warning_indicator: true
+    knockback: 5.0
+    cooldown: 10.0
+
+  roar_debuff:
+    animation: "roar"
+    damage: 0
+    range: 0.0
+    aoe: { shape: "circle", radius: 8.0 }
+    effect: { debuff: "atk_down_20", duration: 5.0 }
+    cast_time: 0.8
+    cooldown: 15.0
+
+  boss_grab:
+    animation: "grab"
+    damage: "atk * 3.0"
+    range: 3.0
+    aoe: false
+    cast_time: 0.8
+    dodge_window: [0.3, 0.8]
+    grab_duration: 2.0
+    cooldown: 20.0
+
+# ── 보스 기믹 ──
+boss_mechanics:
+  safe_zone:
+    warning_time: 2.0
+    warning_vfx: "vfx_danger_zone_full"
+    safe_count: 2
+    safe_radius: 3.0
+    damage_outside: "90% max_hp"
+    sound: "sfx_boss_mechanic_alert"
+
+  stagger_check:
+    duration: 10.0
+    stagger_gauge: 1000
+    success: "boss_stagger_3sec"
+    failure: "boss_ultimate_attack"
+    ui: "stagger_bar_display"
+
+  counter:
+    warning_time: 1.0
+    window: 1.5
+    counter_trigger: "specific_skill"
+    success: "boss_stagger_2sec"
+    failure: "boss_double_damage_attack"
+
+  typing_qte:
+    key_count: 4
+    time_limit: 5.0
+    success: "damage_reduction_50"
+    failure: "unavoidable_damage"
+
+  position_swap:
+    desc: "파티원 위치 교환 → 맞는 자리로 이동"
+    swap_time: 5.0
+    correct_position_indicator: true
+    damage_on_wrong: "50% max_hp"
+
+  cooperation:
+    desc: "2명이 동시에 버튼 상호작용"
+    required_players: 2
+    range: 3.0
+    time_limit: 8.0
+    failure: "wipe_mechanic"
+
+  dps_check:
+    desc: "제한시간 내 일정 데미지 → 실패 시 전멸"
+    hp_threshold: "10%"
+    time_limit: 15.0
+    failure: "instant_wipe"
+
+# ── 리스폰 시간 ──
+respawn_time:
+  normal: [30, 60]        # 30~60초
+  elite: [300, 600]       # 5~10분
+  boss: [3600, 7200]      # 1~2시간
+  field_boss: 7200        # 2시간 고정
+
+# ── 존별 스폰 테이블 ──
+spawn_tables:
+  grass_plain:
+    - { monster: "slime",      weight: 0.4, count: [2, 4] }
+    - { monster: "goblin",     weight: 0.3, count: [1, 3] }
+    - { monster: "wolf",       weight: 0.2, count: [1, 2] }
+    - { monster: "bear",       weight: 0.1, count: [1, 1] }
+  frozen_peak:
+    - { monster: "ice_golem",       weight: 0.35, count: [1, 2] }
+    - { monster: "frost_wolf",      weight: 0.35, count: [2, 3] }
+    - { monster: "yeti",            weight: 0.2,  count: [1, 1] }
+    - { monster: "ice_queen_elite", weight: 0.1,  count: [1, 1], type: "elite" }
+
+# ── 야간 전용 몬스터 ──
+night_only_monsters: ["shadow_wolf", "night_wraith", "phantom"]
+
+# ── 패스파인딩 에이전트 타입 ──
+pathfinding_agents:
+  small:  { radius: 0.3, height: 1.0, step_height: 0.3, max_slope: 45, speed: 3.0 }
+  medium: { radius: 0.5, height: 2.0, step_height: 0.4, max_slope: 40, speed: 4.0 }
+  large:  { radius: 1.5, height: 4.0, step_height: 0.5, max_slope: 30, speed: 3.5 }
+  boss:   { radius: 3.0, height: 6.0, step_height: 1.0, max_slope: 20, speed: 3.0 }
+
+# ── PvE 몬스터 골드 드롭 기본값 ──
+gold_drop_by_tier:
+  normal: 5
+  elite: 50
+  mini_boss: 200
+  boss: 1000
+  raid_boss: 5000
