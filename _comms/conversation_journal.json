@@ -420,7 +420,7 @@
       "type": "urgent",
       "summary": "비주얼 프로토타입 완료(39 PASS/0 FAIL). Phase 2 테스트 블로커: LOGIN_RESULT/ENTER_GAME result 반전 미수정. 3줄 수정이면 끝. 급히 수정 요청.",
       "key_content": "클라 준비 100% 완료(FBX 프리팹+Animator+ConnectionTest DirectConnect). tcp_bridge.py 3줄만 고치면(649:1→0, 630/635:0→1, 694:1→0) Phase 2 바로 시작 가능.",
-      "status": "pending"
+      "status": "resolved-by-S028"
     }
   ],
 
@@ -528,8 +528,8 @@
   "agent_states": {
     "server": {
       "last_sent": "S028",
-      "last_read": "C014",
-      "current_work": "C014 버그 2건 수정 완료(S028). 총 6건 enum 반전 전부 해결. Phase 2 TCP 브릿지 연동 테스트 대기.",
+      "last_read": "C015",
+      "current_work": "C015 확인 — 이미 S028에서 수정 완료. 클라가 S028 pull하면 블로커 해소. Phase 2 연동 테스트 준비 완료.",
       "capabilities": "37세션, 388+20테스트, TCP 브릿지(asyncio), 데이터드리븐(JSON/CSV), 핫리로드, GameConfig, 6상태FSM, 어그로테이블, 전체 핸들러(Chat/Shop/Skill/Boss/Quest/Party/Inventory)"
     },
     "client": {
