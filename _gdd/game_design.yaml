@@ -455,7 +455,7 @@ phases:
             - 허수아비 1마리 (HP=100, ATK=0, 무반격)
             - 슬라임 3마리 (HP=50, ATK=5, AI=IDLE only)
             monster_spawns.csv 또는 zone_config에 추가
-          status: todo
+          status: done
           priority: P0
 
     # ----------------------------------------------------------
@@ -587,7 +587,7 @@ phases:
             data/npc_dialogs.json:
             - npc_id → dialog_lines[] → quest_offer
             NPC_INTERACT(332) → NPC_DIALOG(333) 패킷 추가
-          status: todo
+          status: done
           priority: P1
 
     # ----------------------------------------------------------
@@ -678,7 +678,7 @@ phases:
             zone_id=10 (village)
             data/npc_spawns.csv: npc_id, zone_id, x, y, z, type(shop/quest/craft)
             NPC는 공격 불가 엔티티로 처리
-          status: todo
+          status: done
           priority: P1
 
 # ============================================================
@@ -753,7 +753,7 @@ phases:
             ENHANCE_REQ(340) → ENHANCE_RESULT(341)
             강화 단계별 성공률: +1(90%), +2(80%), +3(70%)...
             실패 시 단계 유지 (파괴 없음, 초보자 친화)
-          status: todo
+          status: done
           priority: P1
 
     - id: "P2_S03"

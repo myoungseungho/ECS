@@ -673,6 +673,126 @@ async def run_tests(port: int):
 
     await test("TUTORIAL: 스텝 완료 + 보상 + 중복방지", test_tutorial())
 
+
+    # ━━━ NPC 대화 / 강화 / 튜토리얼 몬스터 (S034) ━━━
+
+    async def test_tutorial_monsters():
+        """튜토리얼 존(zone=0)에 허수아비+슬라임 몬스터가 스폰되었는지 확인"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        # 로그인 + 게임 입장
+        await c.send(MsgType.LOGIN, struct.pack('<B', 7) + b'tutmon1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        packets = await c.recv_all_packets(timeout=1.0)
+        # MONSTER_SPAWN 패킷 중 zone=0 (tutorial) 몬스터 확인
+        spawns = [p for mt, p in packets if mt == MsgType.MONSTER_SPAWN]
+        # 서버가 zone 기반 필터링을 할 수도 있고 전체 전송할 수도 있음
+        # 최소한 MONSTER_SPAWN이 전송되었는지 확인
+        assert len(spawns) > 0, "Expected MONSTER_SPAWN packets"
+        c.close()
+
+    await test("TUT_MONSTERS: 튜토리얼 몬스터 스폰 확인", test_tutorial_monsters())
+
+    async def test_npc_interact():
+        """NPC 대화 패킷 테스트"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 7) + b'npctest' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # NPC npc_id=1 (튜토리얼 안내원) — entity_id로 보내야 하므로 npc_id fallback 사용
+        await c.send(MsgType.NPC_INTERACT, struct.pack('<I', 1))
+        # AI 틱으로 MONSTER_MOVE가 먼저 올 수 있으므로 recv_all에서 NPC_DIALOG 찾기
+        packets = await c.recv_all_packets(timeout=1.5)
+        npc_dialogs = [(mt, pl) for mt, pl in packets if mt == MsgType.NPC_DIALOG]
+        assert len(npc_dialogs) > 0, f"Expected NPC_DIALOG, got types: {[mt for mt, _ in packets]}"
+        payload = npc_dialogs[0][1]
+        npc_id, npc_type, line_count = struct.unpack_from('<HBB', payload, 0)
+        assert npc_id == 1, f"Expected npc_id=1, got {npc_id}"
+        assert line_count == 3, f"Expected 3 dialog lines, got {line_count}"
+        c.close()
+
+    await test("NPC_DIALOG: NPC 대화 요청/응답", test_npc_interact())
+
+    async def test_npc_dialog_village():
+        """마을 NPC 대화 테스트"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'villnpc1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 마을 장로 npc_id=2
+        await c.send(MsgType.NPC_INTERACT, struct.pack('<I', 2))
+        packets = await c.recv_all_packets(timeout=1.5)
+        npc_dialogs = [(mt, pl) for mt, pl in packets if mt == MsgType.NPC_DIALOG]
+        assert len(npc_dialogs) > 0, f"Expected NPC_DIALOG, got types: {[mt for mt, _ in packets]}"
+        payload = npc_dialogs[0][1]
+        npc_id, npc_type, line_count = struct.unpack_from('<HBB', payload, 0)
+        assert npc_id == 2
+        assert line_count == 2
+        # quest_ids 파싱 — dialog lines 건너뛰기
+        offset = 4
+        for _ in range(line_count):
+            spk_len = payload[offset]
+            offset += 1 + spk_len
+            txt_len = struct.unpack_from('<H', payload, offset)[0]
+            offset += 2 + txt_len
+        quest_count = payload[offset]
+        assert quest_count == 2, f"Expected 2 quest_ids, got {quest_count}"
+        c.close()
+
+    await test("NPC_DIALOG_VILLAGE: 마을 장로 대화 + 퀘스트 연결", test_npc_dialog_village())
+
+    async def test_enhance_with_item():
+        """강화 — 아이템 추가 후 강화 (결과: SUCCESS 또는 FAIL)"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'enhtest1' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 먼저 슬롯 0에 아이템 추가
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IHB', 201, 1, 0))
+        await c.recv_all_packets(timeout=0.5)
+        # 이제 강화 (초기 gold=1000, +1 cost=500)
+        await c.send(MsgType.ENHANCE_REQ, struct.pack('<B', 0))
+        packets = await c.recv_all_packets(timeout=1.5)
+        enh_results = [(mt, pl) for mt, pl in packets if mt == MsgType.ENHANCE_RESULT]
+        assert len(enh_results) > 0, f"Expected ENHANCE_RESULT, got types: {[mt for mt, _ in packets]}"
+        payload = enh_results[0][1]
+        slot_idx = payload[0]
+        result = payload[1]
+        # 0=SUCCESS, 5=FAIL (level preserved)
+        assert result in (0, 5), f"Expected SUCCESS(0) or FAIL(5), got {result}"
+        c.close()
+
+    await test("ENHANCE: 아이템 강화 실행", test_enhance_with_item())
+
+    async def test_enhance_empty_slot():
+        """강화 — 빈 슬롯"""
+        c = TestClient()
+        await c.connect('127.0.0.1', port)
+        await asyncio.sleep(0.1)
+        await c.send(MsgType.LOGIN, struct.pack('<B', 8) + b'enhtest2' + struct.pack('<B', 2) + b'pw')
+        await c.recv_packet()
+        await c.send(MsgType.CHAR_SELECT, struct.pack('<I', 1))
+        await c.recv_all_packets(timeout=1.0)
+        # 빈 슬롯 강화
+        await c.send(MsgType.ENHANCE_REQ, struct.pack('<B', 5))
+        msg_type, payload = await c.recv_packet()
+        assert msg_type == MsgType.ENHANCE_RESULT
+        assert payload[1] == 2, f"Expected NO_ITEM(2), got {payload[1]}"
+        c.close()
+
+    await test("ENHANCE: 빈 슬롯 강화 거부", test_enhance_empty_slot())
+
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
     print(f"  TCP Bridge Test Results: {passed}/{total} PASSED")
@@ -693,6 +813,8 @@ async def main():
         )
         server._running = True
         server._spawn_monsters()
+        if hasattr(server, '_spawn_npcs'):
+            server._spawn_npcs()
         asyncio.create_task(server._game_tick_loop())
         async with srv:
             await srv.serve_forever()

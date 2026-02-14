@@ -237,6 +237,14 @@ class MsgType(IntEnum):
     TUTORIAL_STEP_COMPLETE = 330
     TUTORIAL_REWARD = 331
 
+    # NPC Dialog
+    NPC_INTERACT = 332
+    NPC_DIALOG = 333
+
+    # Enhancement
+    ENHANCE_REQ = 340
+    ENHANCE_RESULT = 341
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -304,6 +312,7 @@ class InventorySlot:
     item_id: int = 0
     count: int = 0
     equipped: bool = False
+    enhance_level: int = 0
 
 @dataclass
 class MonsterAI:
@@ -402,6 +411,12 @@ SHOPS = {
 
 # 몬스터 스폰 데이터
 MONSTER_SPAWNS = [
+    # Tutorial zone (zone=0) — P1_S02_S01
+    {"id": 9001, "name": "Dummy", "level": 1, "hp": 100, "atk": 0, "def": 999, "zone": 0, "x": 50, "y": 0, "z": 80},
+    {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 100, "y": 0, "z": 120},
+    {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 120, "y": 0, "z": 100},
+    {"id": 9002, "name": "TutSlime", "level": 1, "hp": 50, "atk": 5, "zone": 0, "x": 80, "y": 0, "z": 140},
+    # Field zone 1
     {"id": 1, "name": "Goblin", "level": 5, "hp": 100, "atk": 15, "zone": 1, "x": 200, "y": 0, "z": 200},
     {"id": 1, "name": "Goblin", "level": 5, "hp": 100, "atk": 15, "zone": 1, "x": 300, "y": 0, "z": 150},
     {"id": 2, "name": "Wolf", "level": 8, "hp": 200, "atk": 25, "zone": 1, "x": 500, "y": 0, "z": 400},
@@ -443,9 +458,11 @@ QUESTS = {
 
 # 존 경계
 ZONE_BOUNDS = {
+    0: {"min_x": 0, "max_x": 500, "min_z": 0, "max_z": 500},      # tutorial
     1: {"min_x": 0, "max_x": 1000, "min_z": 0, "max_z": 1000},
     2: {"min_x": 0, "max_x": 2000, "min_z": 0, "max_z": 2000},
     3: {"min_x": 0, "max_x": 3000, "min_z": 0, "max_z": 3000},
+    10: {"min_x": 0, "max_x": 300, "min_z": 0, "max_z": 300},     # village
 }
 
 # 서버 리스트 (서버 선택 화면용)
@@ -463,6 +480,66 @@ TUTORIAL_REWARDS = {
     4: {"reward_type": 2, "amount": 50},      # step 4: 경험치 50
     5: {"reward_type": 0, "amount": 500},     # step 5: 골드 500
 }
+
+# NPC 스폰 데이터 (P1_S04_S01, P1_S05_S01)
+NPC_SPAWNS = [
+    # Tutorial zone (zone=0)
+    {"npc_id": 1, "name": "튜토리얼 안내원", "type": "quest", "zone": 0, "x": 10.0, "y": 0.0, "z": 10.0, "quest_ids": [1]},
+    # Village zone (zone=10)
+    {"npc_id": 2, "name": "마을 장로", "type": "quest", "zone": 10, "x": 0.0, "y": 0.0, "z": 0.0, "quest_ids": [2, 3]},
+    {"npc_id": 3, "name": "상점 주인", "type": "shop", "zone": 10, "x": 15.0, "y": 0.0, "z": 5.0, "shop_id": 1},
+    {"npc_id": 4, "name": "무기 상인", "type": "shop", "zone": 10, "x": 20.0, "y": 0.0, "z": 5.0, "shop_id": 2},
+    {"npc_id": 5, "name": "방어구 상인", "type": "shop", "zone": 10, "x": 20.0, "y": 0.0, "z": -5.0, "shop_id": 3},
+    {"npc_id": 6, "name": "대장장이", "type": "blacksmith", "zone": 10, "x": -10.0, "y": 0.0, "z": 5.0},
+    {"npc_id": 7, "name": "퀘스트 게시판", "type": "quest", "zone": 10, "x": 5.0, "y": 0.0, "z": -10.0, "quest_ids": [1, 2, 3]},
+    {"npc_id": 8, "name": "스킬 트레이너", "type": "skill", "zone": 10, "x": -5.0, "y": 0.0, "z": -10.0},
+]
+
+# NPC 대화 데이터
+NPC_DIALOGS = {
+    1: [
+        {"speaker": "튜토리얼 안내원", "text": "모험가여, 환영하네! 자네의 여정을 도와주지."},
+        {"speaker": "튜토리얼 안내원", "text": "먼저 WASD로 이동해보게. 그리고 저 허수아비를 공격해보게나."},
+        {"speaker": "튜토리얼 안내원", "text": "슬라임도 처치해보게. 실전 전투 연습이 될 거야."},
+    ],
+    2: [
+        {"speaker": "마을 장로", "text": "오, 젊은 모험가. 마을에 일이 생겼다네..."},
+        {"speaker": "마을 장로", "text": "마을 근처에 고블린이 출몰하고 있소. 퇴치해 주겠는가?"},
+    ],
+    3: [
+        {"speaker": "상점 주인", "text": "어서오세요! 필요한 물건이 있으신가요?"},
+    ],
+    4: [
+        {"speaker": "무기 상인", "text": "최고급 무기를 갖추고 있습니다!"},
+    ],
+    5: [
+        {"speaker": "방어구 상인", "text": "튼튼한 방어구, 여기 다 있습니다."},
+    ],
+    6: [
+        {"speaker": "대장장이", "text": "뭘 강화할 건가? 내 솜씨를 보여주지."},
+    ],
+    7: [
+        {"speaker": "퀘스트 게시판", "text": "[의뢰 목록을 확인한다]"},
+    ],
+    8: [
+        {"speaker": "스킬 트레이너", "text": "새로운 기술을 배우고 싶은가? 잘 찾아왔어."},
+    ],
+}
+
+# 강화 확률 테이블 (P2_S02_S01)
+ENHANCE_TABLE = {
+    1: 0.90,   # +1: 90%
+    2: 0.80,   # +2: 80%
+    3: 0.70,   # +3: 70%
+    4: 0.60,   # +4: 60%
+    5: 0.50,   # +5: 50%
+    6: 0.40,   # +6: 40%
+    7: 0.30,   # +7: 30%
+    8: 0.20,   # +8: 20%
+    9: 0.10,   # +9: 10%
+    10: 0.05,  # +10: 5%
+}
+ENHANCE_COST_BASE = 500  # 강화 비용 = base * level
 
 # 이동 상수
 MOVEMENT = {
@@ -496,6 +573,7 @@ class BridgeServer:
         self.next_mail_id = 1
         self.characters: Dict[int, List[dict]] = {}  # account_id -> character list
         self.next_char_id = 1
+        self.npcs: Dict[int, dict] = {}  # entity_id -> npc data
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -514,6 +592,7 @@ class BridgeServer:
 
         # 몬스터 스폰
         self._spawn_monsters()
+        self._spawn_npcs()
 
         # 게임 틱 루프 시작
         asyncio.create_task(self._game_tick_loop())
@@ -690,6 +769,8 @@ class BridgeServer:
             MsgType.CHARACTER_CREATE: self._on_character_create,
             MsgType.CHARACTER_DELETE: self._on_character_delete,
             MsgType.TUTORIAL_STEP_COMPLETE: self._on_tutorial_step_complete,
+            MsgType.NPC_INTERACT: self._on_npc_interact,
+            MsgType.ENHANCE_REQ: self._on_enhance_req,
         }
 
         handler = handlers.get(msg_type)
@@ -2477,6 +2558,95 @@ class BridgeServer:
             session.stats.add_exp(amount)
         self.log(f"Tutorial: step {step_id} complete, reward_type={reward_type} amount={amount} ({session.char_name})", "GAME")
         self._send(session, MsgType.TUTORIAL_REWARD, struct.pack('<BBI', step_id, reward_type, amount))
+
+    # ━━━ 몬스터 시스템 ━━━
+
+    def _spawn_npcs(self):
+        """NPC 엔티티 스폰 (P1_S04_S01, P1_S05_S01)"""
+        for npc in NPC_SPAWNS:
+            eid = new_entity()
+            self.npcs[eid] = {
+                "entity_id": eid,
+                "npc_id": npc["npc_id"],
+                "name": npc["name"],
+                "type": npc["type"],
+                "zone": npc["zone"],
+                "pos": Position(npc["x"], npc["y"], npc["z"]),
+                "shop_id": npc.get("shop_id"),
+                "quest_ids": npc.get("quest_ids", []),
+            }
+        self.log(f"Spawned {len(self.npcs)} NPCs", "GAME")
+
+    # ━━━ 핸들러: NPC 대화 (P1_S04_S01) ━━━
+
+    async def _on_npc_interact(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 4:
+            return
+        npc_entity_id = struct.unpack("<I", payload[:4])[0]
+        npc = self.npcs.get(npc_entity_id)
+        if not npc:
+            # npc_id 직접 조회 fallback
+            npc_id = npc_entity_id
+            for n in self.npcs.values():
+                if n["npc_id"] == npc_id:
+                    npc = n
+                    break
+        if not npc:
+            return
+        dialogs = NPC_DIALOGS.get(npc["npc_id"], [])
+        if not dialogs:
+            return
+        npc_id = npc["npc_id"]
+        npc_type_val = {"quest": 0, "shop": 1, "blacksmith": 2, "skill": 3}.get(npc["type"], 0)
+        line_count = len(dialogs)
+        # 대화 패킷: npc_id(u16) + npc_type(u8) + line_count(u8) + [speaker_len(u8) + speaker + text_len(u16) + text] * N
+        buf = struct.pack("<HBB", npc_id, npc_type_val, line_count)
+        for d in dialogs:
+            speaker_bytes = d["speaker"].encode("utf-8")[:32]
+            text_bytes = d["text"].encode("utf-8")[:256]
+            buf += struct.pack("<B", len(speaker_bytes)) + speaker_bytes
+            buf += struct.pack("<H", len(text_bytes)) + text_bytes
+        # quest_ids 추가: quest_count(u8) + [quest_id(u32)] * N
+        quest_ids = npc.get("quest_ids", [])
+        buf += struct.pack("<B", len(quest_ids))
+        for qid in quest_ids:
+            buf += struct.pack("<I", qid)
+        self._send(session, MsgType.NPC_DIALOG, buf)
+        self.log(f"NPC Dialog: npc_id={npc_id} lines={line_count} ({session.char_name})", "GAME")
+
+    # ━━━ 핸들러: 강화 (P2_S02_S01) ━━━
+
+    async def _on_enhance_req(self, session: PlayerSession, payload: bytes):
+        """ENHANCE_REQ: slot_index(u8). 해당 슬롯 장비를 강화."""
+        if not session.in_game or len(payload) < 1:
+            return
+        slot_idx = payload[0]
+        if slot_idx >= len(session.inventory):
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 1, 0))  # 1=INVALID_SLOT
+            return
+        item = session.inventory[slot_idx]
+        if item.item_id == 0:
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 2, 0))  # 2=NO_ITEM
+            return
+        current_level = getattr(item, "enhance_level", 0)
+        if current_level >= 10:
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 3, current_level))  # 3=MAX_LEVEL
+            return
+        cost = ENHANCE_COST_BASE * (current_level + 1)
+        if session.gold < cost:
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 4, current_level))  # 4=NO_GOLD
+            return
+        session.gold -= cost
+        import random as _rng
+        success_rate = ENHANCE_TABLE.get(current_level + 1, 0.05)
+        success = _rng.random() < success_rate
+        if success:
+            item.enhance_level = current_level + 1
+            self.log(f"Enhance: +{item.enhance_level} SUCCESS slot={slot_idx} ({session.char_name})", "GAME")
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 0, item.enhance_level))  # 0=SUCCESS
+        else:
+            self.log(f"Enhance: +{current_level + 1} FAIL slot={slot_idx} ({session.char_name})", "GAME")
+            self._send(session, MsgType.ENHANCE_RESULT, struct.pack("<BBB", slot_idx, 5, current_level))  # 5=FAIL (level preserved)
 
     # ━━━ 몬스터 시스템 ━━━
 

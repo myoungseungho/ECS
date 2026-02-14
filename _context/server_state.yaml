@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-14T22:55:00"
+last_session: "2026-02-14T23:15:00"
 
 # ── 현재 상태 ──
-current_status: "S033 P1 패킷 3종 구현 완료 — SERVER_LIST/CHARACTER_CRUD/TUTORIAL (23/23 PASS). GDD 태스크 3건 done."
+current_status: "S034 GDD 서버 태스크 4건 구현 완료 — 튜토리얼 몬스터/NPC 대화/마을 NPC/강화 (28/28 PASS). Phase 2 연동 대기."
 
 # ── 완료된 작업 ──
 completed:
@@ -46,6 +46,9 @@ completed:
   - id: S033
     desc: "P1 패킷 3종: SERVER_LIST(320-321)/CHARACTER_CRUD(322-327)/TUTORIAL(330-331). 23/23 PASS."
     files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch.py"]
+  - id: S034
+    desc: "GDD 서버 태스크 4건: 튜토리얼 몬스터(P1_S02_S01)/NPC 대화(P1_S04_S01,332-333)/마을 NPC(P1_S05_S01)/강화(P2_S02_S01,340-341). 28/28 PASS."
+    files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch_s034.py"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked:
@@ -63,8 +66,8 @@ pending_tasks:
     priority: P0
     blocked: true
     blocked_reason: "클라이언트 테스트 결과 대기"
-  - id: "gdd_next_tasks"
-    desc: "game_design.yaml에서 다음 미구현 server_tasks 확인 후 구현"
+  - id: "gdd_remaining_tasks"
+    desc: "GDD 남은 서버 태스크: P2_S01_S01(필드 몬스터 확장), P2_S03_S01(던전 매칭), P3(PvP/레이드)"
     priority: P1
     blocked: false
   - id: "entity_pipeline_review"
@@ -102,6 +105,7 @@ processed_messages:
   - "C015"
   - "C016"
   - "C017"
+  - "C018"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -117,4 +121,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python test_tcp_bridge.py
