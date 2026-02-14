@@ -348,6 +348,23 @@ managers:
       - GetBoss(ulong) → BossState
       - IsBoss(ulong) → bool
 
+  - name: SceneFlowManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "씬 전환 매니저 — 페이드인/아웃 트랜지션 + 씬 흐름 순서 관리"
+    reads: []
+    writes:
+      - CurrentScene (GameScene enum)
+    fires_events:
+      - OnSceneChanged(GameScene)
+    subscribes_to: []
+    public_api:
+      - TransitionTo(GameScene)
+      - TransitionToNext()
+    serialized_fields:
+      - fadeDuration: float (default 0.5)
+
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -589,6 +606,11 @@ data_flows:
     to: BossUI
     via: "C# events (OnBossAppeared, OnBossPhaseChanged, OnBossSpecialAttacked, OnBossEnraged, OnBossKilled, OnBossHPChanged)"
     description: "보스 HP바, 페이즈 표시, 알림 팝업"
+
+  - from: SceneFlowManager
+    to: SceneManager (Unity)
+    via: "LoadSceneAsync() 직접 호출"
+    description: "페이드 아웃 → 씬 로드 → 페이드 인 (0.5초 트랜지션)"
 
   - from: LocalPlayer
     to: NetworkManager

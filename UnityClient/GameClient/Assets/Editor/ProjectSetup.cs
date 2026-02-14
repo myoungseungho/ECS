@@ -583,6 +583,7 @@ public static class ProjectSetup
         var shopManagerGo = CreateManagerObject("ShopManager", typeof(ShopManager));
         var bossManagerGo = CreateManagerObject("BossManager", typeof(BossManager));
         var hitVFXManagerGo = CreateManagerObject("HitVFXManager", typeof(HitVFXManager));
+        var sceneFlowManagerGo = CreateManagerObject("SceneFlowManager", typeof(SceneFlowManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

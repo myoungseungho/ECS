@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T22:55:00"
+last_session: "2026-02-14T23:02:00"
 
 # ── 현재 상태 ──
-current_status: "idle cycle — blocked task만 남아 대표님께 다음 작업 우선순위 질문 (ask_user Q001)"
+current_status: "idle cycle — 검증 PASS(0 FAIL), GDD status 동기화 완료, Q001 대표님 답변 대기 중"
 
 # ── 완료된 작업 ──
 completed:
@@ -55,6 +55,9 @@ completed:
   - id: A11
     desc: "art_style.yaml 기반 URP 라이팅/포스트프로세싱 (포그/앰비언트/디렉셔널/볼륨)"
     files: ["Assets/Editor/ProjectSetup.cs"]
+  - id: A12
+    desc: "SceneFlowManager 구현 (P0_S01_C02) — 씬 전환 싱글톤 + 페이드 트랜지션"
+    files: ["Assets/Scripts/Managers/SceneFlowManager.cs", "Assets/Editor/ProjectSetup.cs", "Assets/Editor/SceneValidator.cs", "Assets/Scripts/interaction-map.yaml"]
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -80,6 +83,8 @@ recent_decisions:
   - "HitVFXManager Reflection 기반 Volume 설정 (URP 직접 참조 대신)"
   - "크리티컬 판정 임시 기준: Damage>=50 (서버 IsCritical 필드 추가 전)"
   - "SSAO는 Renderer Feature이므로 Volume이 아닌 URP Asset 설정 필요 → 추후"
+  - "Q001 대기 중: 대표님 다음 작업 우선순위 결정 필요"
+  - "SceneFlowManager 선행 구현 — 모든 씬의 기반이므로 어떤 우선순위든 필요"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
