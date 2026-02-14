@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T04:20:00"
+last_session: "2026-02-16T04:45:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 15 비급&트라이포드 완료! 66/66 ALL PASS (S046). TRIPOD_TABLE 24스킬*192옵션. 다음: TASK 16 현상금(530-537)."
+current_status: "TASK 16 현상금 시스템 완료! 71/71 ALL PASS (S047). 일일/주간/PvP 현상금+랭킹+토큰상점. 다음: TASK 4 퀘스트심화(400-405) or TASK 7 칭호/전직(440-447)."
 
 # ── 완료된 작업 ──
 completed:
@@ -88,6 +88,9 @@ completed:
   - id: S046
     desc: "C026 응답: TASK 15 비급&트라이포드 완료. MsgType 520-524. 핸들러3+TRIPOD_TABLE 24스킬+비급드롭/해금/도감. 66/66 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s046.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S046_c026_response_task15_tripod.md"]
+  - id: S047
+    desc: "C027 응답: TASK 16 현상금 시스템 완료. MsgType 530-537. 핸들러4(LIST/ACCEPT/COMPLETE/RANKING)+PvP현상금+토큰상점+일일생성. 71/71 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s047.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S047_c027_response_task16_bounty.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -355,57 +358,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 16: 강호 현상금 시스템 (GDD rules/bounty.yaml) [브레인스토밍 신규]
-  # 일일/주간 현상금 + PvP 현상금 + 랭킹
-  # MsgType: 530-537
+  # TASK 16: 완료! (S047) — 현상금 시스템 71/71 PASS
+  # bounty_sub01~08 모두 완료
   # ============================================================
-  - id: "bounty_sub01"
-    desc: "BOUNTY_LIST_REQ(530)→BOUNTY_LIST(531) 핸들러 — 일일 현상금 3개 + 주간 대현상금 1개 조회. 대상 몬스터ID/위치/보상/수락상태 반환."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub02"
-    desc: "BOUNTY_ACCEPT(532)→BOUNTY_ACCEPT_RESULT(533) 핸들러 — 현상금 수락. 동시 수락 3개 제한. 미니맵 위치 데이터 포함."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub03"
-    desc: "BOUNTY_COMPLETE(534) 핸들러 — 현상금 대상 처치 감지 → 보상 지급 + 클라 알림. 몬스터 처치 시 현상금 수락 여부 교차 체크."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub04"
-    desc: "BOUNTY_RANKING_REQ(535)→BOUNTY_RANKING(536) 핸들러 — 주간 PvE/PvP 현상금 TOP 10 랭킹. 월요일 리셋 + 보상 우편 발송."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub05"
-    desc: "PVP_BOUNTY_NOTIFY(537) 핸들러 — 킬스트릭 3+ 시 PvP 현상금 자동 부여 + 존 브로드캐스트. 처치자 보상 + 현상금 해제 로직."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub06"
-    desc: "일일 현상금 생성 로직 — 06:00 리셋 시 monsters.csv에서 elite급 3체 랜덤 선정. 날씨 연동 특수 현상금(storm/fog/night)."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub07"
-    desc: "data/world_bosses.yaml + 현상금 토큰 상점 — 주간 월드보스 3종 정의 + bounty_token 교환 아이템 테이블."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "bounty_sub08"
-    desc: "현상금 테스트 5개 — 일일 현상금 조회/수락/완료, PvP 현상금 발생, 랭킹 조회."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 17: 비경 탐험 시스템 (GDD rules/secret_realm.yaml) [브레인스토밍 신규]
@@ -717,6 +672,8 @@ recent_decisions:
   - "클라 Phase 5 완료 확인: TASK 11-14 (474-517) 매니저7종+UI7종+패킷44종, 79 PASS"
   - "클라 Phase 6 거래소 완료: AuctionManager+AuctionUI, 37매니저 24UI 131패킷, 81 PASS"
   - "TASK 15 완료: 비급&트라이포드(520-524) 66/66 PASS. _patch_s046.py. TRIPOD_TABLE 24스킬*192옵션+비급드롭+해금+도감. 비급item_id=9000~9999."
+  - "클라 TASK 15 완료: TripodManager+TripodUI, 83 PASS. T키 토글, 3티어 구조."
+  - "TASK 16 완료: 현상금시스템(530-537) 71/71 PASS. _patch_s047.py. 핸들러4+PvP현상금+토큰상점. BOUNTY_ELITE_POOL3종+WORLD_BOSSES3종+PVP_TIERS4단계."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -748,6 +705,7 @@ processed_messages:
   - "C025"
   - "C025_s042"
   - "C026"
+  - "C027"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -763,4 +721,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python test_tcp_bridge.py

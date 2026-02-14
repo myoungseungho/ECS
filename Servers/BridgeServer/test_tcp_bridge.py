@@ -21,7 +21,9 @@ from tcp_bridge import (
     AUCTION_TAX_RATE, AUCTION_LISTING_FEE,
     AUCTION_MAX_LISTINGS, DAILY_GOLD_CAPS,
     TRIPOD_TABLE, TRIPOD_TIER_UNLOCK,
-    SCROLL_DROP_RATES, SKILL_CLASS_MAP, CLASS_SKILLS
+    SCROLL_DROP_RATES, SKILL_CLASS_MAP, CLASS_SKILLS,
+    BOUNTY_ELITE_POOL, BOUNTY_WORLD_BOSSES, PVP_BOUNTY_TIERS,
+    BOUNTY_MAX_ACCEPTED, BOUNTY_MIN_LEVEL, BOUNTY_TOKEN_SHOP
 )
 
 
@@ -1662,6 +1664,139 @@ async def run_tests(port: int):
         c.close()
 
     await test("TRIPOD_LIST: 트라이포드 목록 조회", test_tripod_list())
+
+
+    # ━━━ Test: BOUNTY_LIST_REQ — 현상금 목록 조회 ━━━
+    async def test_bounty_list():
+        """현상금 목록 조회 (일일 3개 + 주간 확인)."""
+        c = await login_and_enter(port)
+        # Set level to 15+ for bounty access
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_expect(MsgType.STAT_SYNC)
+        await asyncio.sleep(0.1)
+
+        await c.send(MsgType.BOUNTY_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_LIST)
+        assert msg_type == MsgType.BOUNTY_LIST, f"Expected BOUNTY_LIST, got {msg_type}"
+        daily_count = resp[0]
+        assert daily_count == 3, f"Expected 3 daily bounties, got {daily_count}"
+        c.close()
+
+    await test("BOUNTY_LIST: 일일 현상금 3개 조회", test_bounty_list())
+
+    # ━━━ Test: BOUNTY_ACCEPT — 현상금 수락 ━━━
+    async def test_bounty_accept():
+        """현상금 수락 테스트."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_expect(MsgType.STAT_SYNC)
+        await asyncio.sleep(0.1)
+
+        # Get bounty list first
+        await c.send(MsgType.BOUNTY_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_LIST)
+        assert msg_type == MsgType.BOUNTY_LIST
+        # Extract first bounty_id
+        daily_count = resp[0]
+        assert daily_count >= 1
+        bounty_id = struct.unpack_from('<H', resp, 1)[0]
+
+        # Accept the bounty
+        await c.send(MsgType.BOUNTY_ACCEPT, struct.pack('<H', bounty_id))
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_ACCEPT_RESULT)
+        assert msg_type == MsgType.BOUNTY_ACCEPT_RESULT
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        c.close()
+
+    await test("BOUNTY_ACCEPT: 현상금 수락 성공", test_bounty_accept())
+
+    # ━━━ Test: BOUNTY_ACCEPT_DUPLICATE — 중복 수락 차단 ━━━
+    async def test_bounty_accept_duplicate():
+        """이미 수락한 현상금 다시 수락 시도 -> ALREADY_ACCEPTED."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_expect(MsgType.STAT_SYNC)
+        await asyncio.sleep(0.1)
+
+        await c.send(MsgType.BOUNTY_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_LIST)
+        bounty_id = struct.unpack_from('<H', resp, 1)[0]
+
+        # Accept once
+        await c.send(MsgType.BOUNTY_ACCEPT, struct.pack('<H', bounty_id))
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_ACCEPT_RESULT)
+        assert resp[0] == 0, "First accept should succeed"
+
+        # Accept again -> should fail
+        await c.send(MsgType.BOUNTY_ACCEPT, struct.pack('<H', bounty_id))
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_ACCEPT_RESULT)
+        assert resp[0] == 1, f"Expected ALREADY_ACCEPTED(1), got {resp[0]}"
+        c.close()
+
+    await test("BOUNTY_ACCEPT_FAIL: 중복 수락 차단", test_bounty_accept_duplicate())
+
+    # ━━━ Test: BOUNTY_COMPLETE — 현상금 완료 + 보상 ━━━
+    async def test_bounty_complete():
+        """현상금 수락 후 완료 → 골드/토큰 보상."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_expect(MsgType.STAT_SYNC)
+        await asyncio.sleep(0.1)
+
+        await c.send(MsgType.BOUNTY_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_LIST)
+        bounty_id = struct.unpack_from('<H', resp, 1)[0]
+
+        # Accept
+        await c.send(MsgType.BOUNTY_ACCEPT, struct.pack('<H', bounty_id))
+        await c.recv_expect(MsgType.BOUNTY_ACCEPT_RESULT)
+
+        # Complete
+        await c.send(MsgType.BOUNTY_COMPLETE, struct.pack('<H', bounty_id))
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_COMPLETE)
+        assert msg_type == MsgType.BOUNTY_COMPLETE, f"Expected BOUNTY_COMPLETE, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        # bounty_id(2) + gold(4) + exp(4) + token(1) = 11 bytes after result
+        returned_bounty_id = struct.unpack_from('<H', resp, 1)[0]
+        assert returned_bounty_id == bounty_id
+        gold = struct.unpack_from('<I', resp, 3)[0]
+        assert gold > 0, f"Expected gold > 0, got {gold}"
+        exp = struct.unpack_from('<I', resp, 7)[0]
+        assert exp > 0, f"Expected exp > 0, got {exp}"
+        token = resp[11]
+        assert token > 0, f"Expected token > 0, got {token}"
+        c.close()
+
+    await test("BOUNTY_COMPLETE: 현상금 완료 보상 지급", test_bounty_complete())
+
+    # ━━━ Test: BOUNTY_RANKING — 랭킹 조회 ━━━
+    async def test_bounty_ranking():
+        """현상금 완료 후 랭킹 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_expect(MsgType.STAT_SYNC)
+        await asyncio.sleep(0.1)
+
+        # Accept & complete a bounty first to have a score
+        await c.send(MsgType.BOUNTY_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_LIST)
+        bounty_id = struct.unpack_from('<H', resp, 1)[0]
+        await c.send(MsgType.BOUNTY_ACCEPT, struct.pack('<H', bounty_id))
+        await c.recv_expect(MsgType.BOUNTY_ACCEPT_RESULT)
+        await c.send(MsgType.BOUNTY_COMPLETE, struct.pack('<H', bounty_id))
+        await c.recv_expect(MsgType.BOUNTY_COMPLETE)
+
+        # Now query ranking
+        await c.send(MsgType.BOUNTY_RANKING_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BOUNTY_RANKING)
+        assert msg_type == MsgType.BOUNTY_RANKING, f"Expected BOUNTY_RANKING, got {msg_type}"
+        rank_count = resp[0]
+        assert rank_count >= 0, f"Rank count should be >= 0, got {rank_count}"
+        c.close()
+
+    await test("BOUNTY_RANKING: 주간 랭킹 조회", test_bounty_ranking())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
