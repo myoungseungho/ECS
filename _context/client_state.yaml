@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T22:58:00"
+last_session: "2026-02-14T23:02:00"
 
 # ── 현재 상태 ──
-current_status: "idle cycle — SceneFlowManager 구현 완료, Q001 대표님 답변 대기 중"
+current_status: "idle cycle — 검증 PASS(0 FAIL), GDD status 동기화 완료, Q001 대표님 답변 대기 중"
 
 # ── 완료된 작업 ──
 completed:

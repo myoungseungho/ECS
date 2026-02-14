@@ -121,3 +121,20 @@ Please commit your changes or stash them before you merge.
 Aborting
   [IDLE] 300s elapsed, working on pending_tasks
   [CLAUDE] 실행 시작 (1024자 프롬프트)
+  [CLAUDE] 완료 (303초, exit=0)
+  [PUSH] commit & push done
+
+==================================================
+  [!!] 유저 결정 필요! _context/ask_user.yaml 확인
+==================================================
+
+[23:00:20] git pull...
+  [WARN] git pull rebase 실패: error: cannot pull with rebase: You have unstaged changes.
+error: Please commit or stash them.
+  [WARN] stash pop 충돌: error: Your local changes to the following files would be overwritten by merge:
+	_agent/daemon.log
+	_agent/daemon_err.log
+Please commit your changes or stash them before you merge.
+Aborting
+  [IDLE] 300s elapsed, working on pending_tasks
+  [CLAUDE] 실행 시작 (1024자 프롬프트)

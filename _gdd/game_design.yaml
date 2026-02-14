@@ -86,7 +86,7 @@ phases:
             - 씬 전환 순서 관리: Intro → Login → ServerSelect → CharacterSelect → GameWorld
             - 페이드인/아웃 트랜지션 (0.5초 검정 오버레이)
             - DontDestroyOnLoad 싱글톤
-          status: todo
+          status: done
 
       server_tasks: []  # 서버 작업 없음
 
