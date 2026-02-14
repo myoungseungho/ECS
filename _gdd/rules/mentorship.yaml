@@ -1,0 +1,225 @@
+# ============================================================
+# MENTORSHIP SYSTEM (사제 시스템) — 사부-제자 관계
+# Reference: 무협 사부-제자 / BDO 멘토 / WoW Recruit-a-Friend
+# Synergy: social.yaml(친구/친밀도), progression.yaml, economy.yaml, quests.yaml
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 기본 규칙
+# ──────────────────────────────────────────────────────────
+mentorship:
+  desc: |
+    고레벨 플레이어(사부)가 저레벨 플레이어(제자)를 가르치는 시스템.
+    제자가 성장하면 사부도 '사문 기여도'를 얻는다.
+    제자가 Lv.30에 도달하면 졸업, 양쪽 모두 특별 보상.
+    무협 세계관의 사문(師門) 문화를 게임으로 구현.
+
+  # 사부 조건
+  master:
+    min_level: 40
+    max_disciples: 3             # 동시에 제자 3명까지
+    cooldown_after_graduation: 86400  # 졸업 후 24시간 후 새 제자 가능
+    requirements:
+      - "Lv.40 이상"
+      - "현재 제자 수 3명 미만"
+      - "최근 7일 내 3일 이상 접속"
+
+  # 제자 조건
+  disciple:
+    level_range: [1, 20]         # Lv.1~20만 제자 가능
+    max_masters: 1               # 사부는 1명만
+    cooldown_after_leave: 172800 # 사제 관계 해소 후 48시간 후 재가입
+
+  # 졸업 조건
+  graduation:
+    trigger: "disciple_level >= 30"
+    auto: true                   # 자동 트리거 (수동 불가)
+
+  # 사제 해소
+  dissolution:
+    method: "양쪽 모두 가능"
+    penalty:
+      master: "24시간 새 제자 불가"
+      disciple: "48시간 새 사부 불가 + 경험치 버프 즉시 해제"
+    notes: "졸업이 아닌 해소 시 졸업 보상 없음"
+
+# ──────────────────────────────────────────────────────────
+# 2. 사부 혜택
+# ──────────────────────────────────────────────────────────
+master_benefits:
+  # 사문 기여도 획득
+  contribution:
+    disciple_level_up: 10        # 제자 레벨업당 10 기여도
+    mentor_quest_complete: 50    # 사제 퀘스트 완료당 50 기여도
+    disciple_dungeon_clear: 20   # 제자 던전 클리어 시 20 기여도
+    graduation: 500              # 졸업 시 500 기여도 보너스
+
+  # 칭호 누적
+  titles:
+    first_graduation:
+      name: "명사 (名師)"
+      condition: "제자 1명 졸업"
+      bonus: { exp_bonus: 0.03 }
+    five_graduations:
+      name: "대사부 (大師父)"
+      condition: "제자 5명 졸업"
+      bonus: { all_stats: 3, exp_bonus: 0.05 }
+    ten_graduations:
+      name: "무림 종사 (宗師)"
+      condition: "제자 10명 졸업"
+      bonus: { all_stats: 5, cosmetic: "종사의 금관" }
+
+  # 사부 전용 스킬
+  passive:
+    desc: "제자와 같은 파티일 때 사부에게 적용"
+    effects:
+      - { name: "사부의 위엄", effect: "ATK +5% (제자 근처 50m)" }
+      - { name: "가르침의 보람", effect: "제자가 몬스터 처치 시 사부도 EXP의 10% 획득" }
+
+# ──────────────────────────────────────────────────────────
+# 3. 제자 혜택
+# ──────────────────────────────────────────────────────────
+disciple_benefits:
+  # 경험치 보너스
+  exp_buff:
+    party_with_master: 0.30      # 사부와 파티 시 +30%
+    solo: 0.10                   # 사부 있을 때 솔로도 +10%
+    buff_name: "사부의 가르침"
+    buff_icon: "scroll_glow"
+
+  # 일일 혜택
+  daily:
+    free_teleport: 1             # 사부에게 1회 무료 텔레포트 (일일)
+    skill_point_bonus: false     # 스킬 포인트 추가 없음 (밸런스)
+    potion_gift:
+      desc: "매일 접속 시 사부로부터 포션 선물 (자동)"
+      items: [{ item: "hp_potion_m", count: 5 }, { item: "mp_potion_m", count: 5 }]
+
+  # 성장 마일스톤 보상
+  milestones:
+    level_10:
+      desc: "제자 Lv.10 도달"
+      master_reward: { contribution: 50, gold: 1000 }
+      disciple_reward: { equipment_box: "uncommon", gold: 500 }
+    level_20:
+      desc: "제자 Lv.20 도달"
+      master_reward: { contribution: 100, gold: 3000 }
+      disciple_reward: { equipment_box: "rare", gold: 1000 }
+
+# ──────────────────────────────────────────────────────────
+# 4. 사제 전용 퀘스트
+# ──────────────────────────────────────────────────────────
+mentor_quests:
+  desc: |
+    사부와 제자가 같이 완료해야 하는 전용 퀘스트.
+    주 3회 갱신. 같은 파티 상태에서만 진행 가능.
+
+  weekly_count: 3
+  reset: "monday_06:00"
+
+  quest_pool:
+    - id: "mq_hunt_together"
+      name: "사냥 수련"
+      desc: "사부와 함께 몬스터 30마리 처치"
+      objective: { type: "kill", count: 30, condition: "same_party" }
+      reward:
+        master: { contribution: 50, gold: 2000 }
+        disciple: { exp: 3000, gold: 1000 }
+
+    - id: "mq_dungeon_together"
+      name: "던전 돌파"
+      desc: "사부와 함께 던전 1회 클리어"
+      objective: { type: "dungeon_clear", count: 1, condition: "same_party" }
+      reward:
+        master: { contribution: 80, gold: 3000, dungeon_token: 5 }
+        disciple: { exp: 5000, gold: 2000, equipment_box: "uncommon" }
+
+    - id: "mq_gather_together"
+      name: "채집 수업"
+      desc: "사부와 같은 존에서 채집 10회"
+      objective: { type: "gather", count: 10, condition: "same_zone" }
+      reward:
+        master: { contribution: 30, crafting_materials: 3 }
+        disciple: { exp: 1000, crafting_materials: 5, energy: 50 }
+
+    - id: "mq_explore_together"
+      name: "세계 탐험"
+      desc: "사부와 함께 미방문 구역 3곳 발견"
+      objective: { type: "discover_area", count: 3, condition: "same_party" }
+      reward:
+        master: { contribution: 40, gold: 1500 }
+        disciple: { exp: 2000, waypoint_scrolls: 2 }
+
+    - id: "mq_boss_together"
+      name: "보스 도전"
+      desc: "사부와 함께 보스 몬스터 1마리 처치"
+      objective: { type: "kill_boss", count: 1, condition: "same_party" }
+      reward:
+        master: { contribution: 100, gold: 5000 }
+        disciple: { exp: 8000, gold: 3000, scroll_chance: 0.2 }
+
+# ──────────────────────────────────────────────────────────
+# 5. 졸업 시스템
+# ──────────────────────────────────────────────────────────
+graduation:
+  desc: |
+    제자가 Lv.30에 도달하면 자동 졸업 이벤트 발생.
+    양쪽 모두 온라인이면 즉시 연출. 한쪽 오프라인이면 접속 시 연출.
+
+  ceremony:
+    visual:
+      - "화면 전체 꽃비 이펙트 (3초)"
+      - "사부/제자 초상화 나란히 표시"
+      - "'사제 졸업!' 대형 텍스트 (금색, 스케일 애니메이션)"
+      - "보상 목록 팝업"
+    bgm: "sfx_graduation.wav"
+    server_broadcast: true       # 서버 전체 공지: "[사부이름]의 제자 [제자이름]이 졸업했습니다!"
+
+  rewards:
+    master:
+      contribution: 500
+      gold: 10000
+      title: "명사 (名師)"      # 첫 졸업 시
+      cosmetic: "사부의 비단 깃발 (캐릭터 뒤에 걸림)"
+      scroll_box: { tier: "rare+", count: 1 }
+
+    disciple:
+      gold: 5000
+      equipment_box: { tier: "rare", count: 2 }
+      title: "수제자 (首弟子)"
+      exp: 10000
+      scroll_box: { tier: "uncommon+", count: 2 }
+
+  # 졸업 후 관계
+  post_graduation:
+    affinity_bonus: 30           # 친밀도 +30 (social.yaml 연동)
+    permanent_buff: false        # 졸업 후 버프 해제 (밸런스)
+    reunion_quest:
+      desc: "졸업 후 사부와 재파티 시 1회성 특별 퀘스트"
+      reward: { gold: 5000, cosmetic: "사문의 인연 (함께 빛나는 이펙트)" }
+
+# ──────────────────────────────────────────────────────────
+# 6. 사문 상점
+# ──────────────────────────────────────────────────────────
+mentor_shop:
+  desc: "사문 기여도로 교환하는 전용 상점"
+  currency: "contribution"
+
+  items:
+    # 칭호 재료
+    - { name: "대사부의 증표", type: "material", cost: 200, desc: "칭호 업그레이드 재료" }
+
+    # 외형
+    - { name: "사부의 비단 깃발", type: "cosmetic", cost: 100, desc: "캐릭터 뒤에 걸리는 깃발" }
+    - { name: "제자 모집 문패", type: "cosmetic", cost: 50, desc: "머리 위 '사부 모집 중' 표시" }
+
+    # 비급
+    - { name: "미확인 비급 (희귀)", type: "scroll", tier: "rare", cost: 150 }
+    - { name: "미확인 비급 (영웅)", type: "scroll", tier: "epic", cost: 400 }
+
+    # 소모품
+    - { name: "사문의 축복 부적", type: "consumable", cost: 30, effect: "EXP +20% 1시간", desc: "제자 전용" }
+    - { name: "사부의 회복약", type: "consumable", cost: 20, effect: "HP/MP 전체 회복", stack: 5 }
+
+    # 탈것
+    - { name: "탈것: 사문의 학 (흰 학)", type: "mount", cost: 500, desc: "동양풍 학 탈것" }

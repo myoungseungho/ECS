@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-15T18:00:00"
+last_session: "2026-02-15T20:30:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 3 ALL CLEAR! 총 80/80 ALL PASS. GDD 심화 태스크 Phase 4~5 분해 완료 — 기존 10영역 55개 + 신규 4영역 25개 = 14영역 80서브태스크."
+current_status: "TASK 2 제작/채집/요리/인챈트 시스템 완료! 56/56 ALL PASS. MsgType 380-389 핸들러 5개 + 테스트 10개. 다음: TASK 3 거래소(390-397)."
 
 # ── 완료된 작업 ──
 completed:
@@ -73,6 +73,12 @@ completed:
   - id: S041
     desc: "C022 응답: Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS. test_phase3_pvp_raid_tcp.py 작성. 총 80/80 ALL PASS. Phase 3 완전 완료!"
     files: ["Servers/BridgeServer/test_phase3_pvp_raid_tcp.py", "_comms/server_to_client/S041_c022_response_phase3_pvp_raid_80_80.md"]
+  - id: S042
+    desc: "TASK 2 제작/채집/요리/인챈트 시스템 구현. MsgType 380-389. 핸들러 5개(CRAFT_LIST/CRAFT_EXECUTE/GATHER_START/COOK_EXECUTE/ENCHANT_REQ) + 테스트 10개. 56/56 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s042.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py"]
+  - id: S043
+    desc: "C023/C023_s041/C024 응답: TASK 2 완료 알림. 클라이언트 GROUP G TASK 2 UI 작업 가능(CraftingUI/GatheringUI/CookingUI/EnchantUI). 서버 TASK 3 착수 예정."
+    files: ["_comms/server_to_client/S043_c024_response_crafting_system.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -81,45 +87,8 @@ blocked: []
 pending_tasks:
 
   # ============================================================
-  # TASK 2: 제작/채집/요리/인챈트 시스템 (GDD rules/crafting.yaml)
-  # GDD에 상세 정의됨, tcp_bridge에 미구현.
-  # MsgType: 380-389
+  # TASK 2: 완료! (S042) — 제작/채집/요리/인챈트 56/56 PASS
   # ============================================================
-  - id: "crafting_sub01"
-    desc: "CRAFT_LIST_REQ(380)→CRAFT_LIST(381) 핸들러 — 제작 레시피 목록 반환. proficiency_level 기반 필터. crafting.yaml recipes 데이터 로드."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "crafting_sub02"
-    desc: "CRAFT_EXECUTE(382)→CRAFT_RESULT(383) 핸들러 — 재료 검증 + 골드 차감 + success_rate 확률 판정 + 결과 아이템 생성 + bonus_option_chance 처리."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "crafting_sub03"
-    desc: "GATHER_START(384)→GATHER_RESULT(385) 핸들러 — 채집 시작(에너지 차감) + gather_time 후 결과(loot table 확률 드롭). energy 시스템(max:200, cost:5/회, regen:1/분)."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "crafting_sub04"
-    desc: "COOK_EXECUTE(386)→COOK_RESULT(387) 핸들러 — 요리 제작 + 음식 버프 적용(buff_duration:1800초, max_food_buff:1). grilled_meat/fish_stew/royal_feast 레시피."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "crafting_sub05"
-    desc: "ENCHANT_REQ(388)→ENCHANT_RESULT(389) 핸들러 — 무기 원소 부여(fire/ice/lightning/dark/holy/nature). enchant_levels 1-3 단계. one_element_per_weapon + overwrite 규칙."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "crafting_sub06"
-    desc: "제작/채집/인챈트 테스트 케이스 5개 작성 — _patch_s042.py에 추가. 레시피 조회/제작 성공/재료부족 실패/채집/인챈트."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 3: 경제 심화 — 거래소/일일캡/화폐 시스템 (GDD rules/economy.yaml)
@@ -408,6 +377,188 @@ pending_tasks:
     estimated_minutes: 10
 
   # ============================================================
+  # TASK 15: 비급 & 트라이포드 시스템 (GDD rules/tripod.yaml) [브레인스토밍 신규]
+  # 스킬 변형 시스템. 비급 아이템으로 트라이포드 해금.
+  # MsgType: 520-524
+  # ============================================================
+  - id: "tripod_sub01"
+    desc: "TRIPOD_LIST_REQ(520)→TRIPOD_LIST(521) 핸들러 — 보유 비급 + 장착 트라이포드 현황 조회. 스킬별 3단계(초식/절초/오의) 각 선택지 해금 상태 반환."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "tripod_sub02"
+    desc: "TRIPOD_EQUIP(522)→TRIPOD_EQUIP_RESULT(523) 핸들러 — 트라이포드 장착/변경. skill_id+tier+option_id. 해금 여부 체크 + 하위 tier 선택 필수 검증."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "tripod_sub03"
+    desc: "SCROLL_DISCOVER(524) 핸들러 — 비급 획득 서버→클라 알림. 비급 아이템 사용 시 해당 스킬 트라이포드 영구 해금. 도감 자동 등록."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "tripod_sub04"
+    desc: "data/tripod_table.yaml 생성 — 전사/궁수/마법사 각 8스킬 * 3단계 * 2~3옵션 전체 정의. 스킬 배율/CC/원소 변환 효과."
+    priority: P1
+    blocked: false
+    estimated_minutes: 15
+
+  - id: "tripod_sub05"
+    desc: "비급 드롭 로직 — 보스/정예 드롭(5~30%), 비경 S등급 보상, 퀘스트 보상에 비급 아이템 추가. 직업별 필터."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "tripod_sub06"
+    desc: "트라이포드/비급 테스트 5개 — 비급 사용/해금, 트라이포드 장착/변경/프리셋, 도감 등록."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 16: 강호 현상금 시스템 (GDD rules/bounty.yaml) [브레인스토밍 신규]
+  # 일일/주간 현상금 + PvP 현상금 + 랭킹
+  # MsgType: 530-537
+  # ============================================================
+  - id: "bounty_sub01"
+    desc: "BOUNTY_LIST_REQ(530)→BOUNTY_LIST(531) 핸들러 — 일일 현상금 3개 + 주간 대현상금 1개 조회. 대상 몬스터ID/위치/보상/수락상태 반환."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub02"
+    desc: "BOUNTY_ACCEPT(532)→BOUNTY_ACCEPT_RESULT(533) 핸들러 — 현상금 수락. 동시 수락 3개 제한. 미니맵 위치 데이터 포함."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub03"
+    desc: "BOUNTY_COMPLETE(534) 핸들러 — 현상금 대상 처치 감지 → 보상 지급 + 클라 알림. 몬스터 처치 시 현상금 수락 여부 교차 체크."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub04"
+    desc: "BOUNTY_RANKING_REQ(535)→BOUNTY_RANKING(536) 핸들러 — 주간 PvE/PvP 현상금 TOP 10 랭킹. 월요일 리셋 + 보상 우편 발송."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub05"
+    desc: "PVP_BOUNTY_NOTIFY(537) 핸들러 — 킬스트릭 3+ 시 PvP 현상금 자동 부여 + 존 브로드캐스트. 처치자 보상 + 현상금 해제 로직."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub06"
+    desc: "일일 현상금 생성 로직 — 06:00 리셋 시 monsters.csv에서 elite급 3체 랜덤 선정. 날씨 연동 특수 현상금(storm/fog/night)."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub07"
+    desc: "data/world_bosses.yaml + 현상금 토큰 상점 — 주간 월드보스 3종 정의 + bounty_token 교환 아이템 테이블."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "bounty_sub08"
+    desc: "현상금 테스트 5개 — 일일 현상금 조회/수락/완료, PvP 현상금 발생, 랭킹 조회."
+    priority: P1
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 17: 비경 탐험 시스템 (GDD rules/secret_realm.yaml) [브레인스토밍 신규]
+  # 랜덤 챌린지 던전 5종 + 날씨/시간 특수 비경
+  # MsgType: 540-544
+  # ============================================================
+  - id: "realm_sub01"
+    desc: "SECRET_REALM_SPAWN(540) 핸들러 — 비경 포탈 랜덤 스폰. 5~15분 주기, 존당 최대 1개. 존 브로드캐스트."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "realm_sub02"
+    desc: "SECRET_REALM_ENTER(541)→SECRET_REALM_ENTER_RESULT(542) 핸들러 — 비경 입장. 일일 3회 제한 체크 + 솔로/2인 파티 체크 + 인스턴스 생성."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "realm_sub03"
+    desc: "SECRET_REALM_COMPLETE(543) / SECRET_REALM_FAIL(544) 핸들러 — 클리어/실패 결과. 등급(S/A/B/C) 계산 + 보상 지급. 비경 유형별 등급 기준 다름."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "realm_sub04"
+    desc: "날씨/시간 특수 비경 로직 — weather+time_of_day 조합 체크 → 특수 비경 50% 확률 즉시 스폰. 4종 조합(night_fog/storm_noon/snow_dawn/clear_evening)."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "realm_sub05"
+    desc: "data/secret_realm_conditions.yaml 생성 — 비경 5종 몬스터/퍼즐/보상 테이블 + 특수 비경 조건표."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "realm_sub06"
+    desc: "비경 테스트 4개 — 비경 스폰/입장/클리어(등급별)/실패, 일일 제한."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
+  # TASK 18: 사제(師弟) 시스템 (GDD rules/mentorship.yaml) [브레인스토밍 신규]
+  # 사부-제자 관계 + 전용 퀘스트 + 졸업
+  # MsgType: 550-560
+  # ============================================================
+  - id: "mentor_sub01"
+    desc: "MENTOR_SEARCH(550)→MENTOR_LIST(551) 핸들러 — 사부/제자 검색. 사부: Lv.40+/제자3명미만, 제자: Lv.1~20/사부없음."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub02"
+    desc: "MENTOR_REQUEST(552)→MENTOR_REQUEST_RESULT(553) + MENTOR_ACCEPT(554)→MENTOR_ACCEPT_RESULT(555) — 사제 요청/수락/거절."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub03"
+    desc: "MENTOR_QUEST_LIST(556)→MENTOR_QUESTS(557) 핸들러 — 사제 전용 퀘스트 3개/주. 사냥/던전/채집/탐험/보스 중 랜덤 3개. same_party 조건 체크."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub04"
+    desc: "MENTOR_GRADUATE(558) 핸들러 — 제자 Lv.30 도달 시 자동 졸업. 양쪽 보상 지급 + 서버 브로드캐스트. 사문 기여도 500 추가."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub05"
+    desc: "MENTOR_SHOP_LIST(559)→MENTOR_SHOP(560) 핸들러 — 사문 기여도 상점. 칭호재료/외형/비급/소모품/탈것 교환."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub06"
+    desc: "사제 경험치 버프 로직 — 사부와 같은 파티 시 제자 EXP+30%, 솔로 EXP+10%. 사부에게 제자 처치 EXP의 10% 추가."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  - id: "mentor_sub07"
+    desc: "사제 테스트 5개 — 사부검색/요청/수락, 사제퀘스트, 졸업, 기여도 상점."
+    priority: P2
+    blocked: false
+    estimated_minutes: 10
+
+  # ============================================================
   # ============================================================
   # === 신규 Phase 5 태스크 (GDD 전수 스캔으로 발굴) ===
   # ============================================================
@@ -621,6 +772,10 @@ recent_decisions:
   - "D013: GDD 심화 태스크 분해 — 10개 영역 55개 서브태스크 (제작/거래소/퀘스트심화/소셜/전장/칭호 + 보석각인초월/내구도수리/보조화폐)"
   - "Phase 3 PvP/Raid TCP 연동 20/20 ALL PASS (2026-02-15) — 총 80/80 ALL PASS. Phase 3 완전 완료!"
   - "D014: GDD 신규 4영역 25서브태스크 추가 분해 — 캐시샵/배틀패스(474-489), 월드시스템(490-501), 출석/리셋(502-509), 스토리/대화(510-517)"
+  - "TASK 2 완료: 제작/채집/요리/인챈트(380-389) 56/56 PASS. _patch_s042.py. 레시피6종+채집3종+요리3종+인챈트6원소3단계."
+  - "D015: 브레인스토밍 세션 — 4개 신규 시스템 GDD 추가: 비급&트라이포드(520-524), 강호 현상금(530-537), 비경 탐험(540-544), 사제 시스템(550-560)"
+  - "신규 rules 4파일: tripod.yaml, bounty.yaml, secret_realm.yaml, mentorship.yaml"
+  - "서버 TASK 15~18 추가: 비급(6sub) + 현상금(8sub) + 비경(6sub) + 사제(7sub) = 27개 서브태스크"
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -646,6 +801,9 @@ processed_messages:
   - "C020"
   - "C021"
   - "C022"
+  - "C023"
+  - "C023_s041"
+  - "C024"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -661,4 +819,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python test_tcp_bridge.py
