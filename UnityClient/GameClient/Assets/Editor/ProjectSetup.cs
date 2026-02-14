@@ -596,6 +596,13 @@ public static class ProjectSetup
         var craftingManagerGo = CreateManagerObject("CraftingManager", typeof(CraftingManager));
         var gatheringManagerGo = CreateManagerObject("GatheringManager", typeof(GatheringManager));
         var gemManagerGo = CreateManagerObject("GemManager", typeof(GemManager));
+        var weatherManagerGo = CreateManagerObject("WeatherManager", typeof(WeatherManager));
+        var teleportManagerGo = CreateManagerObject("TeleportManager", typeof(TeleportManager));
+        var mountManagerGo = CreateManagerObject("MountManager", typeof(MountManager));
+        var cashShopManagerGo = CreateManagerObject("CashShopManager", typeof(CashShopManager));
+        var battlePassManagerGo = CreateManagerObject("BattlePassManager", typeof(BattlePassManager));
+        var attendanceManagerGo = CreateManagerObject("AttendanceManager", typeof(AttendanceManager));
+        var storyManagerGo = CreateManagerObject("StoryManager", typeof(StoryManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_phase4_crafting_gem
+version: session_phase5_attendance_story
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -750,6 +750,224 @@ managers:
       - GetGemTypeName(byte) → string
       - GetTierName(byte) → string
 
+  - name: WeatherManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "날씨/시간 시스템 관리 — 날씨 전환 보간, 게임 시간 추적, 시간대 계산"
+    reads: []
+    writes:
+      - _currentWeather (WeatherType)
+      - _gameTimeSec (uint)
+      - _transitionTimer (float)
+    fires_events:
+      - OnWeatherChanged(WeatherType, byte)
+      - OnTimeChanged(uint)
+    subscribes_to:
+      - NetworkManager.OnWeatherUpdate → 날씨 변경
+      - NetworkManager.OnTimeUpdate → 게임 시간 갱신
+    public_api:
+      - GetTimeOfDay() → TimeOfDay
+    computed_properties:
+      - CurrentWeather (WeatherType)
+      - GameTime (uint)
+      - TimeOfDay (TimeOfDay)
+      - DayProgress (float 0~1)
+      - WeatherBlend (float 0~1)
+
+  - name: TeleportManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "텔레포트(워프포인트) 시스템 관리 — 목록 요청/텔레포트 실행/패널 토글"
+    reads: []
+    writes:
+      - _waypoints (List<WaypointInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnWaypointsLoaded(WaypointInfo[])
+      - OnTeleportComplete(TeleportResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnTeleportList → 워프포인트 목록 수신
+      - NetworkManager.OnTeleportResult → 텔레포트 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshWaypoints()
+      - Teleport(ushort)
+    computed_properties:
+      - Waypoints (IReadOnlyList<WaypointInfo>)
+      - IsPanelOpen (bool)
+
+  - name: MountManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "탈것 시스템 관리 — 소환/해제, 이동 속도 배율 추적"
+    reads: []
+    writes:
+      - _isMounted (bool)
+      - _currentMountId (uint)
+      - _speedMultiplier (float)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnMounted(MountResultData)
+      - OnDismounted()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnMountResult → 탈것 소환 결과
+      - NetworkManager.OnMountDismountResult → 탈것 해제 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Summon(uint)
+      - Dismount()
+    computed_properties:
+      - IsMounted (bool)
+      - CurrentMountId (uint)
+      - SpeedMultiplier (float)
+      - IsPanelOpen (bool)
+
+  - name: CashShopManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "캐시샵 시스템 관리 — S042 TASK 11 (MsgType 474-477, 488-489) 아이템 목록/구매/크리스탈/월정액"
+    reads: []
+    writes:
+      - _items (List<CashShopItemInfo>)
+      - _crystals (uint)
+      - _isPanelOpen (bool)
+      - _subscription (SubscriptionInfoData)
+    fires_events:
+      - OnShopListChanged()
+      - OnPurchaseResult(CashShopBuyResultData)
+      - OnSubscriptionUpdated(SubscriptionInfoData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnCashShopList → 캐시샵 아이템 목록 수신
+      - NetworkManager.OnCashShopBuyResult → 구매 결과
+      - NetworkManager.OnSubscriptionInfo → 월정액 정보
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RequestItems(byte)
+      - BuyItem(uint, byte)
+      - RequestSubscription()
+    computed_properties:
+      - Items (IReadOnlyList<CashShopItemInfo>)
+      - Crystals (uint)
+      - IsPanelOpen (bool)
+      - Subscription (SubscriptionInfoData)
+
+  - name: BattlePassManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "배틀패스 시스템 관리 — S042 TASK 11 (MsgType 478-483) 시즌 정보/보상 수령/프리미엄 구매"
+    reads: []
+    writes:
+      - _info (BattlePassInfoData)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnInfoUpdated(BattlePassInfoData)
+      - OnRewardClaimed(BattlePassRewardResultData)
+      - OnPremiumPurchased(BattlePassBuyResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnBattlePassInfo → 배틀패스 정보 수신
+      - NetworkManager.OnBattlePassRewardResult → 보상 수령 결과
+      - NetworkManager.OnBattlePassBuyResult → 프리미엄 구매 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshInfo()
+      - ClaimReward(byte, byte)
+      - BuyPremium()
+    computed_properties:
+      - Info (BattlePassInfoData)
+      - IsPanelOpen (bool)
+      - IsPremium (bool)
+      - Level (byte)
+      - ExpRatio (float)
+
+  - name: AttendanceManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "출석 시스템 관리 — 출석 정보, 보상 수령, 일일/주간 리셋, 로그인 보상"
+    reads: []
+    writes:
+      - _info (AttendanceInfoData)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnInfoUpdated(AttendanceInfoData)
+      - OnRewardClaimed(AttendanceClaimResultData)
+      - OnDailyReset(DailyResetNotifyData)
+      - OnLoginReward(LoginRewardNotifyData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnAttendanceInfo → 출석 정보 수신
+      - NetworkManager.OnAttendanceClaimResult → 보상 수령 결과
+      - NetworkManager.OnDailyResetNotify → 일일/주간 리셋 알림
+      - NetworkManager.OnLoginRewardNotify → 로그인 보상 알림
+      - NetworkManager.OnEnterGame → 자동 ATTENDANCE_INFO_REQ
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - ClaimDay(byte)
+      - RefreshInfo()
+    computed_properties:
+      - Info (AttendanceInfoData)
+      - IsPanelOpen (bool)
+      - CurrentDay (byte)
+      - TotalDays (byte)
+
+  - name: StoryManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스토리/대화/컷씬 관리 — 대화 선택지, 컷씬 재생/스킵, 스토리 진행, 메인 퀘스트"
+    reads: []
+    writes:
+      - _currentChapter (byte)
+      - _currentQuestId (uint)
+      - _mainQuest (MainQuestDataInfo)
+      - _isCutscenePlaying (bool)
+      - _activeCutsceneId (ushort)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnDialogWithChoices(DialogChoiceResultData)
+      - OnCutsceneStarted(CutsceneTriggerData)
+      - OnCutsceneFinished(ushort)
+      - OnStoryUpdated(StoryProgressData)
+      - OnMainQuestUpdated(MainQuestDataInfo)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnDialogChoiceResult → 대화 선택지 결과
+      - NetworkManager.OnCutsceneTrigger → 컷씬 트리거
+      - NetworkManager.OnCutsceneEnd → 컷씬 종료
+      - NetworkManager.OnStoryProgress → 스토리 진행 갱신
+      - NetworkManager.OnMainQuestData → 메인 퀘스트 데이터
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - SelectChoice(ushort, byte)
+      - SkipCutscene()
+      - RefreshProgress()
+    computed_properties:
+      - CurrentChapter (byte)
+      - MainQuest (MainQuestDataInfo)
+      - IsCutscenePlaying (bool)
+      - IsPanelOpen (bool)
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1091,6 +1309,76 @@ data_flows:
     to: GemUI
     via: "C# events (OnGemEquipped, OnGemFused, OnPanelOpened, OnPanelClosed)"
     description: "보석 UI 갱신"
+
+  - from: NetworkManager
+    to: WeatherManager
+    via: "C# events (OnWeatherUpdate, OnTimeUpdate)"
+    description: "날씨 변경/게임 시간 갱신 수신 (490-491)"
+
+  - from: NetworkManager
+    to: TeleportManager
+    via: "C# events (OnTeleportList, OnTeleportResult)"
+    description: "워프포인트 목록/텔레포트 결과 수신 (492-495)"
+
+  - from: TeleportManager
+    to: TeleportUI
+    via: "C# events (OnWaypointsLoaded, OnTeleportComplete, OnPanelOpened, OnPanelClosed)"
+    description: "텔레포트 UI 갱신 (;키 토글)"
+
+  - from: NetworkManager
+    to: MountManager
+    via: "C# events (OnMountResult, OnMountDismountResult)"
+    description: "탈것 소환/해제 결과 수신 (498-501)"
+
+  - from: MountManager
+    to: MountUI
+    via: "C# events (OnMounted, OnDismounted, OnPanelOpened, OnPanelClosed)"
+    description: "탈것 UI 갱신 (소환/해제 버튼 토글)"
+
+  - from: NetworkManager
+    to: CashShopManager
+    via: "C# events (OnCashShopList, OnCashShopBuyResult, OnSubscriptionInfo)"
+    description: "캐시샵 아이템 목록/구매 결과/월정액 정보 수신 (474-477, 488-489)"
+
+  - from: CashShopManager
+    to: CashShopUI
+    via: "C# events (OnShopListChanged, OnPurchaseResult, OnSubscriptionUpdated, OnPanelOpened, OnPanelClosed)"
+    description: "캐시샵 UI 갱신 ($키 토글)"
+
+  - from: NetworkManager
+    to: BattlePassManager
+    via: "C# events (OnBattlePassInfo, OnBattlePassRewardResult, OnBattlePassBuyResult)"
+    description: "배틀패스 정보/보상/프리미엄 구매 결과 수신 (478-483)"
+
+  - from: BattlePassManager
+    to: BattlePassUI
+    via: "C# events (OnInfoUpdated, OnRewardClaimed, OnPremiumPurchased, OnPanelOpened, OnPanelClosed)"
+    description: "배틀패스 UI 갱신 (F5키 토글)"
+
+  - from: NetworkManager
+    to: AttendanceManager
+    via: "C# events (OnAttendanceInfo, OnAttendanceClaimResult, OnDailyResetNotify, OnLoginRewardNotify, OnEnterGame)"
+    description: "출석 정보/보상/리셋/로그인 보상 수신 + 게임 진입 시 자동 요청 (502-509)"
+
+  - from: AttendanceManager
+    to: AttendanceUI
+    via: "C# events (OnInfoUpdated, OnRewardClaimed, OnPanelOpened, OnPanelClosed)"
+    description: "출석 UI 갱신 (14일 그리드 + 보상 수령)"
+
+  - from: NetworkManager
+    to: ContentUnlockUI
+    via: "C# event (OnContentUnlockNotify)"
+    description: "컨텐츠 해금 알림 → 풀스크린 팝업 (매니저 없이 직접 구독, 507-508)"
+
+  - from: NetworkManager
+    to: StoryManager
+    via: "C# events (OnDialogChoiceResult, OnCutsceneTrigger, OnCutsceneEnd, OnStoryProgress, OnMainQuestData)"
+    description: "대화 선택지/컷씬/스토리 진행/메인 퀘스트 수신 (510-517)"
+
+  - from: StoryManager
+    to: StoryUI
+    via: "C# events (OnDialogWithChoices, OnCutsceneStarted, OnCutsceneFinished, OnStoryUpdated, OnMainQuestUpdated, OnPanelOpened, OnPanelClosed)"
+    description: "스토리 UI 갱신 (대화 선택지 + 컷씬 오버레이 + 퀘스트 진행)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

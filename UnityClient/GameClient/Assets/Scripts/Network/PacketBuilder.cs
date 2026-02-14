@@ -1814,5 +1814,446 @@ namespace Network
             d.NewTier = payload[2];
             return d;
         }
+
+        // ━━━ S042: 캐시샵 (TASK 11) ━━━
+
+        /// <summary>CASH_SHOP_LIST_REQ 빌드: category(1)</summary>
+        public static byte[] CashShopListReq(byte category)
+        {
+            return Build(MsgType.CASH_SHOP_LIST_REQ, new byte[] { category });
+        }
+
+        /// <summary>CASH_SHOP_BUY 빌드: item_id(4) count(1) = 5B</summary>
+        public static byte[] CashShopBuy(uint itemId, byte count)
+        {
+            byte[] payload = new byte[5];
+            BitConverter.GetBytes(itemId).CopyTo(payload, 0);
+            payload[4] = count;
+            return Build(MsgType.CASH_SHOP_BUY, payload);
+        }
+
+        /// <summary>CASH_SHOP_LIST 파싱: count(1) {item_id(4) name(32) category(1) price(4) currency(1)}*N = 42B/entry</summary>
+        public static CashShopItemInfo[] ParseCashShopList(byte[] payload)
+        {
+            byte count = payload[0];
+            var items = new CashShopItemInfo[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var it = new CashShopItemInfo();
+                it.ItemId = BitConverter.ToUInt32(payload, off); off += 4;
+                int nameEnd = off;
+                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+                it.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 32;
+                it.Category = (CashShopCategory)payload[off]; off += 1;
+                it.Price = BitConverter.ToUInt32(payload, off); off += 4;
+                it.Currency = (CashCurrency)payload[off]; off += 1;
+                items[i] = it;
+            }
+            return items;
+        }
+
+        /// <summary>CASH_SHOP_BUY_RESULT 파싱: result(1) item_id(4) remaining_crystals(4) = 9B</summary>
+        public static CashShopBuyResultData ParseCashShopBuyResult(byte[] payload)
+        {
+            var d = new CashShopBuyResultData();
+            d.Result = (CashShopBuyResult)payload[0];
+            d.ItemId = BitConverter.ToUInt32(payload, 1);
+            d.RemainingCrystals = BitConverter.ToUInt32(payload, 5);
+            return d;
+        }
+
+        // ━━━ S042: 배틀패스 (TASK 11) ━━━
+
+        /// <summary>BATTLEPASS_INFO_REQ 빌드: empty</summary>
+        public static byte[] BattlePassInfoReq()
+        {
+            return Build(MsgType.BATTLEPASS_INFO_REQ);
+        }
+
+        /// <summary>BATTLEPASS_REWARD_CLAIM 빌드: level(1) track(1) = 2B</summary>
+        public static byte[] BattlePassRewardClaim(byte level, byte track)
+        {
+            return Build(MsgType.BATTLEPASS_REWARD_CLAIM, new byte[] { level, track });
+        }
+
+        /// <summary>BATTLEPASS_BUY_PREMIUM 빌드: empty</summary>
+        public static byte[] BattlePassBuyPremium()
+        {
+            return Build(MsgType.BATTLEPASS_BUY_PREMIUM);
+        }
+
+        /// <summary>BATTLEPASS_INFO 파싱: season_id(2) level(1) exp(2) max_exp(2) is_premium(1) days_left(2) = 10B</summary>
+        public static BattlePassInfoData ParseBattlePassInfo(byte[] payload)
+        {
+            var d = new BattlePassInfoData();
+            d.SeasonId = BitConverter.ToUInt16(payload, 0);
+            d.Level = payload[2];
+            d.Exp = BitConverter.ToUInt16(payload, 3);
+            d.MaxExp = BitConverter.ToUInt16(payload, 5);
+            d.IsPremium = payload[7] != 0;
+            d.DaysLeft = BitConverter.ToUInt16(payload, 8);
+            return d;
+        }
+
+        /// <summary>BATTLEPASS_REWARD_RESULT 파싱: result(1) level(1) track(1) reward_type(1) reward_id(4) reward_count(2) = 10B</summary>
+        public static BattlePassRewardResultData ParseBattlePassRewardResult(byte[] payload)
+        {
+            var d = new BattlePassRewardResultData();
+            d.Result = (BattlePassRewardResult)payload[0];
+            d.Level = payload[1];
+            d.Track = (BattlePassTrack)payload[2];
+            d.RewardType = payload[3];
+            d.RewardId = BitConverter.ToUInt32(payload, 4);
+            d.RewardCount = BitConverter.ToUInt16(payload, 8);
+            return d;
+        }
+
+        /// <summary>BATTLEPASS_BUY_RESULT 파싱: result(1) remaining_crystals(4) = 5B</summary>
+        public static BattlePassBuyResultData ParseBattlePassBuyResult(byte[] payload)
+        {
+            var d = new BattlePassBuyResultData();
+            d.Result = payload[0];
+            d.RemainingCrystals = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        // ━━━ S042: 이벤트 (TASK 11) ━━━
+
+        /// <summary>EVENT_LIST_REQ 빌드: empty</summary>
+        public static byte[] EventListReq()
+        {
+            return Build(MsgType.EVENT_LIST_REQ);
+        }
+
+        /// <summary>EVENT_CLAIM 빌드: event_id(2)</summary>
+        public static byte[] EventClaim(ushort eventId)
+        {
+            return Build(MsgType.EVENT_CLAIM, BitConverter.GetBytes(eventId));
+        }
+
+        /// <summary>EVENT_LIST 파싱: count(1) {event_id(2) type(1) name(32) remaining_sec(4)}*N = 39B/entry</summary>
+        public static GameEventInfo[] ParseEventList(byte[] payload)
+        {
+            byte count = payload[0];
+            var events = new GameEventInfo[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var e = new GameEventInfo();
+                e.EventId = BitConverter.ToUInt16(payload, off); off += 2;
+                e.Type = (GameEventType)payload[off]; off += 1;
+                int nameEnd = off;
+                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+                e.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 32;
+                e.RemainingSeconds = BitConverter.ToUInt32(payload, off); off += 4;
+                events[i] = e;
+            }
+            return events;
+        }
+
+        /// <summary>EVENT_CLAIM_RESULT 파싱: result(1) event_id(2) reward_type(1) reward_id(4) reward_count(2) = 10B</summary>
+        public static EventClaimResultData ParseEventClaimResult(byte[] payload)
+        {
+            var d = new EventClaimResultData();
+            d.Result = payload[0];
+            d.EventId = BitConverter.ToUInt16(payload, 1);
+            d.RewardType = payload[3];
+            d.RewardId = BitConverter.ToUInt32(payload, 4);
+            d.RewardCount = BitConverter.ToUInt16(payload, 8);
+            return d;
+        }
+
+        /// <summary>SUBSCRIPTION_INFO_REQ 빌드: empty</summary>
+        public static byte[] SubscriptionInfoReq()
+        {
+            return Build(MsgType.SUBSCRIPTION_INFO_REQ);
+        }
+
+        /// <summary>SUBSCRIPTION_INFO 파싱: is_active(1) days_left(2) daily_crystals(2) = 5B</summary>
+        public static SubscriptionInfoData ParseSubscriptionInfo(byte[] payload)
+        {
+            var d = new SubscriptionInfoData();
+            d.IsActive = payload[0] != 0;
+            d.DaysLeft = BitConverter.ToUInt16(payload, 1);
+            d.DailyCrystals = BitConverter.ToUInt16(payload, 3);
+            return d;
+        }
+
+        // ━━━ S042: 월드 시스템 (TASK 12) ━━━
+
+        /// <summary>WEATHER_UPDATE 파싱: zone_id(4) weather_type(1) transition_sec(1) = 6B</summary>
+        public static WeatherUpdateData ParseWeatherUpdate(byte[] payload)
+        {
+            var d = new WeatherUpdateData();
+            d.ZoneId = BitConverter.ToUInt32(payload, 0);
+            d.Weather = (WeatherType)payload[4];
+            d.TransitionSeconds = payload[5];
+            return d;
+        }
+
+        /// <summary>TELEPORT_LIST_REQ 빌드: empty</summary>
+        public static byte[] TeleportListReq()
+        {
+            return Build(MsgType.TELEPORT_LIST_REQ);
+        }
+
+        /// <summary>TELEPORT_REQ 빌드: waypoint_id(2)</summary>
+        public static byte[] TeleportReq(ushort waypointId)
+        {
+            return Build(MsgType.TELEPORT_REQ, BitConverter.GetBytes(waypointId));
+        }
+
+        /// <summary>TELEPORT_LIST 파싱: count(1) {waypoint_id(2) zone_id(4) name(32) x(4f) y(4f) z(4f) cost(4)}*N = 50B/entry</summary>
+        public static WaypointInfo[] ParseTeleportList(byte[] payload)
+        {
+            byte count = payload[0];
+            var waypoints = new WaypointInfo[count];
+            int off = 1;
+            for (int i = 0; i < count; i++)
+            {
+                var w = new WaypointInfo();
+                w.WaypointId = BitConverter.ToUInt16(payload, off); off += 2;
+                w.ZoneId = BitConverter.ToUInt32(payload, off); off += 4;
+                int nameEnd = off;
+                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+                w.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+                off += 32;
+                w.X = BitConverter.ToSingle(payload, off); off += 4;
+                w.Y = BitConverter.ToSingle(payload, off); off += 4;
+                w.Z = BitConverter.ToSingle(payload, off); off += 4;
+                w.Cost = BitConverter.ToUInt32(payload, off); off += 4;
+                waypoints[i] = w;
+            }
+            return waypoints;
+        }
+
+        /// <summary>TELEPORT_RESULT 파싱: result(1) zone_id(4) x(4f) y(4f) z(4f) = 17B</summary>
+        public static TeleportResultData ParseTeleportResult(byte[] payload)
+        {
+            var d = new TeleportResultData();
+            d.Result = (TeleportResult)payload[0];
+            d.ZoneId = BitConverter.ToUInt32(payload, 1);
+            d.X = BitConverter.ToSingle(payload, 5);
+            d.Y = BitConverter.ToSingle(payload, 9);
+            d.Z = BitConverter.ToSingle(payload, 13);
+            return d;
+        }
+
+        /// <summary>WORLD_OBJECT_INTERACT 빌드: object_id(4) action(1) = 5B</summary>
+        public static byte[] WorldObjectInteract(uint objectId, byte action)
+        {
+            byte[] payload = new byte[5];
+            BitConverter.GetBytes(objectId).CopyTo(payload, 0);
+            payload[4] = action;
+            return Build(MsgType.WORLD_OBJECT_INTERACT, payload);
+        }
+
+        /// <summary>WORLD_OBJECT_RESULT 파싱: result(1) object_id(4) item_id(4) count(2) gold(4) = 15B</summary>
+        public static WorldObjectResultData ParseWorldObjectResult(byte[] payload)
+        {
+            var d = new WorldObjectResultData();
+            d.Result = payload[0];
+            d.ObjectId = BitConverter.ToUInt32(payload, 1);
+            d.ItemId = BitConverter.ToUInt32(payload, 5);
+            d.Count = BitConverter.ToUInt16(payload, 9);
+            d.Gold = BitConverter.ToUInt32(payload, 11);
+            return d;
+        }
+
+        /// <summary>MOUNT_SUMMON 빌드: mount_id(4)</summary>
+        public static byte[] MountSummon(uint mountId)
+        {
+            return Build(MsgType.MOUNT_SUMMON, BitConverter.GetBytes(mountId));
+        }
+
+        /// <summary>MOUNT_DISMOUNT 빌드: empty</summary>
+        public static byte[] MountDismount()
+        {
+            return Build(MsgType.MOUNT_DISMOUNT);
+        }
+
+        /// <summary>MOUNT_RESULT 파싱: result(1) mount_id(4) speed_mult(2) = 7B</summary>
+        public static MountResultData ParseMountResult(byte[] payload)
+        {
+            var d = new MountResultData();
+            d.Result = (MountResult)payload[0];
+            d.MountId = BitConverter.ToUInt32(payload, 1);
+            d.SpeedMultiplied = BitConverter.ToUInt16(payload, 5);
+            return d;
+        }
+
+        // ━━━ S042: 출석/리셋/컨텐츠 해금 (TASK 13) ━━━
+
+        /// <summary>ATTENDANCE_INFO_REQ 빌드: empty</summary>
+        public static byte[] AttendanceInfoReq()
+        {
+            return Build(MsgType.ATTENDANCE_INFO_REQ);
+        }
+
+        /// <summary>ATTENDANCE_CLAIM 빌드: day(1)</summary>
+        public static byte[] AttendanceClaim(byte day)
+        {
+            return Build(MsgType.ATTENDANCE_CLAIM, new byte[] { day });
+        }
+
+        /// <summary>ATTENDANCE_INFO 파싱: day(1) total_days(1) {claimed(1)}*14 = 16B</summary>
+        public static AttendanceInfoData ParseAttendanceInfo(byte[] payload)
+        {
+            var d = new AttendanceInfoData();
+            d.CurrentDay = payload[0];
+            d.TotalDays = payload[1];
+            d.Claimed = new bool[14];
+            for (int i = 0; i < 14 && i + 2 < payload.Length; i++)
+                d.Claimed[i] = payload[2 + i] != 0;
+            return d;
+        }
+
+        /// <summary>ATTENDANCE_CLAIM_RESULT 파싱: result(1) day(1) reward_type(1) reward_id(4) reward_count(2) = 9B</summary>
+        public static AttendanceClaimResultData ParseAttendanceClaimResult(byte[] payload)
+        {
+            var d = new AttendanceClaimResultData();
+            d.Result = (AttendanceClaimResult)payload[0];
+            d.Day = payload[1];
+            d.RewardType = payload[2];
+            d.RewardId = BitConverter.ToUInt32(payload, 3);
+            d.RewardCount = BitConverter.ToUInt16(payload, 7);
+            return d;
+        }
+
+        /// <summary>DAILY_RESET_NOTIFY 파싱: reset_type(1) timestamp(4) = 5B</summary>
+        public static DailyResetNotifyData ParseDailyResetNotify(byte[] payload)
+        {
+            var d = new DailyResetNotifyData();
+            d.Type = (ResetType)payload[0];
+            d.Timestamp = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        /// <summary>CONTENT_UNLOCK_NOTIFY 파싱: unlock_type(1) system_name_len(1) system_name(N) description_len(1) description(N)</summary>
+        public static ContentUnlockNotifyData ParseContentUnlockNotify(byte[] payload)
+        {
+            var d = new ContentUnlockNotifyData();
+            int off = 0;
+            d.UnlockType = payload[off]; off += 1;
+            byte nameLen = payload[off]; off += 1;
+            d.SystemName = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+            byte descLen = payload[off]; off += 1;
+            d.Description = Encoding.UTF8.GetString(payload, off, descLen);
+            return d;
+        }
+
+        /// <summary>CONTENT_UNLOCK_ACK 빌드: unlock_type(1)</summary>
+        public static byte[] ContentUnlockAck(byte unlockType)
+        {
+            return Build(MsgType.CONTENT_UNLOCK_ACK, new byte[] { unlockType });
+        }
+
+        /// <summary>LOGIN_REWARD_NOTIFY 파싱: reward_type(1) reward_id(4) reward_count(2) = 7B</summary>
+        public static LoginRewardNotifyData ParseLoginRewardNotify(byte[] payload)
+        {
+            var d = new LoginRewardNotifyData();
+            d.RewardType = payload[0];
+            d.RewardId = BitConverter.ToUInt32(payload, 1);
+            d.RewardCount = BitConverter.ToUInt16(payload, 5);
+            return d;
+        }
+
+        // ━━━ S042: 스토리/대화 시스템 (TASK 14) ━━━
+
+        /// <summary>DIALOG_CHOICE 빌드: npc_id(2) choice_index(1) = 3B</summary>
+        public static byte[] DialogChoice(ushort npcId, byte choiceIndex)
+        {
+            byte[] payload = new byte[3];
+            BitConverter.GetBytes(npcId).CopyTo(payload, 0);
+            payload[2] = choiceIndex;
+            return Build(MsgType.DIALOG_CHOICE, payload);
+        }
+
+        /// <summary>DIALOG_CHOICE_RESULT 파싱: npc_id(2) next_line_count(1) {speaker_len(1) speaker(N) text_len(2) text(N)}*N choice_count(1) {text_len(1) text(N)}*N</summary>
+        public static DialogChoiceResultData ParseDialogChoiceResult(byte[] payload)
+        {
+            var d = new DialogChoiceResultData();
+            int off = 0;
+            d.NpcId = BitConverter.ToUInt16(payload, off); off += 2;
+            byte lineCount = payload[off]; off += 1;
+            d.Lines = new NpcDialogLine[lineCount];
+            for (int i = 0; i < lineCount; i++)
+            {
+                var line = new NpcDialogLine();
+                byte speakerLen = payload[off]; off += 1;
+                line.Speaker = Encoding.UTF8.GetString(payload, off, speakerLen); off += speakerLen;
+                ushort textLen = BitConverter.ToUInt16(payload, off); off += 2;
+                line.Text = Encoding.UTF8.GetString(payload, off, textLen); off += textLen;
+                d.Lines[i] = line;
+            }
+            byte choiceCount = payload[off]; off += 1;
+            d.Choices = new string[choiceCount];
+            for (int i = 0; i < choiceCount; i++)
+            {
+                byte textLen = payload[off]; off += 1;
+                d.Choices[i] = Encoding.UTF8.GetString(payload, off, textLen); off += textLen;
+            }
+            return d;
+        }
+
+        /// <summary>CUTSCENE_SKIP 빌드: cutscene_id(2)</summary>
+        public static byte[] CutsceneSkip(ushort cutsceneId)
+        {
+            return Build(MsgType.CUTSCENE_SKIP, BitConverter.GetBytes(cutsceneId));
+        }
+
+        /// <summary>CUTSCENE_TRIGGER 파싱: cutscene_id(2) duration_sec(2) = 4B</summary>
+        public static CutsceneTriggerData ParseCutsceneTrigger(byte[] payload)
+        {
+            var d = new CutsceneTriggerData();
+            d.CutsceneId = BitConverter.ToUInt16(payload, 0);
+            d.DurationSeconds = BitConverter.ToUInt16(payload, 2);
+            return d;
+        }
+
+        /// <summary>STORY_PROGRESS_REQ 빌드: empty</summary>
+        public static byte[] StoryProgressReq()
+        {
+            return Build(MsgType.STORY_PROGRESS_REQ);
+        }
+
+        /// <summary>STORY_PROGRESS 파싱: chapter(1) quest_id(4) quest_state(1) = 6B</summary>
+        public static StoryProgressData ParseStoryProgress(byte[] payload)
+        {
+            var d = new StoryProgressData();
+            d.Chapter = payload[0];
+            d.QuestId = BitConverter.ToUInt32(payload, 1);
+            d.QuestState = (QuestState)payload[5];
+            return d;
+        }
+
+        /// <summary>MAIN_QUEST_DATA 파싱: quest_id(4) name(32) desc_len(2) desc(N) objective_count(1) {type(1) target(4) current(4) required(4)}*N = 13B/objective</summary>
+        public static MainQuestDataInfo ParseMainQuestData(byte[] payload)
+        {
+            var d = new MainQuestDataInfo();
+            int off = 0;
+            d.QuestId = BitConverter.ToUInt32(payload, off); off += 4;
+            int nameEnd = off;
+            while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
+            d.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
+            off += 32;
+            ushort descLen = BitConverter.ToUInt16(payload, off); off += 2;
+            d.Description = Encoding.UTF8.GetString(payload, off, descLen); off += descLen;
+            byte objCount = payload[off]; off += 1;
+            d.Objectives = new MainQuestObjective[objCount];
+            for (int i = 0; i < objCount; i++)
+            {
+                var obj = new MainQuestObjective();
+                obj.Type = (MainQuestObjectiveType)payload[off]; off += 1;
+                obj.Target = BitConverter.ToUInt32(payload, off); off += 4;
+                obj.Current = BitConverter.ToUInt32(payload, off); off += 4;
+                obj.Required = BitConverter.ToUInt32(payload, off); off += 4;
+                d.Objectives[i] = obj;
+            }
+            return d;
+        }
     }
 }

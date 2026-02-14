@@ -142,6 +142,35 @@ namespace Network
         public event Action<EnchantResultData> OnEnchantResultResp;
         public event Action<GemEquipResultData> OnGemEquipResult;
         public event Action<GemFuseResultData> OnGemFuseResult;
+        // S042: 캐시샵/배틀패스/이벤트
+        public event Action<CashShopItemInfo[]> OnCashShopList;
+        public event Action<CashShopBuyResultData> OnCashShopBuyResult;
+        public event Action<BattlePassInfoData> OnBattlePassInfo;
+        public event Action<BattlePassRewardResultData> OnBattlePassRewardResult;
+        public event Action<BattlePassBuyResultData> OnBattlePassBuyResult;
+        public event Action<GameEventInfo[]> OnEventList;
+        public event Action<EventClaimResultData> OnEventClaimResult;
+        public event Action<SubscriptionInfoData> OnSubscriptionInfo;
+        // S042: 월드 시스템
+        public event Action<WeatherUpdateData> OnWeatherUpdate;
+        public event Action<uint> OnTimeUpdate;
+        public event Action<WaypointInfo[]> OnTeleportList;
+        public event Action<TeleportResultData> OnTeleportResult;
+        public event Action<WorldObjectResultData> OnWorldObjectResult;
+        public event Action<MountResultData> OnMountResult;
+        public event Action<byte> OnMountDismountResult;
+        // S042: 출석/리셋/컨텐츠 해금
+        public event Action<AttendanceInfoData> OnAttendanceInfo;
+        public event Action<AttendanceClaimResultData> OnAttendanceClaimResult;
+        public event Action<DailyResetNotifyData> OnDailyResetNotify;
+        public event Action<ContentUnlockNotifyData> OnContentUnlockNotify;
+        public event Action<LoginRewardNotifyData> OnLoginRewardNotify;
+        // S042: 스토리/대화 시스템
+        public event Action<DialogChoiceResultData> OnDialogChoiceResult;
+        public event Action<CutsceneTriggerData> OnCutsceneTrigger;
+        public event Action<ushort> OnCutsceneEnd;
+        public event Action<StoryProgressData> OnStoryProgress;
+        public event Action<MainQuestDataInfo> OnMainQuestData;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -720,6 +749,128 @@ namespace Network
         public void FuseGem(byte gemType, byte gemTier)
         {
             _field?.Send(PacketBuilder.GemFuse(gemType, gemTier));
+        }
+
+        // ━━━ S042: 캐시샵/배틀패스/이벤트 API ━━━
+
+        /// <summary>캐시샵 목록 요청</summary>
+        public void RequestCashShopList(byte category)
+        {
+            _field?.Send(PacketBuilder.CashShopListReq(category));
+        }
+
+        /// <summary>캐시샵 구매</summary>
+        public void BuyCashShopItem(uint itemId, byte count = 1)
+        {
+            _field?.Send(PacketBuilder.CashShopBuy(itemId, count));
+        }
+
+        /// <summary>배틀패스 정보 요청</summary>
+        public void RequestBattlePassInfo()
+        {
+            _field?.Send(PacketBuilder.BattlePassInfoReq());
+        }
+
+        /// <summary>배틀패스 보상 수령</summary>
+        public void ClaimBattlePassReward(byte level, byte track)
+        {
+            _field?.Send(PacketBuilder.BattlePassRewardClaim(level, track));
+        }
+
+        /// <summary>배틀패스 프리미엄 구매</summary>
+        public void BuyBattlePassPremium()
+        {
+            _field?.Send(PacketBuilder.BattlePassBuyPremium());
+        }
+
+        /// <summary>이벤트 목록 요청</summary>
+        public void RequestEventList()
+        {
+            _field?.Send(PacketBuilder.EventListReq());
+        }
+
+        /// <summary>이벤트 보상 수령</summary>
+        public void ClaimEventReward(ushort eventId)
+        {
+            _field?.Send(PacketBuilder.EventClaim(eventId));
+        }
+
+        /// <summary>월정액 정보 요청</summary>
+        public void RequestSubscriptionInfo()
+        {
+            _field?.Send(PacketBuilder.SubscriptionInfoReq());
+        }
+
+        // ━━━ S042: 월드 시스템 API ━━━
+
+        /// <summary>텔레포트 목록 요청</summary>
+        public void RequestTeleportList()
+        {
+            _field?.Send(PacketBuilder.TeleportListReq());
+        }
+
+        /// <summary>텔레포트 요청</summary>
+        public void RequestTeleport(ushort waypointId)
+        {
+            _field?.Send(PacketBuilder.TeleportReq(waypointId));
+        }
+
+        /// <summary>월드 오브젝트 상호작용</summary>
+        public void InteractWorldObject(uint objectId, byte action)
+        {
+            _field?.Send(PacketBuilder.WorldObjectInteract(objectId, action));
+        }
+
+        /// <summary>탈것 소환</summary>
+        public void SummonMount(uint mountId)
+        {
+            _field?.Send(PacketBuilder.MountSummon(mountId));
+        }
+
+        /// <summary>탈것 내리기</summary>
+        public void DismountMount()
+        {
+            _field?.Send(PacketBuilder.MountDismount());
+        }
+
+        // ━━━ S042: 출석/컨텐츠 해금 API ━━━
+
+        /// <summary>출석 정보 요청</summary>
+        public void RequestAttendanceInfo()
+        {
+            _field?.Send(PacketBuilder.AttendanceInfoReq());
+        }
+
+        /// <summary>출석 보상 수령</summary>
+        public void ClaimAttendance(byte day)
+        {
+            _field?.Send(PacketBuilder.AttendanceClaim(day));
+        }
+
+        /// <summary>컨텐츠 해금 확인 응답</summary>
+        public void AckContentUnlock(byte unlockType)
+        {
+            _field?.Send(PacketBuilder.ContentUnlockAck(unlockType));
+        }
+
+        // ━━━ S042: 스토리/대화 API ━━━
+
+        /// <summary>대화 선택지 선택</summary>
+        public void SelectDialogChoice(ushort npcId, byte choiceIndex)
+        {
+            _field?.Send(PacketBuilder.DialogChoice(npcId, choiceIndex));
+        }
+
+        /// <summary>컷씬 스킵</summary>
+        public void SkipCutscene(ushort cutsceneId)
+        {
+            _field?.Send(PacketBuilder.CutsceneSkip(cutsceneId));
+        }
+
+        /// <summary>스토리 진행 요청</summary>
+        public void RequestStoryProgress()
+        {
+            _field?.Send(PacketBuilder.StoryProgressReq());
         }
 
         /// <summary>연결 끊기</summary>
@@ -1535,6 +1686,215 @@ namespace Network
                     var data = PacketBuilder.ParseGemFuseResult(payload);
                     Debug.Log($"[Net] GemFuseResult: status={data.Status}, type={data.GemType}, newTier={data.NewTier}");
                     OnGemFuseResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S042: 캐시샵/배틀패스/이벤트 ━━━
+
+                case MsgType.CASH_SHOP_LIST:
+                {
+                    var items = PacketBuilder.ParseCashShopList(payload);
+                    Debug.Log($"[Net] CashShopList: {items.Length} items");
+                    OnCashShopList?.Invoke(items);
+                    break;
+                }
+
+                case MsgType.CASH_SHOP_BUY_RESULT:
+                {
+                    var data = PacketBuilder.ParseCashShopBuyResult(payload);
+                    Debug.Log($"[Net] CashShopBuy: result={data.Result}, item={data.ItemId}, crystals={data.RemainingCrystals}");
+                    OnCashShopBuyResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BATTLEPASS_INFO:
+                {
+                    var data = PacketBuilder.ParseBattlePassInfo(payload);
+                    Debug.Log($"[Net] BattlePassInfo: season={data.SeasonId}, lv={data.Level}, exp={data.Exp}/{data.MaxExp}, premium={data.IsPremium}");
+                    OnBattlePassInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BATTLEPASS_REWARD_RESULT:
+                {
+                    var data = PacketBuilder.ParseBattlePassRewardResult(payload);
+                    Debug.Log($"[Net] BattlePassReward: result={data.Result}, lv={data.Level}, track={data.Track}");
+                    OnBattlePassRewardResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BATTLEPASS_BUY_RESULT:
+                {
+                    var data = PacketBuilder.ParseBattlePassBuyResult(payload);
+                    Debug.Log($"[Net] BattlePassBuy: result={data.Result}, crystals={data.RemainingCrystals}");
+                    OnBattlePassBuyResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.EVENT_LIST:
+                {
+                    var events = PacketBuilder.ParseEventList(payload);
+                    Debug.Log($"[Net] EventList: {events.Length} events");
+                    OnEventList?.Invoke(events);
+                    break;
+                }
+
+                case MsgType.EVENT_CLAIM_RESULT:
+                {
+                    var data = PacketBuilder.ParseEventClaimResult(payload);
+                    Debug.Log($"[Net] EventClaim: result={data.Result}, event={data.EventId}");
+                    OnEventClaimResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SUBSCRIPTION_INFO:
+                {
+                    var data = PacketBuilder.ParseSubscriptionInfo(payload);
+                    Debug.Log($"[Net] Subscription: active={data.IsActive}, days={data.DaysLeft}, daily={data.DailyCrystals}");
+                    OnSubscriptionInfo?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S042: 월드 시스템 ━━━
+
+                case MsgType.WEATHER_UPDATE:
+                {
+                    var data = PacketBuilder.ParseWeatherUpdate(payload);
+                    Debug.Log($"[Net] WeatherUpdate: zone={data.ZoneId}, weather={data.Weather}, transition={data.TransitionSeconds}s");
+                    OnWeatherUpdate?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.TIME_UPDATE:
+                {
+                    uint gameTime = BitConverter.ToUInt32(payload, 0);
+                    OnTimeUpdate?.Invoke(gameTime);
+                    break;
+                }
+
+                case MsgType.TELEPORT_LIST:
+                {
+                    var waypoints = PacketBuilder.ParseTeleportList(payload);
+                    Debug.Log($"[Net] TeleportList: {waypoints.Length} waypoints");
+                    OnTeleportList?.Invoke(waypoints);
+                    break;
+                }
+
+                case MsgType.TELEPORT_RESULT:
+                {
+                    var data = PacketBuilder.ParseTeleportResult(payload);
+                    Debug.Log($"[Net] TeleportResult: result={data.Result}, zone={data.ZoneId}");
+                    if (data.Result == TeleportResult.SUCCESS)
+                        CurrentZone = (int)data.ZoneId;
+                    OnTeleportResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.WORLD_OBJECT_RESULT:
+                {
+                    var data = PacketBuilder.ParseWorldObjectResult(payload);
+                    Debug.Log($"[Net] WorldObjectResult: result={data.Result}, obj={data.ObjectId}, item={data.ItemId}, gold={data.Gold}");
+                    OnWorldObjectResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MOUNT_RESULT:
+                {
+                    var data = PacketBuilder.ParseMountResult(payload);
+                    Debug.Log($"[Net] MountResult: result={data.Result}, mount={data.MountId}, speed={data.SpeedMultiplied / 100f}x");
+                    OnMountResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MOUNT_DISMOUNT_RESULT:
+                {
+                    byte result = payload[0];
+                    Debug.Log($"[Net] MountDismount: result={result}");
+                    OnMountDismountResult?.Invoke(result);
+                    break;
+                }
+
+                // ━━━ S042: 출석/리셋/컨텐츠 해금 ━━━
+
+                case MsgType.ATTENDANCE_INFO:
+                {
+                    var data = PacketBuilder.ParseAttendanceInfo(payload);
+                    Debug.Log($"[Net] AttendanceInfo: day={data.CurrentDay}, total={data.TotalDays}");
+                    OnAttendanceInfo?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ATTENDANCE_CLAIM_RESULT:
+                {
+                    var data = PacketBuilder.ParseAttendanceClaimResult(payload);
+                    Debug.Log($"[Net] AttendanceClaim: result={data.Result}, day={data.Day}");
+                    OnAttendanceClaimResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.DAILY_RESET_NOTIFY:
+                {
+                    var data = PacketBuilder.ParseDailyResetNotify(payload);
+                    Debug.Log($"[Net] DailyReset: type={data.Type}");
+                    OnDailyResetNotify?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CONTENT_UNLOCK_NOTIFY:
+                {
+                    var data = PacketBuilder.ParseContentUnlockNotify(payload);
+                    Debug.Log($"[Net] ContentUnlock: type={data.UnlockType}, system={data.SystemName}");
+                    OnContentUnlockNotify?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.LOGIN_REWARD_NOTIFY:
+                {
+                    var data = PacketBuilder.ParseLoginRewardNotify(payload);
+                    Debug.Log($"[Net] LoginReward: type={data.RewardType}, id={data.RewardId}, count={data.RewardCount}");
+                    OnLoginRewardNotify?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S042: 스토리/대화 시스템 ━━━
+
+                case MsgType.DIALOG_CHOICE_RESULT:
+                {
+                    var data = PacketBuilder.ParseDialogChoiceResult(payload);
+                    Debug.Log($"[Net] DialogChoice: npc={data.NpcId}, lines={data.Lines.Length}, choices={data.Choices.Length}");
+                    OnDialogChoiceResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CUTSCENE_TRIGGER:
+                {
+                    var data = PacketBuilder.ParseCutsceneTrigger(payload);
+                    Debug.Log($"[Net] CutsceneTrigger: id={data.CutsceneId}, duration={data.DurationSeconds}s");
+                    OnCutsceneTrigger?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.CUTSCENE_END:
+                {
+                    ushort cutsceneId = BitConverter.ToUInt16(payload, 0);
+                    Debug.Log($"[Net] CutsceneEnd: id={cutsceneId}");
+                    OnCutsceneEnd?.Invoke(cutsceneId);
+                    break;
+                }
+
+                case MsgType.STORY_PROGRESS:
+                {
+                    var data = PacketBuilder.ParseStoryProgress(payload);
+                    Debug.Log($"[Net] StoryProgress: chapter={data.Chapter}, quest={data.QuestId}, state={data.QuestState}");
+                    OnStoryProgress?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MAIN_QUEST_DATA:
+                {
+                    var data = PacketBuilder.ParseMainQuestData(payload);
+                    Debug.Log($"[Net] MainQuestData: id={data.QuestId}, name={data.Name}, objectives={data.Objectives.Length}");
+                    OnMainQuestData?.Invoke(data);
                     break;
                 }
 
