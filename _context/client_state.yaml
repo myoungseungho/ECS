@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-14T22:47:00"
+last_session: "2026-02-14T22:55:00"
 
 # ── 현재 상태 ──
-current_status: "Animator 콤보/대시/피격 확장 + HitVFX 파티클 풀 + URP 라이팅/포스트프로세싱 완료"
+current_status: "idle cycle — blocked task만 남아 대표님께 다음 작업 우선순위 질문 (ask_user Q001)"
 
 # ── 완료된 작업 ──
 completed:

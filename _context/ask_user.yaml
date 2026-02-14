@@ -4,15 +4,37 @@
 # 유저가 답변 후 status: answered로 변경 + answer 작성
 # ============================================================
 
-questions: []
-  # 예시:
-  # - id: Q001
-  #   from: client
-  #   timestamp: "2026-02-14T20:00:00"
-  #   question: "카메라 방향을 TPS 숄더캠으로 유지할까요?"
-  #   options:
-  #     - "TPS 숄더캠 유지"
-  #     - "쿼터뷰 변경"
-  #   status: pending
-  #   answer: ""
-  #   answered_at: ""
+questions:
+  - id: Q001
+    from: client
+    timestamp: "2026-02-14T22:55:00"
+    question: |
+      현재 blocked 아닌 pending task가 없습니다 (phase2_tcp는 서버 대기 중).
+      GDD에 미완료 client_tasks가 많습니다. 다음 중 어떤 작업을 먼저 진행할까요?
+
+      [P0 우선순위]:
+        1. P0_S02_C01: LoginScene 씬 구현 (로그인 UI + 패킷 연동)
+        2. P0_S04_C01/C02: CharacterSelectScene + CharacterCreatePanel
+
+      [P1 우선순위]:
+        3. P1_S01_C01~C03: TutorialZone 씬 + TutorialManager + 카메라 시스템
+        4. P1_S02_C01: 몬스터 비주얼 시스템 (HP바, 피격 플래시, 데미지 팝업)
+
+      [HUD 개선]:
+        5. HUD_01_C01~C03: MainHUD 프리팹 리뉴얼 (8슬롯 스킬바, HP/MP Slider 등)
+
+      [비주얼]:
+        6. P0_S01_C01~C02: IntroScene + SceneFlowManager
+
+      또는 다른 작업이 있으시면 알려주세요.
+    options:
+      - "1. LoginScene 먼저"
+      - "2. CharacterSelect 먼저"
+      - "3. TutorialZone 먼저"
+      - "4. 몬스터 비주얼 먼저"
+      - "5. HUD 리뉴얼 먼저"
+      - "6. IntroScene 먼저"
+      - "기타 (직접 지시)"
+    status: pending
+    answer: ""
+    answered_at: ""
