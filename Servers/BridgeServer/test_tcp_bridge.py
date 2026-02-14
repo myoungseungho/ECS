@@ -31,7 +31,9 @@ from tcp_bridge import (
     GEM_TYPES, GEM_TIER_NAMES, GEM_FUSION_GOLD, GEM_MAX_SOCKETS,
     ENGRAVING_TABLE, ENGRAVING_MAX_ACTIVE, ENGRAVING_ACTIVATION,
     TRANSCEND_MAX_LEVEL, TRANSCEND_GOLD_COST, TRANSCEND_SUCCESS_RATE,
-    ENHANCE_PITY_BONUS_PER_FAIL, ENHANCE_PITY_MAX_BONUS
+    ENHANCE_PITY_BONUS_PER_FAIL, ENHANCE_PITY_MAX_BONUS,
+    FRIEND_MAX, BLOCK_MAX, PARTY_FINDER_CATEGORIES,
+    PARTY_FINDER_MAX_LISTINGS, PARTY_FINDER_ROLES
 )
 
 
@@ -2075,6 +2077,110 @@ async def run_tests(port: int):
         c.close()
 
     await test("TRANSCEND: 장비 초월 (강화 미달 → FAIL)", test_transcend())
+
+
+    # ━━━ Test: FRIEND_REQUEST — 친구 요청 ━━━
+    async def test_friend_request():
+        """친구 요청 보내기 — 대상 미접속 시 PLAYER_NOT_FOUND."""
+        c = await login_and_enter(port)
+
+        target = b'nonexistent_player'
+        await c.send(MsgType.FRIEND_REQUEST,
+                     struct.pack('<B', len(target)) + target)
+        msg_type, resp = await c.recv_expect(MsgType.FRIEND_REQUEST_RESULT)
+        assert msg_type == MsgType.FRIEND_REQUEST_RESULT, f"Expected FRIEND_REQUEST_RESULT, got {msg_type}"
+        result = resp[0]
+        # result=1 PLAYER_NOT_FOUND (target not online)
+        assert result == 1, f"Expected PLAYER_NOT_FOUND(1), got {result}"
+        c.close()
+
+    await test("FRIEND_REQUEST: 친구 요청 (미접속 → NOT_FOUND)", test_friend_request())
+
+    # ━━━ Test: FRIEND_LIST — 친구 목록 조회 ━━━
+    async def test_friend_list():
+        """친구 목록 조회 — 빈 목록이면 count=0."""
+        c = await login_and_enter(port)
+
+        await c.send(MsgType.FRIEND_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.FRIEND_LIST)
+        assert msg_type == MsgType.FRIEND_LIST, f"Expected FRIEND_LIST, got {msg_type}"
+        count = resp[0]
+        assert count == 0, f"Expected 0 friends for fresh session, got {count}"
+        c.close()
+
+    await test("FRIEND_LIST: 친구 목록 조회 (빈 목록)", test_friend_list())
+
+    # ━━━ Test: BLOCK_PLAYER — 플레이어 차단 ━━━
+    async def test_block_player():
+        """플레이어 차단 + 차단 목록 확인."""
+        c = await login_and_enter(port)
+
+        # Block a player
+        target = b'some_griefer'
+        await c.send(MsgType.BLOCK_PLAYER,
+                     struct.pack('<B B', 0, len(target)) + target)
+        msg_type, resp = await c.recv_expect(MsgType.BLOCK_RESULT)
+        assert msg_type == MsgType.BLOCK_RESULT, f"Expected BLOCK_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+
+        # Verify block list
+        await c.send(MsgType.BLOCK_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BLOCK_LIST)
+        assert msg_type == MsgType.BLOCK_LIST, f"Expected BLOCK_LIST, got {msg_type}"
+        count = resp[0]
+        assert count == 1, f"Expected 1 blocked player, got {count}"
+        c.close()
+
+    await test("BLOCK_PLAYER: 차단 + 목록 확인", test_block_player())
+
+    # ━━━ Test: BLOCK_UNBLOCK — 차단 해제 ━━━
+    async def test_block_unblock():
+        """차단 → 해제 → 빈 목록 확인."""
+        c = await login_and_enter(port)
+
+        target = b'temp_block'
+        # Block
+        await c.send(MsgType.BLOCK_PLAYER,
+                     struct.pack('<B B', 0, len(target)) + target)
+        await c.recv_expect(MsgType.BLOCK_RESULT)
+
+        # Unblock
+        await c.send(MsgType.BLOCK_PLAYER,
+                     struct.pack('<B B', 1, len(target)) + target)
+        msg_type, resp = await c.recv_expect(MsgType.BLOCK_RESULT)
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0) for unblock, got {result}"
+
+        # Verify empty
+        await c.send(MsgType.BLOCK_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.BLOCK_LIST)
+        count = resp[0]
+        assert count == 0, f"Expected 0 after unblock, got {count}"
+        c.close()
+
+    await test("BLOCK_UNBLOCK: 차단 해제 → 빈 목록", test_block_unblock())
+
+    # ━━━ Test: PARTY_FINDER_CREATE — 파티 찾기 등록 + 목록 ━━━
+    async def test_party_finder():
+        """파티 찾기 게시판 등록 + 목록 조회."""
+        c = await login_and_enter(port)
+
+        title = b'Need healer for dungeon'
+        category = 0  # dungeon
+        min_level = 15
+        role = 2  # support
+        await c.send(MsgType.PARTY_FINDER_CREATE,
+                     struct.pack('<B', len(title)) + title +
+                     struct.pack('<B B B', category, min_level, role))
+        # Response is PARTY_FINDER_LIST with updated board
+        msg_type, resp = await c.recv_expect(MsgType.PARTY_FINDER_LIST)
+        assert msg_type == MsgType.PARTY_FINDER_LIST, f"Expected PARTY_FINDER_LIST, got {msg_type}"
+        count = resp[0]
+        assert count >= 1, f"Expected at least 1 listing after create, got {count}"
+        c.close()
+
+    await test("PARTY_FINDER: 파티 찾기 등록 + 목록 조회", test_party_finder())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T05:50:00"
+last_session: "2026-02-16T06:10:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 8 보석/각인/초월 완료! 85/85 ALL PASS (S050). 보석6종5등급+각인9종3레벨+초월5단계+Pity시스템. 다음: TASK 5 소셜(410-422) or TASK 6 전장(430-435)."
+current_status: "TASK 5 소셜 심화 완료! 90/90 ALL PASS (S051). 친구/차단/파티찾기 8핸들러(MsgType 410-422). 다음: TASK 9 내구도(462-467) → TASK 6 전장(430-435)."
 
 # ── 완료된 작업 ──
 completed:
@@ -100,6 +100,9 @@ completed:
   - id: S050
     desc: "C030 응답: TASK 8 보석/각인/초월 완료. MsgType 450-459. 핸들러5(GEM_EQUIP/GEM_FUSE/ENGRAVING_LIST/ENGRAVING_EQUIP/TRANSCEND)+보석6종5등급+각인9종3레벨+초월5단계+Pity(+5%/fail,max+50%). 85/85 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s050.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S050_c030_response_task8_enhancement.md"]
+  - id: S051
+    desc: "C031 응답: TASK 5 소셜 심화 완료. MsgType 410-422. 핸들러8(FRIEND_REQUEST/ACCEPT/REJECT/LIST+BLOCK/BLOCK_LIST+PARTY_FINDER_LIST/CREATE)+친구max100+차단max100+파티찾기5카테고리. 90/90 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s051.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S051_c031_response_task5_social.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -122,39 +125,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 5: 소셜 심화 — 친구/차단/파티찾기 (GDD rules/social.yaml)
-  # 길드/파티/채팅은 구현됨. 친구/차단/파티찾기는 미구현.
-  # MsgType: 410-422
+  # TASK 5: 완료! (S051) — 소셜 심화 90/90 PASS
+  # social_sub01~05 모두 완료
   # ============================================================
-  - id: "social_sub01"
-    desc: "FRIEND_REQUEST(410)→FRIEND_REQUEST_RESULT(411) 핸들러 — 친구 요청 보내기. max_friends:100, expire:72h."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "social_sub02"
-    desc: "FRIEND_ACCEPT(412)/FRIEND_REJECT(413)/FRIEND_LIST_REQ(414)→FRIEND_LIST(415) — 수락/거절/목록. 온라인 상태 + 위치 공유."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "social_sub03"
-    desc: "BLOCK_PLAYER(416)/UNBLOCK(417)/BLOCK_LIST_REQ(418)→BLOCK_LIST(419) — 차단/해제/목록. 채팅 필터 + 거래 불가."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "social_sub04"
-    desc: "PARTY_FINDER_LIST(420)/PARTY_FINDER_CREATE(421)/PARTY_FINDER_JOIN(422) — 파티 찾기 게시판. categories:5종, max_listings:1."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "social_sub05"
-    desc: "소셜 심화 테스트 5개 — 친구 요청/수락/목록, 차단, 파티찾기."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 6: 전장 시스템 (GDD rules/pvp.yaml battleground)
@@ -594,6 +567,8 @@ recent_decisions:
   - "클라 TASK 7 완료: TitleManager+CollectionManager+TitleUI+CollectionUI+JobChangeUI, 93 PASS. H/F6/F7키."
   - "TASK 8 완료: 보석/각인/초월(450-459) 85/85 PASS. _patch_s050.py. 보석6종5등급(ruby/sapphire/emerald/diamond/topaz/amethyst)+각인9종3레벨(grudge/cursed_doll/keen_blunt/master_brawler/adrenaline/spirit_absorption/heavy_armor/expert/awakening)+초월5단계(50%/30%/20%/10%/5%)+Pity(+5%/fail,max+50%)."
   - "OneDrive tcp_bridge.py 잘림 이슈 발견/수정: _patch_s050.py에 git 원본 복구 로직 추가"
+  - "TASK 5 완료: 소셜심화(410-422) 90/90 PASS. _patch_s051.py. 핸들러8개(FRIEND_REQUEST/ACCEPT/REJECT/LIST+BLOCK/BLOCK_LIST+PARTY_FINDER_LIST/CREATE). FRIEND_MAX=100, BLOCK_MAX=100, PARTY_FINDER_CATEGORIES 5종."
+  - "클라 TASK 8 각인/초월 완료 확인: EngravingManager+EngravingUI+TranscendUI, 95 PASS."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -629,6 +604,7 @@ processed_messages:
   - "C028"
   - "C029"
   - "C030"
+  - "C031"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -644,4 +620,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python test_tcp_bridge.py
