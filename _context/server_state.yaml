@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-14T23:30:00"
+last_session: "2026-02-14T22:55:00"
 
 # ── 현재 상태 ──
-current_status: "S032 GDD 데이터 DB 5개 CSV 생성 완료 (monsters/skills/items/quests/npcs). 클라 응답 대기 중."
+current_status: "S033 P1 패킷 3종 구현 완료 — SERVER_LIST/CHARACTER_CRUD/TUTORIAL (23/23 PASS). GDD 태스크 3건 done."
 
 # ── 완료된 작업 ──
 completed:
@@ -43,6 +43,9 @@ completed:
   - id: S032
     desc: "GDD 데이터 DB 5개 CSV 생성 — monsters(20종)/skills(30개)/items(50+)/quests(25개)/npcs(18명)"
     files: ["_gdd/data/monsters.csv", "_gdd/data/skills.csv", "_gdd/data/items.csv", "_gdd/data/quests.csv", "_gdd/data/npcs.csv"]
+  - id: S033
+    desc: "P1 패킷 3종: SERVER_LIST(320-321)/CHARACTER_CRUD(322-327)/TUTORIAL(330-331). 23/23 PASS."
+    files: ["Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "Servers/BridgeServer/_patch.py"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked:
@@ -60,16 +63,8 @@ pending_tasks:
     priority: P0
     blocked: true
     blocked_reason: "클라이언트 테스트 결과 대기"
-  - id: "server_list_packet"
-    desc: "SERVER_LIST 패킷 구현 (MsgType 320-321) — game_design.yaml P0_S03_S01"
-    priority: P1
-    blocked: false
-  - id: "character_crud_packet"
-    desc: "CHARACTER_LIST/CREATE/DELETE 패킷 구현 (MsgType 322-327) — game_design.yaml P0_S04_S01"
-    priority: P1
-    blocked: false
-  - id: "tutorial_progress_packet"
-    desc: "TUTORIAL_PROGRESS 패킷 구현 (MsgType 330-331) — game_design.yaml P1_S01_S01"
+  - id: "gdd_next_tasks"
+    desc: "game_design.yaml에서 다음 미구현 server_tasks 확인 후 구현"
     priority: P1
     blocked: false
   - id: "entity_pipeline_review"
@@ -86,6 +81,7 @@ recent_decisions:
   - "엔티티 파이프라인 제안: 아이디어는 좋으나 현재 보류, Phase 2 후 검토"
   - "에셋 정책: SVG/코드=Git, FBX/텍스처/오디오=로컬 직접 배치"
   - "D011: GDD data/ CSV 5종 생성 — 서버/클라 에이전트가 파싱해서 사용"
+  - "D012: OneDrive 동기화 문제로 _patch.py 사용 — Edit 도구 변경이 복원되는 이슈 우회"
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -116,3 +112,9 @@ rules:
   - "state 파일 업데이트 필수 (컨텍스트 유실 방지)"
   - "conversation_style: 동료 개발자처럼 자연스럽게. 딱딱한 보고서 금지."
   - "대표님 결정 필요 시 _context/ask_user.yaml 사용"
+  - "tcp_bridge.py 수정 시 _patch.py 사용 필수 (OneDrive 동기화 파일 복원 이슈)"
+
+# ── 중요 참고: tcp_bridge.py 패칭 방법 ──
+# OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
+# Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
+# 실행: python _patch.py && python test_tcp_bridge.py
