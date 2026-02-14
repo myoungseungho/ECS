@@ -779,28 +779,28 @@ namespace Network
             _field?.Send(PacketBuilder.AuctionBid(auctionId, bidAmount));
         }
 
-        // ━━━ S041: 제작/채집/요리/인챈트/보석 API ━━━
+        // ━━━ S043: 제작/채집/요리/인챈트/보석 API ━━━
 
-        /// <summary>제작 레시피 목록 요청</summary>
-        public void RequestCraftList()
+        /// <summary>제작 레시피 목록 요청 (카테고리 필터)</summary>
+        public void RequestCraftList(byte category = 0xFF)
         {
-            _field?.Send(PacketBuilder.CraftListReq());
+            _field?.Send(PacketBuilder.CraftListReq(category));
         }
 
-        /// <summary>제작 실행</summary>
-        public void ExecuteCraft(ushort recipeId)
+        /// <summary>제작 실행 (문자열 recipe_id)</summary>
+        public void ExecuteCraft(string recipeId)
         {
             _field?.Send(PacketBuilder.CraftExecute(recipeId));
         }
 
         /// <summary>채집 시작</summary>
-        public void StartGather(byte nodeType)
+        public void StartGather(byte gatherType)
         {
-            _field?.Send(PacketBuilder.GatherStart(nodeType));
+            _field?.Send(PacketBuilder.GatherStart(gatherType));
         }
 
-        /// <summary>요리 실행</summary>
-        public void ExecuteCook(byte recipeId)
+        /// <summary>요리 실행 (문자열 recipe_id)</summary>
+        public void ExecuteCook(string recipeId)
         {
             _field?.Send(PacketBuilder.CookExecute(recipeId));
         }
@@ -1972,7 +1972,7 @@ namespace Network
                 case MsgType.CRAFT_RESULT:
                 {
                     var data = PacketBuilder.ParseCraftResult(payload);
-                    Debug.Log($"[Net] CraftResult: status={data.Status}, recipe={data.RecipeId}, item={data.ItemId}, count={data.Count}, bonus={data.Bonus}");
+                    Debug.Log($"[Net] CraftResult: status={data.Status}, item={data.ItemId}, count={data.Count}, bonus={data.HasBonus}");
                     OnCraftResult?.Invoke(data);
                     break;
                 }
@@ -1980,7 +1980,7 @@ namespace Network
                 case MsgType.GATHER_RESULT:
                 {
                     var data = PacketBuilder.ParseGatherResult(payload);
-                    Debug.Log($"[Net] GatherResult: status={data.Status}, node={data.NodeType}, item={data.ItemId}, energy={data.Energy}");
+                    Debug.Log($"[Net] GatherResult: status={data.Status}, drops={data.Drops.Length}, energy={data.Energy}");
                     OnGatherResult?.Invoke(data);
                     break;
                 }
@@ -1988,7 +1988,7 @@ namespace Network
                 case MsgType.COOK_RESULT:
                 {
                     var data = PacketBuilder.ParseCookResult(payload);
-                    Debug.Log($"[Net] CookResult: status={data.Status}, buff={data.BuffType}+{data.BuffValue} for {data.BuffDuration}s");
+                    Debug.Log($"[Net] CookResult: status={data.Status}, duration={data.Duration}s, effects={data.EffectCount}");
                     OnCookResult?.Invoke(data);
                     break;
                 }
@@ -1996,7 +1996,7 @@ namespace Network
                 case MsgType.ENCHANT_RESULT:
                 {
                     var data = PacketBuilder.ParseEnchantResultData(payload);
-                    Debug.Log($"[Net] EnchantResult: status={data.Status}, slot={data.Slot}, element={data.Element}, lv={data.Level}, dmg%={data.DamagePct}");
+                    Debug.Log($"[Net] EnchantResult: status={data.Status}, element={data.Element}, lv={data.Level}, dmg%={data.DamagePct}");
                     OnEnchantResultResp?.Invoke(data);
                     break;
                 }

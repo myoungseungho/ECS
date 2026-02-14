@@ -263,17 +263,17 @@ namespace Network
         RAID_ATTACK        = 378,  // C→S: instance_id(4) skill_id(2) damage(4)
         RAID_ATTACK_RESULT = 379,  // S→C: instance_id(4) skill_id(2) damage(4) current_hp(4) max_hp(4)
 
-        // 제작/채집/요리/인챈트 (S041 TASK 2)
-        CRAFT_LIST_REQ     = 380,  // C→S: empty
-        CRAFT_LIST         = 381,  // S→C: count(1) {recipe_id(2) name(32) category(1) proficiency(1) material_count(1) success_pct(1) gold(4)}*N
-        CRAFT_EXECUTE      = 382,  // C→S: recipe_id(2)
-        CRAFT_RESULT       = 383,  // S→C: status(1) recipe_id(2) item_id(4) count(2) bonus(1) = 10B
-        GATHER_START       = 384,  // C→S: node_type(1)
-        GATHER_RESULT      = 385,  // S→C: status(1) node_type(1) item_id(4) count(2) energy(2) = 10B
-        COOK_EXECUTE       = 386,  // C→S: recipe_id(1)
-        COOK_RESULT        = 387,  // S→C: status(1) recipe_id(1) buff_type(1) buff_value(2) buff_duration(2) = 7B
-        ENCHANT_REQ        = 388,  // C→S: slot(1) element(1) level(1)
-        ENCHANT_RESULT     = 389,  // S→C: status(1) slot(1) element(1) level(1) damage_pct(1) = 5B
+        // 제작/채집/요리/인챈트 (S043 TASK 2)
+        CRAFT_LIST_REQ     = 380,  // C→S: category(1) (0xFF=all)
+        CRAFT_LIST         = 381,  // S→C: count(1) {rid_len(1) rid(str) prof_req(1) gold_cost(2) success_pct(1) item_id(2) item_count(1) mat_count(1)}*N
+        CRAFT_EXECUTE      = 382,  // C→S: rid_len(1) recipe_id(str)
+        CRAFT_RESULT       = 383,  // S→C: result(1) [+ item_id(2) count(1) has_bonus(1)] (conditional on result==0)
+        GATHER_START       = 384,  // C→S: gather_type(1) (1=herb, 2=mining, 3=logging)
+        GATHER_RESULT      = 385,  // S→C: result(1) energy(1) drop_count(1) {item_id(2)}*N
+        COOK_EXECUTE       = 386,  // C→S: rid_len(1) recipe_id(str)
+        COOK_RESULT        = 387,  // S→C: result(1) [+ duration(2) effect_count(1)] (conditional on result==0)
+        ENCHANT_REQ        = 388,  // C→S: slot_idx(1) element_id(1) target_level(1)
+        ENCHANT_RESULT     = 389,  // S→C: result(1) [+ element_id(1) level(1) dmg_bonus_pct(1)] (conditional on result==0)
 
         // 거래소 (S045 TASK 3)
         AUCTION_LIST_REQ           = 390,  // C→S: category(1) page(1) sort_by(1) = 3B
@@ -1469,96 +1469,89 @@ namespace Network
 
     // ━━━ S041: 제작/채집/요리/인챈트/보석 ━━━
 
-    /// <summary>제작 카테고리</summary>
+    /// <summary>제작 카테고리 (S043)</summary>
     public enum CraftCategory : byte
     {
-        WEAPON   = 1,
-        ARMOR    = 2,
-        POTION   = 3,
-        GEM      = 4,
-        MATERIAL = 5,
+        WEAPON   = 0,
+        ARMOR    = 1,
+        POTION   = 2,
+        GEM      = 3,
+        MATERIAL = 4,
+        ALL      = 0xFF,
     }
 
-    /// <summary>제작 결과 코드</summary>
+    /// <summary>제작 결과 코드 (S043)</summary>
     public enum CraftResult : byte
     {
         SUCCESS           = 0,
         RECIPE_NOT_FOUND  = 1,
         LOW_PROFICIENCY   = 2,
-        NO_MATERIALS      = 3,
-        NO_GOLD           = 4,
+        NO_MATERIALS      = 3,  // 서버 미사용 (간소화)
+        NO_GOLD           = 4,  // 서버는 result=3으로 통합 가능
         CRAFT_FAILED      = 5,
     }
 
-    /// <summary>레시피 정보 (CRAFT_LIST 파싱용)</summary>
+    /// <summary>레시피 정보 (CRAFT_LIST 파싱용, S043)</summary>
     public class CraftRecipeInfo
     {
-        public ushort RecipeId;
-        public string Name;
-        public CraftCategory Category;
+        public string RecipeId;
         public byte Proficiency;
-        public byte MaterialCount;
+        public ushort Gold;
         public byte SuccessPct;
-        public uint Gold;
+        public ushort ItemId;
+        public byte ItemCount;
+        public byte MaterialCount;
     }
 
-    /// <summary>제작 결과 데이터 (CRAFT_RESULT 파싱용)</summary>
+    /// <summary>제작 결과 데이터 (CRAFT_RESULT 파싱용, S043)</summary>
     public class CraftResultData
     {
         public CraftResult Status;
-        public ushort RecipeId;
-        public uint ItemId;
-        public ushort Count;
-        public byte Bonus;
+        public ushort ItemId;
+        public byte Count;
+        public byte HasBonus;
     }
 
-    /// <summary>채집 결과 코드</summary>
+    /// <summary>채집 결과 코드 (S043)</summary>
     public enum GatherResult : byte
     {
         SUCCESS        = 0,
-        NODE_NOT_FOUND = 1,
+        UNKNOWN_TYPE   = 1,
         NO_ENERGY      = 2,
-        NO_LOOT        = 3,
     }
 
-    /// <summary>채집 결과 데이터 (GATHER_RESULT 파싱용)</summary>
+    /// <summary>채집 드롭 아이템</summary>
+    public class GatherDropItem
+    {
+        public ushort ItemId;
+    }
+
+    /// <summary>채집 결과 데이터 (GATHER_RESULT 파싱용, S043)</summary>
     public class GatherResultData
     {
         public GatherResult Status;
-        public byte NodeType;
-        public uint ItemId;
-        public ushort Count;
-        public ushort Energy;
+        public byte Energy;
+        public GatherDropItem[] Drops;
     }
 
-    /// <summary>요리 결과 코드</summary>
+    /// <summary>요리 결과 코드 (S043)</summary>
     public enum CookResult : byte
     {
         SUCCESS       = 0,
         RECIPE_FAIL   = 1,
-        NO_MATERIALS  = 2,
+        LOW_LEVEL     = 2,
         BUFF_ACTIVE   = 3,
     }
 
-    /// <summary>요리 버프 타입</summary>
-    public enum CookBuffType : byte
-    {
-        ATK  = 1,
-        HP   = 2,
-        ALL  = 3,
-    }
-
-    /// <summary>요리 결과 데이터 (COOK_RESULT 파싱용)</summary>
+    /// <summary>요리 결과 데이터 (COOK_RESULT 파싱용, S043)</summary>
     public class CookResultData
     {
         public CookResult Status;
-        public byte RecipeId;
-        public CookBuffType BuffType;
-        public ushort BuffValue;
-        public ushort BuffDuration;
+        public ushort Duration;
+        public byte EffectCount;
     }
 
-    /// <summary>인챈트 결과 코드</summary>
+    /// <summary>인챈트 결과 코드 (S043)</summary>
     public enum EnchantResult : byte
     {
         SUCCESS        = 0,
@@ -1569,11 +1562,10 @@ namespace Network
         INVALID_SLOT   = 5,
     }
 
-    /// <summary>인챈트 결과 데이터 (ENCHANT_RESULT 파싱용)</summary>
+    /// <summary>인챈트 결과 데이터 (ENCHANT_RESULT 파싱용, S043)</summary>
     public class EnchantResultData
     {
         public EnchantResult Status;
-        public byte Slot;
         public byte Element;
         public byte Level;
         public byte DamagePct;

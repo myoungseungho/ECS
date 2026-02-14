@@ -82,7 +82,11 @@ public class GatheringUI : MonoBehaviour
 
         if (data.Status == Network.GatherResult.SUCCESS)
         {
-            _resultText.text = $"Gathered! Item:{data.ItemId} x{data.Count}";
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"Gathered {data.Drops.Length} item(s)!");
+            for (int i = 0; i < data.Drops.Length; i++)
+                sb.Append($" [{data.Drops[i].ItemId}]");
+            _resultText.text = sb.ToString();
             _resultText.color = Color.green;
         }
         else

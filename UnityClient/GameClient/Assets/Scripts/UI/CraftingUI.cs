@@ -80,7 +80,7 @@ public class CraftingUI : MonoBehaviour
         for (int i = 0; i < recipes.Count; i++)
         {
             var r = recipes[i];
-            sb.AppendLine($"  [{r.RecipeId}] {r.Name} ({r.Category}) Prof:{r.Proficiency} Success:{r.SuccessPct}% Gold:{r.Gold}");
+            sb.AppendLine($"  [{r.RecipeId}] Prof:{r.Proficiency} Success:{r.SuccessPct}% Gold:{r.Gold} Item:{r.ItemId}x{r.ItemCount}");
         }
         _recipeListText.text = sb.ToString();
     }
@@ -91,7 +91,7 @@ public class CraftingUI : MonoBehaviour
 
         if (data.Status == Network.CraftResult.SUCCESS)
         {
-            string bonus = data.Bonus > 0 ? " +BONUS!" : "";
+            string bonus = data.HasBonus > 0 ? " +BONUS!" : "";
             _resultText.text = $"Craft SUCCESS! Item:{data.ItemId} x{data.Count}{bonus}";
             _resultText.color = Color.green;
         }
@@ -108,7 +108,7 @@ public class CraftingUI : MonoBehaviour
 
         if (data.Status == Network.CookResult.SUCCESS)
         {
-            _resultText.text = $"Cook SUCCESS! Buff:{data.BuffType} +{data.BuffValue} ({data.BuffDuration}s)";
+            _resultText.text = $"Cook SUCCESS! Duration:{data.Duration}s Effects:{data.EffectCount}";
             _resultText.color = Color.green;
         }
         else

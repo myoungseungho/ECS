@@ -1751,21 +1751,25 @@ namespace Network
             return d;
         }
 
-        // ━━━ S041: 제작 (Crafting) ━━━
+        // ━━━ S043: 제작 (Crafting) ━━━
 
-        /// <summary>CRAFT_LIST_REQ 빌드: empty</summary>
-        public static byte[] CraftListReq()
+        /// <summary>CRAFT_LIST_REQ 빌드: category(1) (0xFF=all)</summary>
+        public static byte[] CraftListReq(byte category = 0xFF)
         {
-            return Build(MsgType.CRAFT_LIST_REQ);
+            return Build(MsgType.CRAFT_LIST_REQ, new byte[] { category });
         }
 
-        /// <summary>CRAFT_EXECUTE 빌드: recipe_id(2)</summary>
-        public static byte[] CraftExecute(ushort recipeId)
+        /// <summary>CRAFT_EXECUTE 빌드: rid_len(1) + recipe_id(str)</summary>
+        public static byte[] CraftExecute(string recipeId)
         {
-            return Build(MsgType.CRAFT_EXECUTE, BitConverter.GetBytes(recipeId));
+            byte[] rid = Encoding.UTF8.GetBytes(recipeId);
+            byte[] payload = new byte[1 + rid.Length];
+            payload[0] = (byte)rid.Length;
+            Array.Copy(rid, 0, payload, 1, rid.Length);
+            return Build(MsgType.CRAFT_EXECUTE, payload);
         }
 
-        /// <summary>CRAFT_LIST 파싱: count(1) {recipe_id(2) name(32) category(1) proficiency(1) material_count(1) success_pct(1) gold(4)}*N</summary>
+        /// <summary>CRAFT_LIST 파싱 (S043): count(1) {rid_len(1) rid(str) prof_req(1) gold_cost(2) success_pct(1) item_id(2) item_count(1) mat_count(1)}*N</summary>
         public static CraftRecipeInfo[] ParseCraftList(byte[] payload)
         {
             byte count = payload[0];
@@ -1774,90 +1778,102 @@ namespace Network
             for (int i = 0; i < count; i++)
             {
                 var r = new CraftRecipeInfo();
-                r.RecipeId = BitConverter.ToUInt16(payload, off); off += 2;
-                int nameEnd = off;
-                while (nameEnd < off + 32 && payload[nameEnd] != 0) nameEnd++;
-                r.Name = Encoding.UTF8.GetString(payload, off, nameEnd - off);
-                off += 32;
-                r.Category = (CraftCategory)payload[off]; off += 1;
+                byte ridLen = payload[off]; off += 1;
+                r.RecipeId = Encoding.UTF8.GetString(payload, off, ridLen); off += ridLen;
                 r.Proficiency = payload[off]; off += 1;
-                r.MaterialCount = payload[off]; off += 1;
+                r.Gold = BitConverter.ToUInt16(payload, off); off += 2;
                 r.SuccessPct = payload[off]; off += 1;
-                r.Gold = BitConverter.ToUInt32(payload, off); off += 4;
+                r.ItemId = BitConverter.ToUInt16(payload, off); off += 2;
+                r.ItemCount = payload[off]; off += 1;
+                r.MaterialCount = payload[off]; off += 1;
                 recipes[i] = r;
             }
             return recipes;
         }
 
-        /// <summary>CRAFT_RESULT 파싱: status(1) recipe_id(2) item_id(4) count(2) bonus(1) = 10B</summary>
+        /// <summary>CRAFT_RESULT 파싱 (S043): result(1) [+ item_id(2) count(1) has_bonus(1)]</summary>
         public static CraftResultData ParseCraftResult(byte[] payload)
         {
             var d = new CraftResultData();
             d.Status = (CraftResult)payload[0];
-            d.RecipeId = BitConverter.ToUInt16(payload, 1);
-            d.ItemId = BitConverter.ToUInt32(payload, 3);
-            d.Count = BitConverter.ToUInt16(payload, 7);
-            d.Bonus = payload[9];
+            if (d.Status == CraftResult.SUCCESS && payload.Length >= 4)
+            {
+                d.ItemId = BitConverter.ToUInt16(payload, 1);
+                d.Count = payload[3];
+                d.HasBonus = payload.Length >= 5 ? payload[4] : (byte)0;
+            }
             return d;
         }
 
-        // ━━━ S041: 채집 (Gathering) ━━━
+        // ━━━ S043: 채집 (Gathering) ━━━
 
-        /// <summary>GATHER_START 빌드: node_type(1)</summary>
-        public static byte[] GatherStart(byte nodeType)
+        /// <summary>GATHER_START 빌드: gather_type(1)</summary>
+        public static byte[] GatherStart(byte gatherType)
         {
-            return Build(MsgType.GATHER_START, new byte[] { nodeType });
+            return Build(MsgType.GATHER_START, new byte[] { gatherType });
         }
 
-        /// <summary>GATHER_RESULT 파싱: status(1) node_type(1) item_id(4) count(2) energy(2) = 10B</summary>
+        /// <summary>GATHER_RESULT 파싱 (S043): result(1) energy(1) drop_count(1) {item_id(2)}*N</summary>
         public static GatherResultData ParseGatherResult(byte[] payload)
         {
             var d = new GatherResultData();
             d.Status = (GatherResult)payload[0];
-            d.NodeType = payload[1];
-            d.ItemId = BitConverter.ToUInt32(payload, 2);
-            d.Count = BitConverter.ToUInt16(payload, 6);
-            d.Energy = BitConverter.ToUInt16(payload, 8);
+            d.Energy = payload[1];
+            byte dropCount = payload[2];
+            d.Drops = new GatherDropItem[dropCount];
+            int off = 3;
+            for (int i = 0; i < dropCount; i++)
+            {
+                d.Drops[i] = new GatherDropItem();
+                d.Drops[i].ItemId = BitConverter.ToUInt16(payload, off); off += 2;
+            }
             return d;
         }
 
-        // ━━━ S041: 요리 (Cooking) ━━━
+        // ━━━ S043: 요리 (Cooking) ━━━
 
-        /// <summary>COOK_EXECUTE 빌드: recipe_id(1)</summary>
-        public static byte[] CookExecute(byte recipeId)
+        /// <summary>COOK_EXECUTE 빌드 (S043): rid_len(1) + recipe_id(str)</summary>
+        public static byte[] CookExecute(string recipeId)
         {
-            return Build(MsgType.COOK_EXECUTE, new byte[] { recipeId });
+            byte[] rid = Encoding.UTF8.GetBytes(recipeId);
+            byte[] payload = new byte[1 + rid.Length];
+            payload[0] = (byte)rid.Length;
+            Array.Copy(rid, 0, payload, 1, rid.Length);
+            return Build(MsgType.COOK_EXECUTE, payload);
         }
 
-        /// <summary>COOK_RESULT 파싱: status(1) recipe_id(1) buff_type(1) buff_value(2) buff_duration(2) = 7B</summary>
+        /// <summary>COOK_RESULT 파싱 (S043): result(1) [+ duration(2) effect_count(1)]</summary>
         public static CookResultData ParseCookResult(byte[] payload)
         {
             var d = new CookResultData();
             d.Status = (CookResult)payload[0];
-            d.RecipeId = payload[1];
-            d.BuffType = (CookBuffType)payload[2];
-            d.BuffValue = BitConverter.ToUInt16(payload, 3);
-            d.BuffDuration = BitConverter.ToUInt16(payload, 5);
+            if (d.Status == CookResult.SUCCESS && payload.Length >= 4)
+            {
+                d.Duration = BitConverter.ToUInt16(payload, 1);
+                d.EffectCount = payload[3];
+            }
             return d;
         }
 
-        // ━━━ S041: 인챈트 (Enchant) ━━━
+        // ━━━ S043: 인챈트 (Enchant) ━━━
 
-        /// <summary>ENCHANT_REQ 빌드: slot(1) element(1) level(1) = 3B</summary>
+        /// <summary>ENCHANT_REQ 빌드: slot_idx(1) element_id(1) target_level(1) = 3B</summary>
         public static byte[] EnchantReq(byte slot, byte element, byte level)
         {
             return Build(MsgType.ENCHANT_REQ, new byte[] { slot, element, level });
         }
 
-        /// <summary>ENCHANT_RESULT 파싱: status(1) slot(1) element(1) level(1) damage_pct(1) = 5B</summary>
+        /// <summary>ENCHANT_RESULT 파싱 (S043): result(1) [+ element_id(1) level(1) dmg_bonus_pct(1)]</summary>
         public static EnchantResultData ParseEnchantResultData(byte[] payload)
         {
             var d = new EnchantResultData();
             d.Status = (EnchantResult)payload[0];
-            d.Slot = payload[1];
-            d.Element = payload[2];
-            d.Level = payload[3];
-            d.DamagePct = payload[4];
+            if (d.Status == EnchantResult.SUCCESS && payload.Length >= 4)
+            {
+                d.Element = payload[1];
+                d.Level = payload[2];
+                d.DamagePct = payload[3];
+            }
             return d;
         }
 

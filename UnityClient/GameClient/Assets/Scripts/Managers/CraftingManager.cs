@@ -1,5 +1,5 @@
 // ━━━ CraftingManager.cs ━━━
-// 제작/요리/인챈트 시스템 관리 (S041 TASK 2)
+// 제작/요리/인챈트 시스템 관리 (S043 TASK 2)
 // MsgType: 380-383 (제작), 386-387 (요리), 388-389 (인챈트)
 
 using System;
@@ -101,12 +101,12 @@ public class CraftingManager : MonoBehaviour
         OnPanelClosed?.Invoke();
     }
 
-    public void Craft(ushort recipeId)
+    public void Craft(string recipeId)
     {
         Network.NetworkManager.Instance?.ExecuteCraft(recipeId);
     }
 
-    public void Cook(byte recipeId)
+    public void Cook(string recipeId)
     {
         Network.NetworkManager.Instance?.ExecuteCook(recipeId);
     }
@@ -116,12 +116,12 @@ public class CraftingManager : MonoBehaviour
         Network.NetworkManager.Instance?.RequestEnchant(slot, element, level);
     }
 
-    public void RefreshRecipes()
+    public void RefreshRecipes(byte category = 0xFF)
     {
-        Network.NetworkManager.Instance?.RequestCraftList();
+        Network.NetworkManager.Instance?.RequestCraftList(category);
     }
 
-    public Network.CraftRecipeInfo GetRecipe(ushort recipeId)
+    public Network.CraftRecipeInfo GetRecipe(string recipeId)
     {
         for (int i = 0; i < _recipes.Count; i++)
         {

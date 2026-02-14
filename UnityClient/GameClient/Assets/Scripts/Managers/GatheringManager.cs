@@ -1,5 +1,5 @@
 // ━━━ GatheringManager.cs ━━━
-// 채집 시스템 관리 (S041 TASK 2)
+// 채집 시스템 관리 (S043 TASK 2)
 // MsgType: 384-385 (채집 시작/결과)
 
 using System;
@@ -11,28 +11,27 @@ public class GatheringManager : MonoBehaviour
     public static GatheringManager Instance { get; private set; }
 
     // ━━━ 상태 ━━━
-    private ushort _energy = 200;
+    private byte _energy = 200;
     private bool _isGathering;
     private float _gatherTimer;
-    private byte _currentNodeType;
+    private byte _currentGatherType;
     private bool _isPanelOpen;
 
-    // ━━━ 채집 노드 타입 ━━━
-    public const byte NODE_HERB = 0;
-    public const byte NODE_ORE = 1;
-    public const byte NODE_WOOD = 2;
-    public const byte NODE_FISH = 3;
+    // ━━━ 채집 타입 (S043: 1=herb, 2=mining, 3=logging) ━━━
+    public const byte GATHER_HERB = 1;
+    public const byte GATHER_MINING = 2;
+    public const byte GATHER_LOGGING = 3;
 
     // ━━━ 채집 시간 (GDD 기준) ━━━
-    private static readonly float[] GatherTimes = { 3.0f, 5.0f, 4.0f, 4.0f };
+    private static readonly float[] GatherTimes = { 0f, 3.0f, 5.0f, 4.0f };
 
     // ━━━ 프로퍼티 ━━━
-    public ushort Energy => _energy;
-    public ushort MaxEnergy => 200;
+    public byte Energy => _energy;
+    public byte MaxEnergy => 200;
     public bool IsGathering => _isGathering;
     public bool IsPanelOpen => _isPanelOpen;
-    public float GatherProgress => _isGathering && _currentNodeType < GatherTimes.Length
-        ? Mathf.Clamp01(_gatherTimer / GatherTimes[_currentNodeType])
+    public float GatherProgress => _isGathering && _currentGatherType < GatherTimes.Length
+        ? Mathf.Clamp01(_gatherTimer / GatherTimes[_currentGatherType])
         : 0f;
 
     // ━━━ 이벤트 ━━━
@@ -104,27 +103,26 @@ public class GatheringManager : MonoBehaviour
         OnPanelClosed?.Invoke();
     }
 
-    public void Gather(byte nodeType)
+    public void Gather(byte gatherType)
     {
         if (_isGathering) return;
         if (_energy < 5) return;
 
         _isGathering = true;
         _gatherTimer = 0f;
-        _currentNodeType = nodeType;
+        _currentGatherType = gatherType;
         OnGatherStarted?.Invoke();
-        Network.NetworkManager.Instance?.StartGather(nodeType);
+        Network.NetworkManager.Instance?.StartGather(gatherType);
     }
 
-    public string GetNodeName(byte nodeType)
+    public string GetGatherName(byte gatherType)
     {
-        switch (nodeType)
+        switch (gatherType)
         {
-            case NODE_HERB: return "Herb";
-            case NODE_ORE:  return "Ore";
-            case NODE_WOOD: return "Wood";
-            case NODE_FISH: return "Fish";
-            default:        return "Unknown";
+            case GATHER_HERB:    return "Herbalism";
+            case GATHER_MINING:  return "Mining";
+            case GATHER_LOGGING: return "Logging";
+            default:             return "Unknown";
         }
     }
 }

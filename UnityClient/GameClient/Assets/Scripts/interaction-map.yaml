@@ -671,7 +671,7 @@ managers:
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "제작/요리/인챈트 시스템 관리 — S041 TASK 2 (MsgType 380-383, 386-389)"
+    purpose: "제작/요리/인챈트 시스템 관리 — S043 TASK 2 (MsgType 380-383, 386-389)"
     reads: []
     writes:
       - _recipes (List<CraftRecipeInfo>)
@@ -691,17 +691,17 @@ managers:
     public_api:
       - OpenPanel()
       - ClosePanel()
-      - Craft(ushort)
-      - Cook(byte)
+      - Craft(string)
+      - Cook(string)
       - Enchant(byte, byte, byte)
-      - RefreshRecipes()
-      - GetRecipe(ushort) → CraftRecipeInfo
+      - RefreshRecipes(byte)
+      - GetRecipe(string) → CraftRecipeInfo
 
   - name: GatheringManager
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "채집 시스템 관리 — S041 TASK 2 (MsgType 384-385) 에너지/진행바"
+    purpose: "채집 시스템 관리 — S043 TASK 2 (MsgType 384-385) 에너지/진행바"
     reads: []
     writes:
       - _energy (ushort)
@@ -719,10 +719,10 @@ managers:
       - OpenPanel()
       - ClosePanel()
       - Gather(byte)
-      - GetNodeName(byte) → string
+      - GetGatherName(byte) → string
     computed_properties:
-      - Energy (ushort)
-      - MaxEnergy (ushort)
+      - Energy (byte)
+      - MaxEnergy (byte)
       - IsGathering (bool)
       - GatherProgress (float)
 
