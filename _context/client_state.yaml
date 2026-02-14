@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T22:30:00"
+last_session: "2026-02-16T05:00:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 7 비급&트라이포드 구현 완료 — TripodManager + TripodUI + 패킷 5종(520-524) + TCP 테스트 8건 | 83 PASS 0 FAIL"
+current_status: "Phase 8 현상금 시스템 구현 완료 — BountyManager + BountyUI + 패킷 8종(530-537) + TCP 테스트 10건 | 85 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -172,6 +172,18 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase7_tripod_tcp.py"
+  - id: A22
+    desc: "S047 Phase 8 현상금 시스템 — BountyManager + BountyUI + 패킷 8종(530-537) + TCP 테스트 10건"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/BountyManager.cs"
+      - "Assets/Scripts/UI/BountyUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase8_bounty_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -267,10 +279,11 @@ pending_tasks:
     blocked: true
     blocked_reason: "서버 TASK 6 (전장/길드전 핸들러) 구현 대기 — Batch 4"
   - id: "gdd_task16_bounty_ui"
-    desc: "현상금 UI — BountyUI (서버 TASK 16 MsgType 530-537)"
+    desc: "현상금 UI — BountyManager + BountyUI (서버 TASK 16 MsgType 530-537)"
     priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 16 (현상금 핸들러) 구현 대기 — S044 신규"
+    blocked: false
+    blocked_reason: "완료 (A22)"
+    status: done
   - id: "gdd_task17_secret_dungeon_ui"
     desc: "비경 UI — SecretDungeonUI (서버 TASK 17 MsgType 540-544)"
     priority: P2
@@ -311,6 +324,7 @@ recent_decisions:
   - "Phase 6: 거래소(390-397) AuctionManager+AuctionUI 클라 구현 완료"
   - "S044 신규 4대 시스템: 비급(520-524)/현상금(530-537)/비경(540-544)/사제(550-560) — 모두 서버 블로킹"
   - "Phase 7: 비급&트라이포드(520-524) TripodManager+TripodUI 클라 구현 완료 — S046 응답"
+  - "Phase 8: 현상금 시스템(530-537) BountyManager+BountyUI 클라 구현 완료 — S047 응답"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -357,6 +371,7 @@ processed_messages:
   - "S044"
   - "S045"
   - "S046"
+  - "S047"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

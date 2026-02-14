@@ -2416,5 +2416,140 @@ namespace Network
             }
             return d;
         }
+
+        // ━━━ S047: 현상금 시스템 ━━━
+
+        /// <summary>BOUNTY_LIST_REQ 빌더: empty</summary>
+        public static byte[] BountyListReq()
+        {
+            return BuildPacket(MsgType.BOUNTY_LIST_REQ);
+        }
+
+        /// <summary>BOUNTY_ACCEPT 빌더: bounty_id(2)</summary>
+        public static byte[] BountyAccept(ushort bountyId)
+        {
+            var payload = BitConverter.GetBytes(bountyId);
+            return BuildPacket(MsgType.BOUNTY_ACCEPT, payload);
+        }
+
+        /// <summary>BOUNTY_COMPLETE REQ 빌더: bounty_id(2)</summary>
+        public static byte[] BountyCompleteReq(ushort bountyId)
+        {
+            var payload = BitConverter.GetBytes(bountyId);
+            return BuildPacket(MsgType.BOUNTY_COMPLETE, payload);
+        }
+
+        /// <summary>BOUNTY_RANKING_REQ 빌더: empty</summary>
+        public static byte[] BountyRankingReq()
+        {
+            return BuildPacket(MsgType.BOUNTY_RANKING_REQ);
+        }
+
+        /// <summary>BOUNTY_LIST 파싱: daily_count(1) + [bounty entries] + has_weekly(1) + [weekly] + accepted_count(1)</summary>
+        public static BountyListData ParseBountyList(byte[] payload)
+        {
+            var d = new BountyListData();
+            int off = 0;
+
+            byte dailyCount = payload[off]; off += 1;
+            d.DailyBounties = new BountyInfo[dailyCount];
+            for (int i = 0; i < dailyCount; i++)
+            {
+                d.DailyBounties[i] = ParseBountyInfoEntry(payload, ref off);
+            }
+
+            d.HasWeekly = payload[off] != 0; off += 1;
+            if (d.HasWeekly)
+            {
+                d.WeeklyBounty = ParseBountyInfoEntry(payload, ref off);
+            }
+
+            d.AcceptedCount = payload[off]; off += 1;
+            return d;
+        }
+
+        private static BountyInfo ParseBountyInfoEntry(byte[] payload, ref int off)
+        {
+            var b = new BountyInfo();
+            b.BountyId = BitConverter.ToUInt16(payload, off); off += 2;
+            b.MonsterId = BitConverter.ToUInt16(payload, off); off += 2;
+            b.Level = payload[off]; off += 1;
+            byte zoneLen = payload[off]; off += 1;
+            b.Zone = System.Text.Encoding.UTF8.GetString(payload, off, zoneLen); off += zoneLen;
+            b.Gold = BitConverter.ToUInt32(payload, off); off += 4;
+            b.Exp = BitConverter.ToUInt32(payload, off); off += 4;
+            b.Token = payload[off]; off += 1;
+            b.Accepted = payload[off]; off += 1;
+            b.Completed = payload[off]; off += 1;
+            return b;
+        }
+
+        /// <summary>BOUNTY_ACCEPT_RESULT 파싱: result(1) [+ bounty_id(2)]</summary>
+        public static BountyAcceptResultData ParseBountyAcceptResult(byte[] payload)
+        {
+            var d = new BountyAcceptResultData();
+            d.Result = (BountyAcceptResult)payload[0];
+            if (d.Result == BountyAcceptResult.SUCCESS && payload.Length >= 3)
+            {
+                d.BountyId = BitConverter.ToUInt16(payload, 1);
+            }
+            return d;
+        }
+
+        /// <summary>BOUNTY_COMPLETE RESP 파싱: result(1)+bounty_id(2)+gold(4)+exp(4)+token(1)</summary>
+        public static BountyCompleteData ParseBountyComplete(byte[] payload)
+        {
+            var d = new BountyCompleteData();
+            d.Result = (BountyCompleteResult)payload[0];
+            if (d.Result == BountyCompleteResult.SUCCESS && payload.Length >= 12)
+            {
+                d.BountyId = BitConverter.ToUInt16(payload, 1);
+                d.Gold = BitConverter.ToUInt32(payload, 3);
+                d.Exp = BitConverter.ToUInt32(payload, 7);
+                d.Token = payload[11];
+            }
+            else if (payload.Length >= 3)
+            {
+                d.BountyId = BitConverter.ToUInt16(payload, 1);
+            }
+            return d;
+        }
+
+        /// <summary>BOUNTY_RANKING 파싱: rank_count(1) + [rank(1)+name_len(1)+name(str)+score(2)] + my_rank(1)+my_score(2)</summary>
+        public static BountyRankingData ParseBountyRanking(byte[] payload)
+        {
+            var d = new BountyRankingData();
+            int off = 0;
+
+            byte rankCount = payload[off]; off += 1;
+            d.Rankings = new BountyRankEntry[rankCount];
+            for (int i = 0; i < rankCount; i++)
+            {
+                var entry = new BountyRankEntry();
+                entry.Rank = payload[off]; off += 1;
+                byte nameLen = payload[off]; off += 1;
+                entry.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                entry.Score = BitConverter.ToUInt16(payload, off); off += 2;
+                d.Rankings[i] = entry;
+            }
+
+            d.MyRank = payload[off]; off += 1;
+            d.MyScore = BitConverter.ToUInt16(payload, off); off += 2;
+            return d;
+        }
+
+        /// <summary>PVP_BOUNTY_NOTIFY 파싱: target_entity(8)+tier(1)+kill_streak(2)+gold_reward(4)+name_len(1)+name(str)</summary>
+        public static PvPBountyNotifyData ParsePvPBountyNotify(byte[] payload)
+        {
+            var d = new PvPBountyNotifyData();
+            int off = 0;
+            d.TargetEntity = BitConverter.ToUInt64(payload, off); off += 8;
+            d.Tier = payload[off]; off += 1;
+            d.KillStreak = BitConverter.ToUInt16(payload, off); off += 2;
+            d.GoldReward = BitConverter.ToUInt32(payload, off); off += 4;
+            byte nameLen = payload[off]; off += 1;
+            d.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+            return d;
+        }
     }
 }

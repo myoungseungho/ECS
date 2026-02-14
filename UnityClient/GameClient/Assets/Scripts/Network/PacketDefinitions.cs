@@ -349,6 +349,16 @@ namespace Network
         TRIPOD_EQUIP            = 522,  // C→S: skill_id(2) tier(1) option_idx(1) = 4B
         TRIPOD_EQUIP_RESULT     = 523,  // S→C: result(1)
         SCROLL_DISCOVER         = 524,  // C→S: scroll_slot(1) | S→C: result(1) [+ skill_id(2) tier(1) option_idx(1) if success]
+
+        // ━━━ S047: 현상금 시스템 (TASK 16, MsgType 530-537) ━━━
+        BOUNTY_LIST_REQ         = 530,  // C→S: empty
+        BOUNTY_LIST             = 531,  // S→C: daily_count(1) + [bounty_id(2)+monster_id(2)+level(1)+zone_len(1)+zone(str)+gold(4)+exp(4)+token(1)+accepted(1)+completed(1)] + has_weekly(1) + [weekly data] + accepted_count(1)
+        BOUNTY_ACCEPT           = 532,  // C→S: bounty_id(2)
+        BOUNTY_ACCEPT_RESULT    = 533,  // S→C: result(1) [+ bounty_id(2)]
+        BOUNTY_COMPLETE         = 534,  // C→S: bounty_id(2) | S→C: result(1)+bounty_id(2)+gold(4)+exp(4)+token(1)
+        BOUNTY_RANKING_REQ      = 535,  // C→S: empty
+        BOUNTY_RANKING          = 536,  // S→C: rank_count(1) + [rank(1)+name_len(1)+name(str)+score(2)] + my_rank(1)+my_score(2)
+        PVP_BOUNTY_NOTIFY       = 537,  // S→C: target_entity(8)+tier(1)+kill_streak(2)+gold_reward(4)+name_len(1)+name(str)
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -1912,5 +1922,92 @@ namespace Network
         public ushort SkillId;
         public byte Tier;
         public byte OptionIdx;
+    }
+
+    // ━━━ S047: 현상금 시스템 데이터 ━━━
+
+    /// <summary>현상금 수락 결과 코드</summary>
+    public enum BountyAcceptResult : byte
+    {
+        SUCCESS           = 0,
+        ALREADY_ACCEPTED  = 1,
+        MAX_LIMIT         = 2,
+        ALREADY_COMPLETED = 3,
+        LEVEL_TOO_LOW     = 4,
+        NOT_FOUND         = 5,
+    }
+
+    /// <summary>현상금 완료 결과 코드</summary>
+    public enum BountyCompleteResult : byte
+    {
+        SUCCESS           = 0,
+        NOT_ACCEPTED      = 1,
+        ALREADY_COMPLETED = 2,
+    }
+
+    /// <summary>현상금 정보 (BOUNTY_LIST 파싱용)</summary>
+    public class BountyInfo
+    {
+        public ushort BountyId;
+        public ushort MonsterId;
+        public byte Level;
+        public string Zone;
+        public uint Gold;
+        public uint Exp;
+        public byte Token;
+        public byte Accepted;   // 0=미수락, 1=수락
+        public byte Completed;  // 0=미완료, 1=완료
+    }
+
+    /// <summary>현상금 목록 데이터 (BOUNTY_LIST 파싱용)</summary>
+    public class BountyListData
+    {
+        public BountyInfo[] DailyBounties;
+        public bool HasWeekly;
+        public BountyInfo WeeklyBounty;
+        public byte AcceptedCount;
+    }
+
+    /// <summary>현상금 수락 결과 데이터</summary>
+    public class BountyAcceptResultData
+    {
+        public BountyAcceptResult Result;
+        public ushort BountyId;
+    }
+
+    /// <summary>현상금 완료 결과 데이터</summary>
+    public class BountyCompleteData
+    {
+        public BountyCompleteResult Result;
+        public ushort BountyId;
+        public uint Gold;
+        public uint Exp;
+        public byte Token;
+    }
+
+    /// <summary>현상금 랭킹 항목</summary>
+    public class BountyRankEntry
+    {
+        public byte Rank;
+        public string Name;
+        public ushort Score;
+    }
+
+    /// <summary>현상금 랭킹 데이터 (BOUNTY_RANKING 파싱용)</summary>
+    public class BountyRankingData
+    {
+        public BountyRankEntry[] Rankings;
+        public byte MyRank;
+        public ushort MyScore;
+    }
+
+    /// <summary>PvP 현상금 알림 데이터 (PVP_BOUNTY_NOTIFY 파싱용)</summary>
+    public class PvPBountyNotifyData
+    {
+        public ulong TargetEntity;
+        public byte Tier;
+        public ushort KillStreak;
+        public uint GoldReward;
+        public string Name;
     }
 }

@@ -180,6 +180,12 @@ namespace Network
         public event Action<TripodListData> OnTripodList;
         public event Action<TripodEquipResult> OnTripodEquipResult;
         public event Action<ScrollDiscoverResultData> OnScrollDiscoverResult;
+        // S047: 현상금 시스템
+        public event Action<BountyListData> OnBountyList;
+        public event Action<BountyAcceptResultData> OnBountyAcceptResult;
+        public event Action<BountyCompleteData> OnBountyComplete;
+        public event Action<BountyRankingData> OnBountyRanking;
+        public event Action<PvPBountyNotifyData> OnPvPBountyNotify;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -926,6 +932,32 @@ namespace Network
         public void RequestScrollDiscover(byte scrollSlot)
         {
             _field?.Send(PacketBuilder.ScrollDiscover(scrollSlot));
+        }
+
+        // ━━━ S047: 현상금 시스템 API ━━━
+
+        /// <summary>현상금 목록 요청</summary>
+        public void RequestBountyList()
+        {
+            _field?.Send(PacketBuilder.BountyListReq());
+        }
+
+        /// <summary>현상금 수락</summary>
+        public void AcceptBounty(ushort bountyId)
+        {
+            _field?.Send(PacketBuilder.BountyAccept(bountyId));
+        }
+
+        /// <summary>현상금 완료 요청</summary>
+        public void CompleteBounty(ushort bountyId)
+        {
+            _field?.Send(PacketBuilder.BountyCompleteReq(bountyId));
+        }
+
+        /// <summary>현상금 랭킹 요청</summary>
+        public void RequestBountyRanking()
+        {
+            _field?.Send(PacketBuilder.BountyRankingReq());
         }
 
         /// <summary>연결 끊기</summary>
@@ -2010,6 +2042,48 @@ namespace Network
                     var data = PacketBuilder.ParseScrollDiscoverResult(payload);
                     Debug.Log($"[Net] ScrollDiscover: result={data.Result}, skill={data.SkillId}, tier={data.Tier}, opt={data.OptionIdx}");
                     OnScrollDiscoverResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S047: 현상금 시스템 ━━━
+
+                case MsgType.BOUNTY_LIST:
+                {
+                    var data = PacketBuilder.ParseBountyList(payload);
+                    Debug.Log($"[Net] BountyList: daily={data.DailyBounties.Length}, weekly={data.HasWeekly}, accepted={data.AcceptedCount}");
+                    OnBountyList?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOUNTY_ACCEPT_RESULT:
+                {
+                    var data = PacketBuilder.ParseBountyAcceptResult(payload);
+                    Debug.Log($"[Net] BountyAccept: result={data.Result}, bountyId={data.BountyId}");
+                    OnBountyAcceptResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOUNTY_COMPLETE:
+                {
+                    var data = PacketBuilder.ParseBountyComplete(payload);
+                    Debug.Log($"[Net] BountyComplete: result={data.Result}, bountyId={data.BountyId}, gold={data.Gold}, exp={data.Exp}, token={data.Token}");
+                    OnBountyComplete?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOUNTY_RANKING:
+                {
+                    var data = PacketBuilder.ParseBountyRanking(payload);
+                    Debug.Log($"[Net] BountyRanking: count={data.Rankings.Length}, myRank={data.MyRank}, myScore={data.MyScore}");
+                    OnBountyRanking?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.PVP_BOUNTY_NOTIFY:
+                {
+                    var data = PacketBuilder.ParsePvPBountyNotify(payload);
+                    Debug.Log($"[Net] PvPBounty: target={data.TargetEntity}, tier={data.Tier}, streak={data.KillStreak}, gold={data.GoldReward}, name={data.Name}");
+                    OnPvPBountyNotify?.Invoke(data);
                     break;
                 }
 

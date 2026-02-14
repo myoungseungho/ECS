@@ -605,6 +605,7 @@ public static class ProjectSetup
         var storyManagerGo = CreateManagerObject("StoryManager", typeof(StoryManager));
         var auctionManagerGo = CreateManagerObject("AuctionManager", typeof(AuctionManager));
         var tripodManagerGo = CreateManagerObject("TripodManager", typeof(TripodManager));
+        var bountyManagerGo = CreateManagerObject("BountyManager", typeof(BountyManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");
