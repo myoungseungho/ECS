@@ -275,6 +275,16 @@ namespace Network
         ENCHANT_REQ        = 388,  // C→S: slot(1) element(1) level(1)
         ENCHANT_RESULT     = 389,  // S→C: status(1) slot(1) element(1) level(1) damage_pct(1) = 5B
 
+        // 거래소 (S045 TASK 3)
+        AUCTION_LIST_REQ           = 390,  // C→S: category(1) page(1) sort_by(1) = 3B
+        AUCTION_LIST               = 391,  // S→C: total_count(2) total_pages(1) page(1) item_count(1) {auction_id(4) item_id(2) count(1) buyout(4) bid(4) seller_name_len(1) seller_name(N)}*N
+        AUCTION_REGISTER           = 392,  // C→S: slot_idx(1) count(1) buyout_price(4) category(1) = 7B
+        AUCTION_REGISTER_RESULT    = 393,  // S→C: result(1) auction_id(4) = 5B
+        AUCTION_BUY                = 394,  // C→S: auction_id(4)
+        AUCTION_BUY_RESULT         = 395,  // S→C: result(1) auction_id(4) = 5B
+        AUCTION_BID                = 396,  // C→S: auction_id(4) bid_amount(4) = 8B
+        AUCTION_BID_RESULT         = 397,  // S→C: result(1) auction_id(4) = 5B
+
         // 보석 (S041 TASK 8)
         GEM_EQUIP          = 450,  // C→S: item_slot(1) gem_slot(1) gem_item_id(4)
         GEM_EQUIP_RESULT   = 451,  // S→C: status(1) item_slot(1) gem_slot(1) gem_type(1) gem_tier(1) = 5B
@@ -1280,6 +1290,99 @@ namespace Network
     {
         public uint InstanceId;
         public byte Phase;
+    }
+
+    // ━━━ S045: 거래소 ━━━
+
+    /// <summary>거래소 카테고리</summary>
+    public enum AuctionCategory : byte
+    {
+        ALL      = 0xFF,
+        WEAPON   = 0,
+        ARMOR    = 1,
+        POTION   = 2,
+        GEM      = 3,
+        MATERIAL = 4,
+        OTHER    = 5,
+    }
+
+    /// <summary>거래소 정렬 기준</summary>
+    public enum AuctionSortBy : byte
+    {
+        PRICE_ASC  = 0,
+        PRICE_DESC = 1,
+        NEWEST     = 2,
+    }
+
+    /// <summary>거래소 등록 결과 코드</summary>
+    public enum AuctionRegisterResult : byte
+    {
+        SUCCESS       = 0,
+        NOT_IN_GAME   = 1,
+        NO_ITEM       = 2,
+        MAX_LISTINGS  = 3,
+        NO_GOLD       = 4,
+        INVALID_PRICE = 5,
+    }
+
+    /// <summary>거래소 구매 결과 코드</summary>
+    public enum AuctionBuyResult : byte
+    {
+        SUCCESS    = 0,
+        NOT_FOUND  = 1,
+        SELF_BUY   = 2,
+        NO_GOLD    = 3,
+    }
+
+    /// <summary>거래소 입찰 결과 코드</summary>
+    public enum AuctionBidResult : byte
+    {
+        SUCCESS      = 0,
+        NOT_FOUND    = 1,
+        SELF_BID     = 2,
+        NO_GOLD      = 3,
+        BID_TOO_LOW  = 4,
+    }
+
+    /// <summary>거래소 목록 항목 (AUCTION_LIST 파싱용)</summary>
+    public class AuctionListingInfo
+    {
+        public uint AuctionId;
+        public ushort ItemId;
+        public byte Count;
+        public uint BuyoutPrice;
+        public uint CurrentBid;
+        public string SellerName;
+    }
+
+    /// <summary>거래소 목록 데이터 (AUCTION_LIST 파싱용)</summary>
+    public class AuctionListData
+    {
+        public ushort TotalCount;
+        public byte TotalPages;
+        public byte CurrentPage;
+        public AuctionListingInfo[] Items;
+    }
+
+    /// <summary>거래소 등록 결과 (AUCTION_REGISTER_RESULT 파싱용)</summary>
+    public class AuctionRegisterResultData
+    {
+        public AuctionRegisterResult Result;
+        public uint AuctionId;
+    }
+
+    /// <summary>거래소 구매 결과 (AUCTION_BUY_RESULT 파싱용)</summary>
+    public class AuctionBuyResultData
+    {
+        public AuctionBuyResult Result;
+        public uint AuctionId;
+    }
+
+    /// <summary>거래소 입찰 결과 (AUCTION_BID_RESULT 파싱용)</summary>
+    public class AuctionBidResultData
+    {
+        public AuctionBidResult Result;
+        public uint AuctionId;
     }
 
     // ━━━ S041: 제작/채집/요리/인챈트/보석 ━━━

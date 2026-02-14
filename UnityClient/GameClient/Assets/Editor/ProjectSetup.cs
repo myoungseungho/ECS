@@ -603,6 +603,7 @@ public static class ProjectSetup
         var battlePassManagerGo = CreateManagerObject("BattlePassManager", typeof(BattlePassManager));
         var attendanceManagerGo = CreateManagerObject("AttendanceManager", typeof(AttendanceManager));
         var storyManagerGo = CreateManagerObject("StoryManager", typeof(StoryManager));
+        var auctionManagerGo = CreateManagerObject("AuctionManager", typeof(AuctionManager));
 
         // --- GameBootstrap (auto-connect on Play) ---
         var bootstrapGo = new GameObject("GameBootstrap");

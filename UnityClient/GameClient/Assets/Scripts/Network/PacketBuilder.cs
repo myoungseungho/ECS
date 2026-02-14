@@ -1665,6 +1665,92 @@ namespace Network
             return d;
         }
 
+        // ━━━ S045: 거래소 (Auction) ━━━
+
+        /// <summary>AUCTION_LIST_REQ 빌드: category(1) page(1) sort_by(1) = 3B</summary>
+        public static byte[] AuctionListReq(byte category, byte page, byte sortBy)
+        {
+            return Build(MsgType.AUCTION_LIST_REQ, new byte[] { category, page, sortBy });
+        }
+
+        /// <summary>AUCTION_REGISTER 빌드: slot_idx(1) count(1) buyout_price(4) category(1) = 7B</summary>
+        public static byte[] AuctionRegister(byte slotIdx, byte count, uint buyoutPrice, byte category)
+        {
+            byte[] payload = new byte[7];
+            payload[0] = slotIdx;
+            payload[1] = count;
+            BitConverter.GetBytes(buyoutPrice).CopyTo(payload, 2);
+            payload[6] = category;
+            return Build(MsgType.AUCTION_REGISTER, payload);
+        }
+
+        /// <summary>AUCTION_BUY 빌드: auction_id(4)</summary>
+        public static byte[] AuctionBuy(uint auctionId)
+        {
+            return Build(MsgType.AUCTION_BUY, BitConverter.GetBytes(auctionId));
+        }
+
+        /// <summary>AUCTION_BID 빌드: auction_id(4) bid_amount(4) = 8B</summary>
+        public static byte[] AuctionBid(uint auctionId, uint bidAmount)
+        {
+            byte[] payload = new byte[8];
+            BitConverter.GetBytes(auctionId).CopyTo(payload, 0);
+            BitConverter.GetBytes(bidAmount).CopyTo(payload, 4);
+            return Build(MsgType.AUCTION_BID, payload);
+        }
+
+        /// <summary>AUCTION_LIST 파싱: total_count(2) total_pages(1) page(1) item_count(1) + items[]</summary>
+        public static AuctionListData ParseAuctionList(byte[] payload)
+        {
+            var d = new AuctionListData();
+            d.TotalCount = BitConverter.ToUInt16(payload, 0);
+            d.TotalPages = payload[2];
+            d.CurrentPage = payload[3];
+            byte itemCount = payload[4];
+            d.Items = new AuctionListingInfo[itemCount];
+            int off = 5;
+            for (int i = 0; i < itemCount; i++)
+            {
+                var it = new AuctionListingInfo();
+                it.AuctionId = BitConverter.ToUInt32(payload, off); off += 4;
+                it.ItemId = BitConverter.ToUInt16(payload, off); off += 2;
+                it.Count = payload[off]; off += 1;
+                it.BuyoutPrice = BitConverter.ToUInt32(payload, off); off += 4;
+                it.CurrentBid = BitConverter.ToUInt32(payload, off); off += 4;
+                byte nameLen = payload[off]; off += 1;
+                it.SellerName = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                d.Items[i] = it;
+            }
+            return d;
+        }
+
+        /// <summary>AUCTION_REGISTER_RESULT 파싱: result(1) auction_id(4) = 5B</summary>
+        public static AuctionRegisterResultData ParseAuctionRegisterResult(byte[] payload)
+        {
+            var d = new AuctionRegisterResultData();
+            d.Result = (AuctionRegisterResult)payload[0];
+            d.AuctionId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        /// <summary>AUCTION_BUY_RESULT 파싱: result(1) auction_id(4) = 5B</summary>
+        public static AuctionBuyResultData ParseAuctionBuyResult(byte[] payload)
+        {
+            var d = new AuctionBuyResultData();
+            d.Result = (AuctionBuyResult)payload[0];
+            d.AuctionId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
+        /// <summary>AUCTION_BID_RESULT 파싱: result(1) auction_id(4) = 5B</summary>
+        public static AuctionBidResultData ParseAuctionBidResult(byte[] payload)
+        {
+            var d = new AuctionBidResultData();
+            d.Result = (AuctionBidResult)payload[0];
+            d.AuctionId = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
+
         // ━━━ S041: 제작 (Crafting) ━━━
 
         /// <summary>CRAFT_LIST_REQ 빌드: empty</summary>

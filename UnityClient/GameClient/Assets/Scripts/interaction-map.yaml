@@ -968,6 +968,47 @@ managers:
       - IsCutscenePlaying (bool)
       - IsPanelOpen (bool)
 
+  - name: AuctionManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "거래소/경매장 관리 — 목록 조회, 아이템 등록, 즉시 구매, 입찰"
+    reads: []
+    writes:
+      - _listings (List<AuctionListingInfo>)
+      - _currentCategory (byte)
+      - _currentPage (byte)
+      - _currentSortBy (byte)
+      - _totalPages (byte)
+      - _totalCount (ushort)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnListingChanged(List<AuctionListingInfo>)
+      - OnRegisterResult(AuctionRegisterResultData)
+      - OnBuyResult(AuctionBuyResultData)
+      - OnBidResult(AuctionBidResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnAuctionList → 거래소 목록 수신
+      - NetworkManager.OnAuctionRegisterResult → 등록 결과
+      - NetworkManager.OnAuctionBuyResult → 구매 결과
+      - NetworkManager.OnAuctionBidResult → 입찰 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RequestListings(byte, byte, byte)
+      - NextPage()
+      - PrevPage()
+      - RegisterItem(byte, byte, uint, byte)
+      - BuyItem(uint)
+      - PlaceBid(uint, uint)
+    computed_properties:
+      - Listings (List<AuctionListingInfo>)
+      - CurrentPage (byte)
+      - TotalPages (byte)
+      - IsPanelOpen (bool)
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1379,6 +1420,16 @@ data_flows:
     to: StoryUI
     via: "C# events (OnDialogWithChoices, OnCutsceneStarted, OnCutsceneFinished, OnStoryUpdated, OnMainQuestUpdated, OnPanelOpened, OnPanelClosed)"
     description: "스토리 UI 갱신 (대화 선택지 + 컷씬 오버레이 + 퀘스트 진행)"
+
+  - from: NetworkManager
+    to: AuctionManager
+    via: "C# events (OnAuctionList, OnAuctionRegisterResult, OnAuctionBuyResult, OnAuctionBidResult)"
+    description: "거래소 목록/등록 결과/구매 결과/입찰 결과 수신 (390-397)"
+
+  - from: AuctionManager
+    to: AuctionUI
+    via: "C# events (OnListingChanged, OnRegisterResult, OnBuyResult, OnBidResult, OnPanelOpened, OnPanelClosed)"
+    description: "거래소 UI 갱신 (Y키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

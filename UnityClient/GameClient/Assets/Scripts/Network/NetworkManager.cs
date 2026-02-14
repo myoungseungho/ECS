@@ -134,6 +134,11 @@ namespace Network
         public event Action<RaidWipeData> OnRaidWipe;
         public event Action<RaidClearData> OnRaidClear;
         public event Action<RaidAttackResultData> OnRaidAttackResult;
+        // S045: 거래소
+        public event Action<AuctionListData> OnAuctionList;
+        public event Action<AuctionRegisterResultData> OnAuctionRegisterResult;
+        public event Action<AuctionBuyResultData> OnAuctionBuyResult;
+        public event Action<AuctionBidResultData> OnAuctionBidResult;
         // S041: 제작/채집/요리/인챈트/보석
         public event Action<CraftRecipeInfo[]> OnCraftList;
         public event Action<CraftResultData> OnCraftResult;
@@ -705,6 +710,32 @@ namespace Network
         public void RaidAttack(uint instanceId, ushort skillId, uint damage)
         {
             _field?.Send(PacketBuilder.RaidAttack(instanceId, skillId, damage));
+        }
+
+        // ━━━ S045: 거래소 API ━━━
+
+        /// <summary>거래소 목록 요청</summary>
+        public void RequestAuctionList(byte category, byte page, byte sortBy)
+        {
+            _field?.Send(PacketBuilder.AuctionListReq(category, page, sortBy));
+        }
+
+        /// <summary>거래소 아이템 등록</summary>
+        public void RegisterAuction(byte slotIdx, byte count, uint buyoutPrice, byte category)
+        {
+            _field?.Send(PacketBuilder.AuctionRegister(slotIdx, count, buyoutPrice, category));
+        }
+
+        /// <summary>거래소 즉시 구매</summary>
+        public void BuyAuction(uint auctionId)
+        {
+            _field?.Send(PacketBuilder.AuctionBuy(auctionId));
+        }
+
+        /// <summary>거래소 입찰</summary>
+        public void BidAuction(uint auctionId, uint bidAmount)
+        {
+            _field?.Send(PacketBuilder.AuctionBid(auctionId, bidAmount));
         }
 
         // ━━━ S041: 제작/채집/요리/인챈트/보석 API ━━━
@@ -1628,6 +1659,40 @@ namespace Network
                     var data = PacketBuilder.ParseRaidAttackResult(payload);
                     Debug.Log($"[Net] RaidAttackResult: dmg={data.Damage}, hp={data.CurrentHP}/{data.MaxHP}");
                     OnRaidAttackResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S045: 거래소 ━━━
+
+                case MsgType.AUCTION_LIST:
+                {
+                    var data = PacketBuilder.ParseAuctionList(payload);
+                    Debug.Log($"[Net] AuctionList: total={data.TotalCount}, page={data.CurrentPage}/{data.TotalPages}, items={data.Items.Length}");
+                    OnAuctionList?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.AUCTION_REGISTER_RESULT:
+                {
+                    var data = PacketBuilder.ParseAuctionRegisterResult(payload);
+                    Debug.Log($"[Net] AuctionRegister: result={data.Result}, auctionId={data.AuctionId}");
+                    OnAuctionRegisterResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.AUCTION_BUY_RESULT:
+                {
+                    var data = PacketBuilder.ParseAuctionBuyResult(payload);
+                    Debug.Log($"[Net] AuctionBuy: result={data.Result}, auctionId={data.AuctionId}");
+                    OnAuctionBuyResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.AUCTION_BID_RESULT:
+                {
+                    var data = PacketBuilder.ParseAuctionBidResult(payload);
+                    Debug.Log($"[Net] AuctionBid: result={data.Result}, auctionId={data.AuctionId}");
+                    OnAuctionBidResult?.Invoke(data);
                     break;
                 }
 
