@@ -208,6 +208,11 @@ def run_claude(prompt, project_root):
     start = time.time()
 
     try:
+        # CLAUDECODE 환경변수 해제 — 대화형 세션 안에서도 실행 가능하게
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+        env["PYTHONIOENCODING"] = "utf-8"
+
         result = subprocess.run(
             ["claude", "-p", prompt, "--allowedTools",
              "Read,Write,Edit,Bash,Glob,Grep,Task"],
@@ -215,6 +220,7 @@ def run_claude(prompt, project_root):
             capture_output=True,
             text=True,
             timeout=MAX_CLAUDE_TIMEOUT,
+            env=env,
         )
         elapsed = time.time() - start
         print(f"  [CLAUDE] 완료 ({elapsed:.0f}초, exit={result.returncode})")
@@ -252,7 +258,7 @@ def check_ask_user(project_root):
         content = f.read()
     if "status: pending" in content:
         print("\n" + "=" * 50)
-        print("  ⚠ 유저 결정 필요! _context/ask_user.yaml 확인")
+        print("  [!] 유저 결정 필요! _context/ask_user.yaml 확인")
         print("=" * 50 + "\n")
 
 
