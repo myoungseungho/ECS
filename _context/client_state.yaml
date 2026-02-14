@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T01:30:00"
+last_session: "2026-02-15T02:00:00"
 
 # ── 현재 상태 ──
-current_status: "Hub v2.0 git conflict auto-resolve 적용 + 재시작 완료"
+current_status: "Phase 4 Batch 1 클라이언트 구현 완료 — Crafting(380-389) + Gem(450-453) UI/Manager/패킷 + TCP 테스트 14건"
 
 # ── 완료된 작업 ──
 completed:
@@ -108,6 +108,22 @@ completed:
     desc: "S040 Phase 3 브릿지 연동 테스트 25/25 ALL PASS + MATCH_ENQUEUE 테스트 수정"
     files:
       - "UnityClient/GameClient/test_tcp_bridge_client.py"
+  - id: A18
+    desc: "S041 Phase 4 Batch 1 — CraftingManager/GatheringManager/GemManager + UI 3종 + 패킷 16종(380-389,450-453)"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/CraftingManager.cs"
+      - "Assets/Scripts/Managers/GatheringManager.cs"
+      - "Assets/Scripts/Managers/GemManager.cs"
+      - "Assets/Scripts/UI/CraftingUI.cs"
+      - "Assets/Scripts/UI/GatheringUI.cs"
+      - "Assets/Scripts/UI/GemUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase4_crafting_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -127,33 +143,50 @@ pending_tasks:
   - id: "gdd_task2_crafting_ui"
     desc: "제작/채집 UI — CraftingUI + GatheringUI (서버 TASK 2 MsgType 380-389)"
     priority: P1
-    blocked: true
-    blocked_reason: "서버 TASK 2 (제작/채집 핸들러) 구현 대기"
+    blocked: false
+    blocked_reason: "완료 (A18)"
+    status: done
+  - id: "gdd_task8_gem_ui"
+    desc: "보석 UI — GemUI (서버 TASK 8 MsgType 450-453)"
+    priority: P1
+    blocked: false
+    blocked_reason: "완료 (A18)"
+    status: done
   - id: "gdd_task3_auction_ui"
     desc: "거래소 UI — AuctionUI (서버 TASK 3 MsgType 390-397)"
     priority: P1
     blocked: true
-    blocked_reason: "서버 TASK 3 (거래소 핸들러) 구현 대기"
+    blocked_reason: "서버 TASK 3 (거래소 핸들러) 구현 대기 — Batch 2"
+  - id: "gdd_task10_currency_ui"
+    desc: "화폐/재화 UI — CurrencyUI (서버 TASK 10 MsgType 468-473)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 10 (화폐 핸들러) 구현 대기 — Batch 2"
   - id: "gdd_task4_daily_quest_ui"
     desc: "일일/주간 퀘스트 UI — DailyQuestUI + ReputationUI (서버 TASK 4 MsgType 400-405)"
     priority: P1
     blocked: true
-    blocked_reason: "서버 TASK 4 (일일/주간 퀘스트 핸들러) 구현 대기"
-  - id: "gdd_task5_social_ui"
-    desc: "소셜 UI — FriendUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 5 (친구/차단/파티찾기 핸들러) 구현 대기"
-  - id: "gdd_task6_pvp_extended_ui"
-    desc: "전장/길드전 UI — BattlegroundUI + GuildWarUI (서버 TASK 6 MsgType 430-435)"
-    priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 6 (전장/길드전 핸들러) 구현 대기"
+    blocked_reason: "서버 TASK 4 (일일/주간 퀘스트 핸들러) 구현 대기 — Batch 3"
   - id: "gdd_task7_progression_ui"
     desc: "칭호/도감 UI — TitleUI + CollectionUI + JobChangeUI (서버 TASK 7 MsgType 440-447)"
     priority: P2
     blocked: true
-    blocked_reason: "서버 TASK 7 (칭호/도감/2차전직 핸들러) 구현 대기"
+    blocked_reason: "서버 TASK 7 (칭호/도감/2차전직 핸들러) 구현 대기 — Batch 3"
+  - id: "gdd_task9_durability_ui"
+    desc: "내구도 UI — DurabilityUI (서버 TASK 9 MsgType 462-467)"
+    priority: P1
+    blocked: true
+    blocked_reason: "서버 TASK 9 (내구도 핸들러) 구현 대기 — Batch 3"
+  - id: "gdd_task5_social_ui"
+    desc: "소셜 UI — FriendUI + PartyFinderUI (서버 TASK 5 MsgType 410-422)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 5 (친구/차단/파티찾기 핸들러) 구현 대기 — Batch 4"
+  - id: "gdd_task6_pvp_extended_ui"
+    desc: "전장/길드전 UI — BattlegroundUI + GuildWarUI (서버 TASK 6 MsgType 430-435)"
+    priority: P2
+    blocked: true
+    blocked_reason: "서버 TASK 6 (전장/길드전 핸들러) 구현 대기 — Batch 4"
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -171,19 +204,15 @@ recent_decisions:
   - "SceneFlowManager 선행 구현 — 모든 씬의 기반이므로 어떤 우선순위든 필요"
   - "S033 패킷 연동: SERVER_LIST(320-321), CHARACTER_CRUD(322-327), TUTORIAL(330-331)"
   - "S034 패킷 연동: NPC_INTERACT(332), NPC_DIALOG(333), ENHANCE(340-341)"
-  - "새 매니저 3종: NpcManager, EnhanceManager, TutorialManager"
-  - "새 UI 4종: NpcDialogUI, EnhanceUI, ServerSelectUI, CharacterSelectUI"
   - "S029 패킷 연동: GUILD(290-299), TRADE(300-307), MAIL(310-318)"
-  - "새 매니저 3종: GuildManager, TradeManager, MailManager"
-  - "새 UI 3종: GuildUI(G키), TradeUI, MailUI(M키)"
   - "Phase 2 TCP 브릿지 연동 테스트 20/20 PASS — 역사적 첫 실연동 성공"
   - "Phase 3 던전/PvP 매니저 구현 — Instance(170-174)/Match(180-184) 기존 패킷 활용"
-  - "DungeonManager: 던전 타입(Story/Party/Chaos/Raid/Abyss) + 매칭 상태 머신"
-  - "PvPManager: PvP 모드(Arena1v1/3v3/Battleground) + DungeonType 100+로 PvP 구분"
   - "Hub v2.0 이벤트 기반 시스템 확인 — agent_loop.py에서 hub.py로 전환"
   - "Phase 3 브릿지 연동 25/25 ALL PASS — 서버 46/46 + 클라 25/25 = 71/71 PASS"
-  - "MATCH_ENQUEUE 테스트: 레벨 부족(status=2)도 유효한 프로토콜 응답으로 수용"
-  - "GDD 심화 태스크 42개 확인 — 서버 구현 순서대로 클라 UI 대응 예정"
+  - "GDD 심화 태스크 42개→55개 확인 — 서버 구현 순서대로 클라 UI 대응 예정"
+  - "ENHANCE_RESULT(341) vs ENCHANT_RESULT(389) — 별도 시스템 (기본강화 vs 원소인챈트)"
+  - "Phase 4 Batch 1: Crafting(380-389) + Gem(450-453) 클라 구현 완료"
+  - "Batch 순서: B1=제작+보석, B2=거래소+화폐, B3=퀘스트+직업+내구도, B4=소셜+전장"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -224,6 +253,7 @@ processed_messages:
   - "S038"
   - "S039"
   - "S040"
+  - "S041"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

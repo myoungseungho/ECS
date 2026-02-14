@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_phase3_dungeon_pvp
+version: session_phase4_crafting_gem
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -667,6 +667,89 @@ managers:
       - GetQuest(uint) → QuestInfo
       - HasQuest(uint) → bool
 
+  - name: CraftingManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "제작/요리/인챈트 시스템 관리 — S041 TASK 2 (MsgType 380-383, 386-389)"
+    reads: []
+    writes:
+      - _recipes (List<CraftRecipeInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnRecipeListChanged()
+      - OnCraftComplete(CraftResultData)
+      - OnCookComplete(CookResultData)
+      - OnEnchantComplete(EnchantResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnCraftList → 레시피 목록 수신
+      - NetworkManager.OnCraftResult → 제작 결과
+      - NetworkManager.OnCookResult → 요리 결과
+      - NetworkManager.OnEnchantResultResp → 인챈트 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Craft(ushort)
+      - Cook(byte)
+      - Enchant(byte, byte, byte)
+      - RefreshRecipes()
+      - GetRecipe(ushort) → CraftRecipeInfo
+
+  - name: GatheringManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "채집 시스템 관리 — S041 TASK 2 (MsgType 384-385) 에너지/진행바"
+    reads: []
+    writes:
+      - _energy (ushort)
+      - _isGathering (bool)
+      - _gatherTimer (float)
+    fires_events:
+      - OnGatherComplete(GatherResultData)
+      - OnGatherStarted()
+      - OnEnergyChanged()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnGatherResult → 채집 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Gather(byte)
+      - GetNodeName(byte) → string
+    computed_properties:
+      - Energy (ushort)
+      - MaxEnergy (ushort)
+      - IsGathering (bool)
+      - GatherProgress (float)
+
+  - name: GemManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "보석 장착/합성 관리 — S041 TASK 8 (MsgType 450-453)"
+    reads: []
+    writes:
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnGemEquipped(GemEquipResultData)
+      - OnGemFused(GemFuseResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnGemEquipResult → 보석 장착 결과
+      - NetworkManager.OnGemFuseResult → 보석 합성 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - EquipGem(byte, byte, uint)
+      - FuseGems(byte, byte)
+      - GetGemTypeName(byte) → string
+      - GetTierName(byte) → string
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -978,6 +1061,36 @@ data_flows:
     to: RaidUI
     via: "C# events (OnBossSpawned, OnPhaseChanged, OnMechanicStarted, OnMechanicResult, OnStaggerUpdated, OnEnraged, OnWiped, OnCleared, OnAttackResult)"
     description: "레이드 보스 UI (HP바/페이즈/기믹/스태거/보상)"
+
+  - from: NetworkManager
+    to: CraftingManager
+    via: "C# events (OnCraftList, OnCraftResult, OnCookResult, OnEnchantResultResp)"
+    description: "제작/요리/인챈트 결과 수신 (380-389)"
+
+  - from: CraftingManager
+    to: CraftingUI
+    via: "C# events (OnRecipeListChanged, OnCraftComplete, OnCookComplete, OnEnchantComplete, OnPanelOpened, OnPanelClosed)"
+    description: "제작 UI 갱신 (N키 토글)"
+
+  - from: NetworkManager
+    to: GatheringManager
+    via: "C# event (OnGatherResult)"
+    description: "채집 결과 수신 (384-385)"
+
+  - from: GatheringManager
+    to: GatheringUI
+    via: "C# events (OnGatherComplete, OnGatherStarted, OnEnergyChanged, OnPanelOpened, OnPanelClosed)"
+    description: "채집 UI 갱신 (진행바+에너지)"
+
+  - from: NetworkManager
+    to: GemManager
+    via: "C# events (OnGemEquipResult, OnGemFuseResult)"
+    description: "보석 장착/합성 결과 수신 (450-453)"
+
+  - from: GemManager
+    to: GemUI
+    via: "C# events (OnGemEquipped, OnGemFused, OnPanelOpened, OnPanelClosed)"
+    description: "보석 UI 갱신"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

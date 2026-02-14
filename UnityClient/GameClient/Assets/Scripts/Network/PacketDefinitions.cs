@@ -262,6 +262,24 @@ namespace Network
         RAID_CLEAR         = 377,  // S→C: instance_id(4) gold(4) exp(4) tokens(2)
         RAID_ATTACK        = 378,  // C→S: instance_id(4) skill_id(2) damage(4)
         RAID_ATTACK_RESULT = 379,  // S→C: instance_id(4) skill_id(2) damage(4) current_hp(4) max_hp(4)
+
+        // 제작/채집/요리/인챈트 (S041 TASK 2)
+        CRAFT_LIST_REQ     = 380,  // C→S: empty
+        CRAFT_LIST         = 381,  // S→C: count(1) {recipe_id(2) name(32) category(1) proficiency(1) material_count(1) success_pct(1) gold(4)}*N
+        CRAFT_EXECUTE      = 382,  // C→S: recipe_id(2)
+        CRAFT_RESULT       = 383,  // S→C: status(1) recipe_id(2) item_id(4) count(2) bonus(1) = 10B
+        GATHER_START       = 384,  // C→S: node_type(1)
+        GATHER_RESULT      = 385,  // S→C: status(1) node_type(1) item_id(4) count(2) energy(2) = 10B
+        COOK_EXECUTE       = 386,  // C→S: recipe_id(1)
+        COOK_RESULT        = 387,  // S→C: status(1) recipe_id(1) buff_type(1) buff_value(2) buff_duration(2) = 7B
+        ENCHANT_REQ        = 388,  // C→S: slot(1) element(1) level(1)
+        ENCHANT_RESULT     = 389,  // S→C: status(1) slot(1) element(1) level(1) damage_pct(1) = 5B
+
+        // 보석 (S041 TASK 8)
+        GEM_EQUIP          = 450,  // C→S: item_slot(1) gem_slot(1) gem_item_id(4)
+        GEM_EQUIP_RESULT   = 451,  // S→C: status(1) item_slot(1) gem_slot(1) gem_type(1) gem_tier(1) = 5B
+        GEM_FUSE           = 452,  // C→S: gem_type(1) gem_tier(1)
+        GEM_FUSE_RESULT    = 453,  // S→C: status(1) gem_type(1) new_tier(1) = 3B
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -1210,5 +1228,146 @@ namespace Network
     {
         public uint InstanceId;
         public byte Phase;
+    }
+
+    // ━━━ S041: 제작/채집/요리/인챈트/보석 ━━━
+
+    /// <summary>제작 카테고리</summary>
+    public enum CraftCategory : byte
+    {
+        WEAPON   = 1,
+        ARMOR    = 2,
+        POTION   = 3,
+        GEM      = 4,
+        MATERIAL = 5,
+    }
+
+    /// <summary>제작 결과 코드</summary>
+    public enum CraftResult : byte
+    {
+        SUCCESS           = 0,
+        RECIPE_NOT_FOUND  = 1,
+        LOW_PROFICIENCY   = 2,
+        NO_MATERIALS      = 3,
+        NO_GOLD           = 4,
+        CRAFT_FAILED      = 5,
+    }
+
+    /// <summary>레시피 정보 (CRAFT_LIST 파싱용)</summary>
+    public class CraftRecipeInfo
+    {
+        public ushort RecipeId;
+        public string Name;
+        public CraftCategory Category;
+        public byte Proficiency;
+        public byte MaterialCount;
+        public byte SuccessPct;
+        public uint Gold;
+    }
+
+    /// <summary>제작 결과 데이터 (CRAFT_RESULT 파싱용)</summary>
+    public class CraftResultData
+    {
+        public CraftResult Status;
+        public ushort RecipeId;
+        public uint ItemId;
+        public ushort Count;
+        public byte Bonus;
+    }
+
+    /// <summary>채집 결과 코드</summary>
+    public enum GatherResult : byte
+    {
+        SUCCESS        = 0,
+        NODE_NOT_FOUND = 1,
+        NO_ENERGY      = 2,
+        NO_LOOT        = 3,
+    }
+
+    /// <summary>채집 결과 데이터 (GATHER_RESULT 파싱용)</summary>
+    public class GatherResultData
+    {
+        public GatherResult Status;
+        public byte NodeType;
+        public uint ItemId;
+        public ushort Count;
+        public ushort Energy;
+    }
+
+    /// <summary>요리 결과 코드</summary>
+    public enum CookResult : byte
+    {
+        SUCCESS       = 0,
+        RECIPE_FAIL   = 1,
+        NO_MATERIALS  = 2,
+        BUFF_ACTIVE   = 3,
+    }
+
+    /// <summary>요리 버프 타입</summary>
+    public enum CookBuffType : byte
+    {
+        ATK  = 1,
+        HP   = 2,
+        ALL  = 3,
+    }
+
+    /// <summary>요리 결과 데이터 (COOK_RESULT 파싱용)</summary>
+    public class CookResultData
+    {
+        public CookResult Status;
+        public byte RecipeId;
+        public CookBuffType BuffType;
+        public ushort BuffValue;
+        public ushort BuffDuration;
+    }
+
+    /// <summary>인챈트 결과 코드</summary>
+    public enum EnchantResult : byte
+    {
+        SUCCESS        = 0,
+        INVALID_ELEMENT = 1,
+        INVALID_LEVEL  = 2,
+        NO_MATERIALS   = 3,
+        NO_GOLD        = 4,
+        INVALID_SLOT   = 5,
+    }
+
+    /// <summary>인챈트 결과 데이터 (ENCHANT_RESULT 파싱용)</summary>
+    public class EnchantResultData
+    {
+        public EnchantResult Status;
+        public byte Slot;
+        public byte Element;
+        public byte Level;
+        public byte DamagePct;
+    }
+
+    /// <summary>보석 결과 코드</summary>
+    public enum GemResult : byte
+    {
+        SUCCESS         = 0,
+        INVALID_SLOT    = 1,
+        INVALID_GEM     = 2,
+        NO_GEMS         = 3,
+        NO_GOLD         = 4,
+        MAX_TIER        = 5,
+    }
+
+    /// <summary>보석 장착 결과 (GEM_EQUIP_RESULT 파싱용)</summary>
+    public class GemEquipResultData
+    {
+        public GemResult Status;
+        public byte ItemSlot;
+        public byte GemSlot;
+        public byte GemType;
+        public byte GemTier;
+    }
+
+    /// <summary>보석 합성 결과 (GEM_FUSE_RESULT 파싱용)</summary>
+    public class GemFuseResultData
+    {
+        public GemResult Status;
+        public byte GemType;
+        public byte NewTier;
     }
 }

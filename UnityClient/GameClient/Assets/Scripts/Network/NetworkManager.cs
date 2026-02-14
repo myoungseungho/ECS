@@ -134,6 +134,14 @@ namespace Network
         public event Action<RaidWipeData> OnRaidWipe;
         public event Action<RaidClearData> OnRaidClear;
         public event Action<RaidAttackResultData> OnRaidAttackResult;
+        // S041: 제작/채집/요리/인챈트/보석
+        public event Action<CraftRecipeInfo[]> OnCraftList;
+        public event Action<CraftResultData> OnCraftResult;
+        public event Action<GatherResultData> OnGatherResult;
+        public event Action<CookResultData> OnCookResult;
+        public event Action<EnchantResultData> OnEnchantResultResp;
+        public event Action<GemEquipResultData> OnGemEquipResult;
+        public event Action<GemFuseResultData> OnGemFuseResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -668,6 +676,50 @@ namespace Network
         public void RaidAttack(uint instanceId, ushort skillId, uint damage)
         {
             _field?.Send(PacketBuilder.RaidAttack(instanceId, skillId, damage));
+        }
+
+        // ━━━ S041: 제작/채집/요리/인챈트/보석 API ━━━
+
+        /// <summary>제작 레시피 목록 요청</summary>
+        public void RequestCraftList()
+        {
+            _field?.Send(PacketBuilder.CraftListReq());
+        }
+
+        /// <summary>제작 실행</summary>
+        public void ExecuteCraft(ushort recipeId)
+        {
+            _field?.Send(PacketBuilder.CraftExecute(recipeId));
+        }
+
+        /// <summary>채집 시작</summary>
+        public void StartGather(byte nodeType)
+        {
+            _field?.Send(PacketBuilder.GatherStart(nodeType));
+        }
+
+        /// <summary>요리 실행</summary>
+        public void ExecuteCook(byte recipeId)
+        {
+            _field?.Send(PacketBuilder.CookExecute(recipeId));
+        }
+
+        /// <summary>인챈트 요청</summary>
+        public void RequestEnchant(byte slot, byte element, byte level)
+        {
+            _field?.Send(PacketBuilder.EnchantReq(slot, element, level));
+        }
+
+        /// <summary>보석 장착</summary>
+        public void EquipGem(byte itemSlot, byte gemSlot, uint gemItemId)
+        {
+            _field?.Send(PacketBuilder.GemEquip(itemSlot, gemSlot, gemItemId));
+        }
+
+        /// <summary>보석 합성</summary>
+        public void FuseGem(byte gemType, byte gemTier)
+        {
+            _field?.Send(PacketBuilder.GemFuse(gemType, gemTier));
         }
 
         /// <summary>연결 끊기</summary>
@@ -1425,6 +1477,64 @@ namespace Network
                     var data = PacketBuilder.ParseRaidAttackResult(payload);
                     Debug.Log($"[Net] RaidAttackResult: dmg={data.Damage}, hp={data.CurrentHP}/{data.MaxHP}");
                     OnRaidAttackResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S041: 제작/채집/요리/인챈트/보석 ━━━
+
+                case MsgType.CRAFT_LIST:
+                {
+                    var recipes = PacketBuilder.ParseCraftList(payload);
+                    Debug.Log($"[Net] CraftList: {recipes.Length} recipes");
+                    OnCraftList?.Invoke(recipes);
+                    break;
+                }
+
+                case MsgType.CRAFT_RESULT:
+                {
+                    var data = PacketBuilder.ParseCraftResult(payload);
+                    Debug.Log($"[Net] CraftResult: status={data.Status}, recipe={data.RecipeId}, item={data.ItemId}, count={data.Count}, bonus={data.Bonus}");
+                    OnCraftResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.GATHER_RESULT:
+                {
+                    var data = PacketBuilder.ParseGatherResult(payload);
+                    Debug.Log($"[Net] GatherResult: status={data.Status}, node={data.NodeType}, item={data.ItemId}, energy={data.Energy}");
+                    OnGatherResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.COOK_RESULT:
+                {
+                    var data = PacketBuilder.ParseCookResult(payload);
+                    Debug.Log($"[Net] CookResult: status={data.Status}, buff={data.BuffType}+{data.BuffValue} for {data.BuffDuration}s");
+                    OnCookResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ENCHANT_RESULT:
+                {
+                    var data = PacketBuilder.ParseEnchantResultData(payload);
+                    Debug.Log($"[Net] EnchantResult: status={data.Status}, slot={data.Slot}, element={data.Element}, lv={data.Level}, dmg%={data.DamagePct}");
+                    OnEnchantResultResp?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.GEM_EQUIP_RESULT:
+                {
+                    var data = PacketBuilder.ParseGemEquipResult(payload);
+                    Debug.Log($"[Net] GemEquipResult: status={data.Status}, slot={data.ItemSlot}/{data.GemSlot}, type={data.GemType}, tier={data.GemTier}");
+                    OnGemEquipResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.GEM_FUSE_RESULT:
+                {
+                    var data = PacketBuilder.ParseGemFuseResult(payload);
+                    Debug.Log($"[Net] GemFuseResult: status={data.Status}, type={data.GemType}, newTier={data.NewTier}");
+                    OnGemFuseResult?.Invoke(data);
                     break;
                 }
 
