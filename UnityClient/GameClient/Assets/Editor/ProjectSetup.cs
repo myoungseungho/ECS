@@ -398,6 +398,23 @@ public static class ProjectSetup
         floor.transform.position = new Vector3(50f, 0f, 50f);
         floor.transform.localScale = new Vector3(10f, 1f, 10f);
 
+        // Floor material — bright green
+        var floorRenderer = floor.GetComponent<MeshRenderer>();
+        if (floorRenderer != null)
+        {
+            var floorShader = Shader.Find(URPLitShader) ?? Shader.Find("Standard");
+            var floorMat = new Material(floorShader);
+            floorMat.SetColor("_BaseColor", new Color(0.35f, 0.65f, 0.25f));
+            floorRenderer.sharedMaterial = floorMat;
+        }
+
+        // --- Environment ---
+        RenderSettings.fog = true;
+        RenderSettings.fogMode = FogMode.Exponential;
+        RenderSettings.fogDensity = 0.015f;
+        RenderSettings.fogColor = new Color(0.7f, 0.82f, 0.95f);
+        RenderSettings.ambientSkyColor = new Color(0.6f, 0.75f, 0.95f);
+
         // --- Directional Light ---
         var lightGo = new GameObject("Directional Light");
         var light = lightGo.AddComponent<Light>();
@@ -891,7 +908,82 @@ public static class ProjectSetup
         SetTextRef(questSO, "questCountText", questCountGo);
         questSO.ApplyModifiedPropertiesWithoutUndo();
 
-        Debug.Log("  [UI] Canvas + HUD + Target + Death + DamageText + SkillBar + Inventory + Party + Buff + Quest 생성 완료");
+        // --- Crosshair (화면 중앙) ---
+        var crosshairGo = new GameObject("Crosshair");
+        crosshairGo.transform.SetParent(canvasGo.transform, false);
+        var crosshairRT = crosshairGo.AddComponent<RectTransform>();
+        crosshairRT.anchorMin = new Vector2(0.5f, 0.5f);
+        crosshairRT.anchorMax = new Vector2(0.5f, 0.5f);
+        crosshairRT.pivot = new Vector2(0.5f, 0.5f);
+        crosshairRT.anchoredPosition = Vector2.zero;
+        crosshairRT.sizeDelta = new Vector2(20, 20);
+
+        // Horizontal bar
+        var chHGo = new GameObject("H");
+        chHGo.transform.SetParent(crosshairGo.transform, false);
+        var chHRT = chHGo.AddComponent<RectTransform>();
+        chHRT.anchorMin = new Vector2(0.5f, 0.5f);
+        chHRT.anchorMax = new Vector2(0.5f, 0.5f);
+        chHRT.pivot = new Vector2(0.5f, 0.5f);
+        chHRT.anchoredPosition = Vector2.zero;
+        chHRT.sizeDelta = new Vector2(20, 2);
+        var chHImg = chHGo.AddComponent<Image>();
+        chHImg.color = Color.white;
+
+        // Vertical bar
+        var chVGo = new GameObject("V");
+        chVGo.transform.SetParent(crosshairGo.transform, false);
+        var chVRT = chVGo.AddComponent<RectTransform>();
+        chVRT.anchorMin = new Vector2(0.5f, 0.5f);
+        chVRT.anchorMax = new Vector2(0.5f, 0.5f);
+        chVRT.pivot = new Vector2(0.5f, 0.5f);
+        chVRT.anchoredPosition = Vector2.zero;
+        chVRT.sizeDelta = new Vector2(2, 20);
+        var chVImg = chVGo.AddComponent<Image>();
+        chVImg.color = Color.white;
+
+        // Crosshair Image ref for HUDManager (use horizontal bar as main image)
+        var crosshairImage = crosshairGo.AddComponent<Image>();
+        crosshairImage.color = new Color(1, 1, 1, 0); // transparent container
+
+        // Connect crosshair to HUDManager
+        var crosshairProp = hudSO.FindProperty("crosshair");
+        if (crosshairProp != null)
+        {
+            crosshairProp.objectReferenceValue = crosshairImage;
+            hudSO.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // --- Keybind Guide (화면 중앙 왼쪽) ---
+        var guidePanelGo = new GameObject("KeybindGuidePanel");
+        guidePanelGo.transform.SetParent(canvasGo.transform, false);
+        var guidePanelRT = guidePanelGo.AddComponent<RectTransform>();
+        guidePanelRT.anchorMin = new Vector2(0f, 0.2f);
+        guidePanelRT.anchorMax = new Vector2(0f, 0.8f);
+        guidePanelRT.pivot = new Vector2(0f, 0.5f);
+        guidePanelRT.anchoredPosition = new Vector2(20, 0);
+        guidePanelRT.sizeDelta = new Vector2(260, 0);
+        var guideBg = guidePanelGo.AddComponent<Image>();
+        guideBg.color = new Color(0, 0, 0, 0.6f);
+
+        var guideTextGo = CreateUIText(guidePanelGo.transform, "GuideText", "",
+            new Vector2(15, -10), new Vector2(230, 280), TextAnchor.UpperLeft);
+        var guideTextComp = guideTextGo.GetComponent<Text>();
+        if (guideTextComp != null) guideTextComp.fontSize = 13;
+        var guideTextRT = guideTextGo.GetComponent<RectTransform>();
+        guideTextRT.anchorMin = Vector2.zero;
+        guideTextRT.anchorMax = Vector2.one;
+        guideTextRT.offsetMin = new Vector2(15, 10);
+        guideTextRT.offsetMax = new Vector2(-10, -10);
+
+        var guideUI = guidePanelGo.AddComponent<KeybindGuideUI>();
+        var guideSO = new SerializedObject(guideUI);
+        var guidePanelProp = guideSO.FindProperty("guidePanel");
+        if (guidePanelProp != null) guidePanelProp.objectReferenceValue = guidePanelGo;
+        SetTextRef(guideSO, "guideText", guideTextGo);
+        guideSO.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log("  [UI] Canvas + HUD + Target + Death + DamageText + SkillBar + Inventory + Party + Buff + Quest + Crosshair + KeybindGuide 생성 완료");
     }
 
     // ━━━ UI 헬퍼 ━━━

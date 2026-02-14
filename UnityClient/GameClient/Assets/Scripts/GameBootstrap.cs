@@ -68,11 +68,31 @@ public class GameBootstrap : MonoBehaviour
             Debug.Log($"[Bootstrap] EnterGame OK (entity={result.EntityId}, zone={result.ZoneId}), joining channel {channelId}");
             NetworkManager.Instance.JoinChannel(channelId);
             Debug.Log("[Bootstrap] Bootstrap complete — game is ready!");
+
+            // Auto-accept first quest after a short delay
+            Invoke(nameof(DoAutoQuestAccept), 1.5f);
         }
         else
         {
             Debug.LogError($"[Bootstrap] EnterGame FAILED: code={result.ResultCode}");
         }
+    }
+
+    private void DoAutoQuestAccept()
+    {
+        if (QuestManager.Instance != null)
+        {
+            QuestManager.Instance.OnQuestAccepted += HandleQuestAccepted;
+            QuestManager.Instance.AcceptQuest(1);
+            Debug.Log("[Bootstrap] Auto-accepting quest 1");
+        }
+    }
+
+    private void HandleQuestAccepted(QuestAcceptResultData data)
+    {
+        Debug.Log($"[Bootstrap] Quest accept result: questId={data.QuestId}, result={data.Result}");
+        if (QuestManager.Instance != null)
+            QuestManager.Instance.OnQuestAccepted -= HandleQuestAccepted;
     }
 
     private void HandleError(string msg)
@@ -94,5 +114,8 @@ public class GameBootstrap : MonoBehaviour
         net.OnEnterGame -= HandleEnterGame;
         net.OnError -= HandleError;
         net.OnDisconnected -= HandleDisconnected;
+
+        if (QuestManager.Instance != null)
+            QuestManager.Instance.OnQuestAccepted -= HandleQuestAccepted;
     }
 }

@@ -22,6 +22,11 @@ public class HUDManager : MonoBehaviour
     [Header("Level")]
     [SerializeField] private Text levelText;
 
+    [Header("Crosshair")]
+    [SerializeField] private Image crosshair;
+
+    private Image[] _crosshairBars;
+
     public static HUDManager Instance { get; private set; }
 
     private void Awake()
@@ -46,6 +51,28 @@ public class HUDManager : MonoBehaviour
             StatsManager.Instance.OnStatsChanged -= Refresh;
 
         if (Instance == this) Instance = null;
+    }
+
+    private void Update()
+    {
+        UpdateCrosshair();
+    }
+
+    private void UpdateCrosshair()
+    {
+        if (crosshair == null) return;
+
+        if (_crosshairBars == null)
+            _crosshairBars = crosshair.GetComponentsInChildren<Image>();
+
+        bool hasTarget = CombatManager.Instance != null && CombatManager.Instance.SelectedTarget != 0;
+        Color c = hasTarget ? Color.red : Color.white;
+
+        for (int i = 0; i < _crosshairBars.Length; i++)
+        {
+            if (_crosshairBars[i] != crosshair)
+                _crosshairBars[i].color = c;
+        }
     }
 
     private void Refresh()

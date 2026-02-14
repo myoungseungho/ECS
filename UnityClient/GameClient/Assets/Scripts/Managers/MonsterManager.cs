@@ -112,6 +112,12 @@ public class MonsterManager : MonoBehaviour
         monster.Initialize(data.EntityId, data.MonsterId, data.Level, data.HP, data.MaxHP, spawnPos);
         _monsterMap[data.EntityId] = monster;
 
+        // World UI (HP bar + name)
+        var worldUI = go.GetComponent<MonsterWorldUI>();
+        if (worldUI == null)
+            worldUI = go.AddComponent<MonsterWorldUI>();
+        worldUI.Initialize(monster);
+
         Debug.Log($"[MonsterManager] Spawn: entity={data.EntityId}, monsterId={data.MonsterId}, lv={data.Level}, hp={data.HP}/{data.MaxHP}");
         OnMonsterSpawned?.Invoke(monster);
     }
