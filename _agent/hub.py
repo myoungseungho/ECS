@@ -78,38 +78,142 @@ def git_run(args, cwd):
         return 1, "", str(e)
 
 
+def detect_role_from_root(root):
+    """이 머신이 client인지 server인지 판별"""
+    client_state = os.path.join(root, "_context", "client_state.yaml")
+    if os.path.exists(client_state):
+        with open(client_state, "r", encoding="utf-8") as f:
+            content = f.read()
+        if os.path.basename(root).upper() in content.upper() or "client" in content[:200]:
+            return "client"
+    return "server"
+
+
+def auto_resolve_conflicts(root):
+    """충돌 파일을 소유권 기반으로 자동 해결"""
+    code, status_out, _ = git_run(["status", "--porcelain"], root)
+    if code != 0:
+        return False
+
+    my_role = detect_role_from_root(root)
+    resolved_any = False
+
+    for line in status_out.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+
+        # UU = both modified, AA = both added
+        if not (line.startswith("UU ") or line.startswith("AA ")):
+            continue
+
+        fpath = line[3:].strip()
+        resolved_any = True
+
+        # 소유권 기반 전략
+        if "client_state.yaml" in fpath:
+            strategy = "ours" if my_role == "client" else "theirs"
+        elif "server_state.yaml" in fpath:
+            strategy = "ours" if my_role == "server" else "theirs"
+        elif "conversation_journal" in fpath:
+            strategy = "theirs"
+        elif fpath.startswith("UnityClient/"):
+            strategy = "ours" if my_role == "client" else "theirs"
+        elif fpath.startswith("Servers/"):
+            strategy = "ours" if my_role == "server" else "theirs"
+        elif fpath.startswith("_comms/"):
+            strategy = "theirs"
+        else:
+            strategy = "ours"
+
+        log(f"  [RESOLVE] {fpath} -> {strategy}")
+        git_run(["checkout", f"--{strategy}", fpath], root)
+        git_run(["add", fpath], root)
+
+    return resolved_any
+
+
 def git_pull(root):
-    """stash → pull --rebase → stash pop"""
+    """stash -> pull (merge) -> auto-resolve conflicts -> stash pop"""
+    # 1. unstaged 변경 stash (log 파일 등 제외하기 위해 tracked만)
     _, status_out, _ = git_run(["status", "--porcelain"], root)
     has_changes = bool(status_out.strip())
     if has_changes:
-        git_run(["stash"], root)
+        git_run(["stash", "--include-untracked"], root)
 
-    code, out, err = git_run(["pull", "--rebase"], root)
+    # 2. rebase 대신 merge 사용 (충돌 해결이 더 쉬움)
+    code, out, err = git_run(["pull", "--no-rebase"], root)
+
+    # 3. 충돌 시 자동 해결
+    combined = f"{out} {err}"
     if code != 0:
-        git_run(["rebase", "--abort"], root)
-        code, out, err = git_run(["pull"], root)
+        if "CONFLICT" in combined or "conflict" in combined.lower() or "merge conflict" in combined.lower():
+            log(f"  [CONFLICT] auto-resolving...")
+            resolved = auto_resolve_conflicts(root)
+            if resolved:
+                git_run(["commit", "--no-edit", "-m", "auto-merge: conflict resolved by hub"], root)
+                code = 0
+            else:
+                # 해결 못하면 merge abort
+                log(f"  [WARN] could not auto-resolve, aborting merge")
+                git_run(["merge", "--abort"], root)
+        elif "rebase" in combined.lower():
+            git_run(["rebase", "--abort"], root)
+            # merge로 재시도
+            code, out, err = git_run(["pull", "--no-rebase"], root)
+            combined2 = f"{out} {err}"
+            if code != 0 and ("CONFLICT" in combined2 or "conflict" in combined2.lower()):
+                resolved = auto_resolve_conflicts(root)
+                if resolved:
+                    git_run(["commit", "--no-edit", "-m", "auto-merge: conflict resolved by hub"], root)
+                    code = 0
+                else:
+                    git_run(["merge", "--abort"], root)
+        elif "not possible" in combined.lower() or "unstaged" in combined.lower():
+            # unstaged changes blocking pull - force stash
+            log(f"  [WARN] unstaged changes blocking pull, force stashing")
+            git_run(["stash", "--include-untracked"], root)
+            code, out, err = git_run(["pull", "--no-rebase"], root)
+            git_run(["stash", "pop"], root)
 
+    # 4. stash pop (실패해도 무시 - 대부분 log 파일 충돌)
     if has_changes:
         pop_code, _, pop_err = git_run(["stash", "pop"], root)
         if pop_code != 0:
-            log(f"[WARN] stash pop conflict: {pop_err}")
+            # stash pop 충돌 시 stash drop하고 진행
+            log(f"  [WARN] stash pop failed, dropping stash")
+            git_run(["checkout", "--", "."], root)
+            git_run(["stash", "drop"], root)
 
     return code == 0
 
 
 def git_push(root, message):
-    """add → commit → push"""
+    """add -> commit -> push, 실패 시 pull+resolve 후 재시도"""
     git_run(["add", "-A"], root)
     code, out, _ = git_run(["status", "--porcelain"], root)
     if not out or not out.strip():
         return False
 
     git_run(["commit", "-m", message], root)
+
+    # push 시도
     code, _, err = git_run(["push"], root)
     if code != 0:
-        git_pull(root)
-        code, _, err = git_run(["push"], root)
+        log(f"  [PUSH] rejected, pulling and retrying...")
+        pull_ok = git_pull(root)
+        if pull_ok:
+            # pull 중 새 merge commit이 생겼을 수 있으므로 다시 add
+            git_run(["add", "-A"], root)
+            _, status_check, _ = git_run(["status", "--porcelain"], root)
+            if status_check and status_check.strip():
+                git_run(["commit", "-m", f"{message} (after merge)"], root)
+            code, _, err = git_run(["push"], root)
+            if code != 0:
+                log(f"  [PUSH] still failed: {err[:100]}")
+        else:
+            log(f"  [PUSH] pull failed, cannot push")
+
     return code == 0
 
 
@@ -475,14 +579,17 @@ def schedule(root, session_count, consecutive_idle):
         return None
 
     # Priority 2: 새 메시지 응답 (즉시 반응)
-    for role in ["server", "client"]:
+    # 이 머신의 역할을 먼저 처리
+    my_role = detect_role_from_root(root)
+    role_order = [my_role, "server" if my_role == "client" else "client"]
+    for role in role_order:
         msgs = scan_new_messages(role, root)
         if msgs:
             msg_ids = [m[0] for m in msgs]
             return Action("RESPOND", role, msg_ids)
 
     # Priority 3: unblocked 태스크 작업
-    for role in ["server", "client"]:
+    for role in role_order:
         tasks = get_unblocked_tasks(role, root)
         if tasks:
             return Action("WORK", role, tasks)
