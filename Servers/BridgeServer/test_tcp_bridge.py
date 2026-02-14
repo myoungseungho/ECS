@@ -40,7 +40,9 @@ from tcp_bridge import (
     BG_WIN_SCORE, GW_CRYSTAL_HP, GW_MIN_PARTICIPANTS,
     CURRENCY_MAX, TOKEN_SHOP_DUNGEON, TOKEN_SHOP_PVP, TOKEN_SHOP_GUILD,
     TOKEN_SHOPS, SILVER_SHOP_ITEMS, DUNGEON_TOKEN_REWARDS,
-    PVP_TOKEN_WIN, PVP_TOKEN_LOSS
+    PVP_TOKEN_WIN, PVP_TOKEN_LOSS,
+    SECRET_REALM_UNLOCK_LEVEL, SECRET_REALM_DAILY_LIMIT,
+    REALM_TYPES, REALM_TYPE_LIST, SPECIAL_REALM_CONDITIONS
 )
 
 
@@ -2421,6 +2423,86 @@ async def run_tests(port: int):
         c.close()
 
     await test("TOKEN_SHOP_BUY: 잘못된 아이템 → INVALID_ITEM", test_token_shop_buy_invalid())
+
+
+    # ━━━ Test: SECRET_REALM_ENTER — 비경 입장 (레벨 부족) ━━━
+    async def test_realm_enter_level_too_low():
+        """레벨 20 미만 캐릭터 → LEVEL_TOO_LOW(3)."""
+        c = await login_and_enter(port)
+        # Default level is 1, need 20 — should fail
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B', 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT, f"Expected ENTER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 3, f"Expected LEVEL_TOO_LOW(3), got {result}"
+        c.close()
+
+    await test("SECRET_REALM_ENTER: 레벨 부족 → LEVEL_TOO_LOW", test_realm_enter_level_too_low())
+
+    # ━━━ Test: SECRET_REALM_ENTER — 비경 입장 성공 (auto_spawn) ━━━
+    async def test_realm_enter_success():
+        """레벨업 후 auto_spawn=1로 입장 → SUCCESS(0) + instance_id."""
+        c = await login_and_enter(port)
+        # Level up to 20+
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter realm with auto_spawn=1
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT, f"Expected ENTER_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        instance_id = struct.unpack('<H', resp[1:3])[0]
+        assert instance_id > 0, f"Expected instance_id > 0, got {instance_id}"
+        c.close()
+
+    await test("SECRET_REALM_ENTER: auto_spawn 입장 성공", test_realm_enter_success())
+
+    # ━━━ Test: SECRET_REALM_COMPLETE — 비경 클리어 (등급 계산) ━━━
+    async def test_realm_complete():
+        """비경 클리어 → 등급(S/A/B/C) + 골드 보상."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS, got {resp[0]}"
+        realm_type_idx = resp[3]
+        # Complete — send score 150 (for trial: S grade if <=180s)
+        # For other types the grade varies, but we at least get a valid response
+        await c.send(MsgType.SECRET_REALM_COMPLETE, struct.pack('<H B', 150, 0))
+        msg_type2, resp2 = await c.recv_expect(MsgType.SECRET_REALM_COMPLETE)
+        assert msg_type2 == MsgType.SECRET_REALM_COMPLETE, f"Expected COMPLETE, got {msg_type2}"
+        grade = resp2[0]
+        gold_reward = struct.unpack('<I', resp2[1:5])[0]
+        assert grade in [0, 1, 2, 3], f"Grade must be 0-3 (S/A/B/C), got {grade}"
+        assert gold_reward > 0, f"Expected gold_reward > 0, got {gold_reward}"
+        c.close()
+
+    await test("SECRET_REALM_COMPLETE: 비경 클리어 → 등급+골드", test_realm_complete())
+
+    # ━━━ Test: SECRET_REALM_FAIL — 비경 실패 ━━━
+    async def test_realm_fail():
+        """비경 실패 → 위로 보상 100골드."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.STAT_ADD_EXP, struct.pack('<I', 50000))
+        await c.recv_all_packets(timeout=0.5)
+        # Enter
+        await c.send(MsgType.SECRET_REALM_ENTER, struct.pack('<B B', 1, 1))
+        msg_type, resp = await c.recv_expect(MsgType.SECRET_REALM_ENTER_RESULT)
+        assert msg_type == MsgType.SECRET_REALM_ENTER_RESULT
+        assert resp[0] == 0, f"Expected SUCCESS, got {resp[0]}"
+        # Fail
+        await c.send(MsgType.SECRET_REALM_FAIL, b'')
+        msg_type2, resp2 = await c.recv_expect(MsgType.SECRET_REALM_FAIL)
+        assert msg_type2 == MsgType.SECRET_REALM_FAIL, f"Expected FAIL, got {msg_type2}"
+        consolation_gold = struct.unpack('<I', resp2[:4])[0]
+        assert consolation_gold == 100, f"Expected 100 consolation gold, got {consolation_gold}"
+        c.close()
+
+    await test("SECRET_REALM_FAIL: 비경 실패 → 위로 100골드", test_realm_fail())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T07:15:00"
+last_session: "2026-02-16T07:42:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 10 보조화폐/토큰상점 완료! 104/104 ALL PASS (S054). 화폐5종(gold/silver/dungeon_token/pvp_token/guild_contribution)+토큰상점3종(던전/PvP/길드)+토큰획득훅2개 핸들러3(MsgType 468-473). 다음: TASK 17 비경탐험(540-544)."
+current_status: "TASK 17 비경탐험 완료! 108/108 ALL PASS (S055). 비경5종(trial/wisdom/treasure/training/fortune)+특수비경4종(night_fog/storm_noon/snow_dawn/clear_evening)+등급S/A/B/C보상+일일3회제한 핸들러3+헬퍼3(MsgType 540-544). 다음: TASK 18 사제시스템(550-560)."
 
 # ── 완료된 작업 ──
 completed:
@@ -112,6 +112,9 @@ completed:
   - id: S054
     desc: "C034 응답: TASK 10 보조화폐/토큰상점 완료. MsgType 468-473. 핸들러3(CURRENCY_QUERY/TOKEN_SHOP_LIST/TOKEN_SHOP_BUY). 화폐5종(gold/silver/dungeon_token/pvp_token/guild_contribution)+토큰상점3종(던전4+PvP4+길드3)+토큰획득훅2(레이드→dt/전장→pt). 104/104 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s054.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S054_c034_response_task10_currency.md"]
+  - id: S055
+    desc: "C035 응답: TASK 17 비경탐험 완료. MsgType 540-544. 핸들러3(ENTER/COMPLETE/FAIL)+헬퍼3(_realm_grade/_realm_rewards/_check_special_realm)+포탈스폰. 비경5종(trial/wisdom/treasure/training/fortune)+특수4종(night_fog/storm_noon/snow_dawn/clear_evening)+등급S/A/B/C+일일3회. 108/108 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s055.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_gdd/data/secret_realm_conditions.yaml", "_comms/server_to_client/S055_c035_response_task17_secret_realm.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -174,45 +177,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 17: 비경 탐험 시스템 (GDD rules/secret_realm.yaml) [브레인스토밍 신규]
-  # 랜덤 챌린지 던전 5종 + 날씨/시간 특수 비경
-  # MsgType: 540-544
+  # TASK 17: 완료! (S055) — 비경 탐험 108/108 PASS
+  # realm_sub01~06 모두 완료
   # ============================================================
-  - id: "realm_sub01"
-    desc: "SECRET_REALM_SPAWN(540) 핸들러 — 비경 포탈 랜덤 스폰. 5~15분 주기, 존당 최대 1개. 존 브로드캐스트."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "realm_sub02"
-    desc: "SECRET_REALM_ENTER(541)→SECRET_REALM_ENTER_RESULT(542) 핸들러 — 비경 입장. 일일 3회 제한 체크 + 솔로/2인 파티 체크 + 인스턴스 생성."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "realm_sub03"
-    desc: "SECRET_REALM_COMPLETE(543) / SECRET_REALM_FAIL(544) 핸들러 — 클리어/실패 결과. 등급(S/A/B/C) 계산 + 보상 지급. 비경 유형별 등급 기준 다름."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "realm_sub04"
-    desc: "날씨/시간 특수 비경 로직 — weather+time_of_day 조합 체크 → 특수 비경 50% 확률 즉시 스폰. 4종 조합(night_fog/storm_noon/snow_dawn/clear_evening)."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "realm_sub05"
-    desc: "data/secret_realm_conditions.yaml 생성 — 비경 5종 몬스터/퍼즐/보상 테이블 + 특수 비경 조건표."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "realm_sub06"
-    desc: "비경 테스트 4개 — 비경 스폰/입장/클리어(등급별)/실패, 일일 제한."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 18: 사제(師弟) 시스템 (GDD rules/mentorship.yaml) [브레인스토밍 신규]
@@ -500,6 +467,8 @@ recent_decisions:
   - "TASK 6 완료: 전장/길드전/PvP시즌(430-435) 100/100 PASS. _patch_s053.py. 핸들러3(BATTLEGROUND_QUEUE/SCORE/GUILD_WAR_DECLARE)+헬퍼4. 전장2모드(거점점령:3거점win1000+수레호위:2페이즈)+길드전(min10/30분/크리스탈10000HP)+PvP시즌7티어(Bronze~GM/soft_reset). BG_TEAM_SIZE=6."
   - "클라 TASK 6 전장 완료 확인: BattlegroundManager+GuildWarManager+BattlegroundUI+GuildWarUI(F7/F8키), 107 PASS."
   - "TASK 10 완료: 보조화폐/토큰상점(468-473) 104/104 PASS. _patch_s054.py. 핸들러3(CURRENCY_QUERY/TOKEN_SHOP_LIST/TOKEN_SHOP_BUY). 화폐5종(gold:999M/silver:99M/dt:99K/pt:99K/gc:99K)+토큰상점3종(던전4+PvP4+길드3아이템)+토큰획득훅(레이드클리어→dt/전장종료→pt)."
+  - "클라 TASK 10 보조화폐 완료 확인: CurrencyManager+CurrencyUI(F9)+TokenShopUI(Shift+F9), 109 PASS."
+  - "TASK 17 완료: 비경탐험(540-544) 108/108 PASS. _patch_s055.py. 핸들러3(SECRET_REALM_ENTER/COMPLETE/FAIL)+헬퍼3(_realm_grade/_realm_rewards/_check_special_realm)+포탈스폰. 비경5종(trial/wisdom/treasure/training/fortune)+특수4종(night_fog x2.0/storm_noon x1.5/snow_dawn x1.5/clear_evening x1.5)+등급S/A/B/C+일일3회제한+Lv20+. secret_realm_conditions.yaml."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -539,6 +508,7 @@ processed_messages:
   - "C032"
   - "C033"
   - "C034"
+  - "C035"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -554,4 +524,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python _patch_s054.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python _patch_s054.py && python _patch_s055.py && python test_tcp_bridge.py
