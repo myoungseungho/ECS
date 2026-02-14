@@ -325,6 +325,18 @@ class MsgType(IntEnum):
     JOB_CHANGE_REQ = 446
     JOB_CHANGE_RESULT = 447
 
+    # Enhancement Deepening (TASK 8)
+    GEM_EQUIP = 450
+    GEM_EQUIP_RESULT = 451
+    GEM_FUSE = 452
+    GEM_FUSE_RESULT = 453
+    ENGRAVING_LIST_REQ = 454
+    ENGRAVING_LIST = 455
+    ENGRAVING_EQUIP = 456
+    ENGRAVING_RESULT = 457
+    TRANSCEND_REQ = 458
+    TRANSCEND_RESULT = 459
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -479,6 +491,16 @@ class PlayerSession:
     milestones_claimed: list = field(default_factory=list)  # [level, ...] already claimed
     dungeon_clears: int = 0                                # total dungeon clears (for title condition)
     boss_kills: int = 0                                    # total boss kills (for title condition)
+    # ---- Enhancement Deepening (TASK 8) ----
+    gem_inventory: list = field(default_factory=list)       # [{gem_type, tier, gem_id}, ...]
+    gem_equipped: dict = field(default_factory=dict)        # {slot_key: [gem_id, ...]} e.g. "weapon_0": gem_id
+    gem_next_id: int = 1                                    # auto-increment gem id
+    engraving_points: dict = field(default_factory=dict)    # {engraving_name: points}
+    engravings_active: list = field(default_factory=list)   # [engraving_name, ...] max 6
+    transcend_levels: dict = field(default_factory=dict)    # {equip_slot: transcend_level}
+    enhance_pity: dict = field(default_factory=dict)        # {equip_slot: fail_count}
+    protection_scrolls: int = 0                             # 축복의 보호권 수량
+    enhance_levels: dict = field(default_factory=dict)      # {equip_slot: enhance_level}
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -1459,6 +1481,50 @@ MILESTONE_REWARDS = {
     60: {"desc_kr": "만렙 달성",                "gold": 50000, "unlock": "chaos_dungeon,paragon"},
 }
 
+# ---- Enhancement Deepening Data (GDD enhancement.yaml) ----
+# Gem types: 6 kinds, 5 tiers each
+GEM_TYPES = {
+    "ruby":     {"name_kr": "루비",       "stat": "ATK",       "bonus_per_tier": [5, 10, 18, 25, 40]},
+    "sapphire": {"name_kr": "사파이어",   "stat": "MATK",      "bonus_per_tier": [5, 10, 18, 25, 40]},
+    "emerald":  {"name_kr": "에메랄드",   "stat": "DEF",       "bonus_per_tier": [3, 6, 10, 15, 25]},
+    "diamond":  {"name_kr": "다이아몬드", "stat": "MAX_HP",    "bonus_per_tier": [30, 60, 100, 150, 250]},
+    "topaz":    {"name_kr": "토파즈",     "stat": "CRIT_RATE", "bonus_per_tier": [5, 10, 15, 20, 30]},
+    "amethyst": {"name_kr": "자수정",     "stat": "CRIT_DMG",  "bonus_per_tier": [10, 20, 35, 50, 80]},
+}
+GEM_TIER_NAMES = ["rough", "polished", "refined", "flawless", "perfect"]
+GEM_MAX_TIER = 5   # tier 1~5
+GEM_FUSION_COUNT = 3  # 3개 합성 → 상위 1개
+GEM_FUSION_GOLD = [100, 500, 2000, 10000]  # tier 1→2, 2→3, 3→4, 4→5
+GEM_REMOVAL_COST = 500
+GEM_MAX_SOCKETS = {"weapon": 2, "armor": 1, "accessory": 1}
+
+# Engraving definitions: 9 types, 3 levels each
+ENGRAVING_TABLE = {
+    "grudge":             {"name_kr": "원한",         "effects": {1: {"boss_damage": 4},  2: {"boss_damage": 10}, 3: {"boss_damage": 20}}},
+    "cursed_doll":        {"name_kr": "저주받은 인형","effects": {1: {"atk_bonus": 3},    2: {"atk_bonus": 8},    3: {"atk_bonus": 16}}},
+    "keen_blunt":         {"name_kr": "예리한 둔기",  "effects": {1: {"crit_dmg": 10},    2: {"crit_dmg": 25},    3: {"crit_dmg": 50}}},
+    "master_brawler":     {"name_kr": "정면승부",     "effects": {1: {"front_atk": 5},    2: {"front_atk": 12},   3: {"front_atk": 25}}},
+    "adrenaline":         {"name_kr": "아드레날린",   "effects": {1: {"atk_stack": 3},    2: {"atk_stack": 6},    3: {"atk_stack": 10}}},
+    "spirit_absorption":  {"name_kr": "정기 흡수",    "effects": {1: {"speed": 3},        2: {"speed": 8},        3: {"speed": 15}}},
+    "heavy_armor":        {"name_kr": "중갑",         "effects": {1: {"def_bonus": 20},   2: {"def_bonus": 50},   3: {"def_bonus": 100}}},
+    "expert":             {"name_kr": "전문가",       "effects": {1: {"heal_bonus": 6},   2: {"heal_bonus": 14},  3: {"heal_bonus": 24}}},
+    "awakening_engraving":{"name_kr": "각성",         "effects": {1: {"ult_cdr": 10},     2: {"ult_cdr": 25},     3: {"ult_cdr": 50}}},
+}
+ENGRAVING_MAX_ACTIVE = 6
+ENGRAVING_ACTIVATION = {1: 5, 2: 10, 3: 15}  # points -> level
+
+# Transcendence (equipment)
+TRANSCEND_MAX_LEVEL = 5
+TRANSCEND_MIN_ENHANCE = 15  # +15 이상만 초월 가능
+TRANSCEND_GOLD_COST = [50000, 100000, 200000, 500000, 1000000]
+TRANSCEND_SUCCESS_RATE = [0.50, 0.30, 0.20, 0.10, 0.05]
+TRANSCEND_STAT_BONUS_PCT = 10  # 단계당 기본 스탯 +10%
+
+# Enhancement Pity System
+ENHANCE_PITY_BONUS_PER_FAIL = 0.05   # 실패당 +5%
+ENHANCE_PITY_MAX_BONUS = 0.50        # 최대 +50%
+# Protection scroll prevents downgrade on 11+ failure
+
 # ──── 던전 목록 데이터 (P2_S03_S01) ────
 DUNGEON_LIST_DATA = [
     {"id": 1, "name": "고블린 동굴",    "type": "party", "min_level": 15, "stages": 3, "zone_id": 100, "party_size": 4, "boss_id": 3004, "boss_hp": 30000},
@@ -1817,6 +1883,11 @@ class BridgeServer:
             MsgType.TITLE_EQUIP: self._on_title_equip,
             MsgType.COLLECTION_QUERY: self._on_collection_query,
             MsgType.JOB_CHANGE_REQ: self._on_job_change_req,
+            MsgType.GEM_EQUIP: self._on_gem_equip,
+            MsgType.GEM_FUSE: self._on_gem_fuse,
+            MsgType.ENGRAVING_LIST_REQ: self._on_engraving_list_req,
+            MsgType.ENGRAVING_EQUIP: self._on_engraving_equip,
+            MsgType.TRANSCEND_REQ: self._on_transcend_req,
         }
 
         handler = handlers.get(msg_type)
@@ -4273,6 +4344,305 @@ class BridgeServer:
 
 
 
+
+
+
+    # ---- Enhancement Deepening (TASK 8: MsgType 450-459) ----
+
+    async def _on_gem_equip(self, session, payload: bytes):
+        """GEM_EQUIP(450) -> GEM_EQUIP_RESULT(451)
+        Request: action(u8) + gem_id(u16) + slot_len(u8) + slot(str)
+          action: 0=equip, 1=remove
+          slot: "weapon_0", "weapon_1", "armor_0", "accessory_0"
+        Response: result(u8) + gem_id(u16) + slot_len(u8) + slot(str)
+          result: 0=SUCCESS, 1=GEM_NOT_FOUND, 2=SLOT_FULL, 3=SLOT_INVALID, 4=ALREADY_EQUIPPED"""
+        if not session.in_game or len(payload) < 4:
+            return
+
+        action = payload[0]
+        gem_id = struct.unpack_from('<H', payload, 1)[0]
+        slot_len = payload[3]
+        if len(payload) < 4 + slot_len:
+            return
+        slot = payload[4:4+slot_len].decode('utf-8')
+
+        def _send_gem_result(result_code):
+            slot_bytes = slot.encode('utf-8')
+            self._send(session, MsgType.GEM_EQUIP_RESULT,
+                       struct.pack('<B H B', result_code, gem_id, len(slot_bytes)) + slot_bytes)
+
+        if action == 0:  # Equip
+            # Find gem in inventory
+            gem = None
+            for g in session.gem_inventory:
+                if g["gem_id"] == gem_id:
+                    gem = g
+                    break
+            if not gem:
+                _send_gem_result(1)  # GEM_NOT_FOUND
+                return
+
+            # Check if gem is already equipped somewhere
+            for s, equipped_ids in session.gem_equipped.items():
+                if gem_id in equipped_ids:
+                    _send_gem_result(4)  # ALREADY_EQUIPPED
+                    return
+
+            # Parse slot type (weapon/armor/accessory)
+            slot_parts = slot.split('_')
+            if len(slot_parts) < 2:
+                _send_gem_result(3)  # SLOT_INVALID
+                return
+            equip_type = slot_parts[0]
+            slot_idx = int(slot_parts[1]) if slot_parts[1].isdigit() else 0
+            max_sockets = GEM_MAX_SOCKETS.get(equip_type, 0)
+            if slot_idx >= max_sockets:
+                _send_gem_result(3)  # SLOT_INVALID
+                return
+
+            # Check slot availability
+            if slot not in session.gem_equipped:
+                session.gem_equipped[slot] = []
+            if len(session.gem_equipped[slot]) >= 1:  # 1 gem per socket slot
+                _send_gem_result(2)  # SLOT_FULL
+                return
+
+            session.gem_equipped[slot].append(gem_id)
+            _send_gem_result(0)  # SUCCESS
+
+        elif action == 1:  # Remove
+            # Find and remove gem from slot
+            if slot in session.gem_equipped and gem_id in session.gem_equipped[slot]:
+                session.gem_equipped[slot].remove(gem_id)
+                # Deduct removal cost
+                session.gold = max(0, getattr(session, 'gold', 0) - GEM_REMOVAL_COST)
+                _send_gem_result(0)  # SUCCESS
+            else:
+                _send_gem_result(1)  # GEM_NOT_FOUND (not in that slot)
+
+    async def _on_gem_fuse(self, session, payload: bytes):
+        """GEM_FUSE(452) -> GEM_FUSE_RESULT(453)
+        Request: gem_type_len(u8) + gem_type(str) + tier(u8) — fuse 3 gems of this type+tier
+        Response: result(u8) + new_gem_id(u16) + gem_type_len(u8) + gem_type(str) + new_tier(u8) + gold_cost(u32)
+          result: 0=SUCCESS, 1=NOT_ENOUGH_GEMS, 2=MAX_TIER, 3=NOT_ENOUGH_GOLD"""
+        if not session.in_game or len(payload) < 2:
+            return
+
+        type_len = payload[0]
+        if len(payload) < 1 + type_len + 1:
+            return
+        gem_type = payload[1:1+type_len].decode('utf-8')
+        tier = payload[1+type_len]
+
+        def _send_fuse_result(result_code, new_gem_id=0, new_tier=0, gold=0):
+            gt_bytes = gem_type.encode('utf-8')
+            self._send(session, MsgType.GEM_FUSE_RESULT,
+                       struct.pack('<B H B', result_code, new_gem_id, len(gt_bytes)) +
+                       gt_bytes + struct.pack('<B I', new_tier, gold))
+
+        # Validate gem type
+        if gem_type not in GEM_TYPES:
+            _send_fuse_result(1)
+            return
+
+        # Check max tier
+        if tier >= GEM_MAX_TIER:
+            _send_fuse_result(2)
+            return
+
+        # Count available gems (not equipped) of this type+tier
+        available = []
+        equipped_gem_ids = set()
+        for ids in session.gem_equipped.values():
+            equipped_gem_ids.update(ids)
+
+        for g in session.gem_inventory:
+            if g["gem_type"] == gem_type and g["tier"] == tier and g["gem_id"] not in equipped_gem_ids:
+                available.append(g)
+
+        if len(available) < GEM_FUSION_COUNT:
+            _send_fuse_result(1)  # NOT_ENOUGH_GEMS
+            return
+
+        # Check gold cost
+        cost_idx = tier - 1  # tier 1→index 0
+        if cost_idx < 0 or cost_idx >= len(GEM_FUSION_GOLD):
+            cost_idx = len(GEM_FUSION_GOLD) - 1
+        gold_cost = GEM_FUSION_GOLD[cost_idx]
+        current_gold = getattr(session, 'gold', 0)
+        if current_gold < gold_cost:
+            _send_fuse_result(3, gold=gold_cost)  # NOT_ENOUGH_GOLD
+            return
+
+        # Consume 3 gems
+        consumed = available[:GEM_FUSION_COUNT]
+        for c in consumed:
+            session.gem_inventory.remove(c)
+
+        # Deduct gold
+        session.gold = current_gold - gold_cost
+
+        # Create new gem of tier+1
+        new_tier = tier + 1
+        new_gem = {"gem_type": gem_type, "tier": new_tier, "gem_id": session.gem_next_id}
+        session.gem_next_id += 1
+        session.gem_inventory.append(new_gem)
+
+        _send_fuse_result(0, new_gem["gem_id"], new_tier, gold_cost)
+
+    async def _on_engraving_list_req(self, session, payload: bytes):
+        """ENGRAVING_LIST_REQ(454) -> ENGRAVING_LIST(455)
+        Response: count(u8) + [name_len(u8) + name(str) + name_kr_len(u8) + name_kr(str) +
+                  points(u8) + active_level(u8) + is_active(u8) +
+                  effect_key_len(u8) + effect_key(str) + effect_value(u16)]"""
+        if not session.in_game:
+            return
+
+        engravings = list(ENGRAVING_TABLE.items())
+        data = struct.pack('<B', len(engravings))
+
+        for eng_name, eng_data in engravings:
+            name_bytes = eng_name.encode('utf-8')
+            name_kr_bytes = eng_data["name_kr"].encode('utf-8')
+            points = session.engraving_points.get(eng_name, 0)
+            # Calculate active level
+            active_level = 0
+            for lv in [3, 2, 1]:
+                if points >= ENGRAVING_ACTIVATION[lv]:
+                    active_level = lv
+                    break
+            is_active = 1 if eng_name in session.engravings_active else 0
+
+            # Get primary effect key+value at current level (or level 1 if not active)
+            display_level = active_level if active_level > 0 else 1
+            effects = eng_data["effects"].get(display_level, {})
+            effect_key = list(effects.keys())[0] if effects else "none"
+            effect_value = list(effects.values())[0] if effects else 0
+
+            ek_bytes = effect_key.encode('utf-8')
+            data += struct.pack('<B', len(name_bytes)) + name_bytes
+            data += struct.pack('<B', len(name_kr_bytes)) + name_kr_bytes
+            data += struct.pack('<BBB', points, active_level, is_active)
+            data += struct.pack('<B', len(ek_bytes)) + ek_bytes
+            data += struct.pack('<H', effect_value)
+
+        self._send(session, MsgType.ENGRAVING_LIST, data)
+
+    async def _on_engraving_equip(self, session, payload: bytes):
+        """ENGRAVING_EQUIP(456) -> ENGRAVING_RESULT(457)
+        Request: action(u8) + name_len(u8) + name(str)
+          action: 0=activate, 1=deactivate
+        Response: result(u8) + name_len(u8) + name(str) + active_count(u8)
+          result: 0=SUCCESS, 1=NOT_ENOUGH_POINTS, 2=MAX_ACTIVE, 3=NOT_ACTIVE, 4=INVALID"""
+        if not session.in_game or len(payload) < 2:
+            return
+
+        action = payload[0]
+        name_len = payload[1]
+        if len(payload) < 2 + name_len:
+            return
+        eng_name = payload[2:2+name_len].decode('utf-8')
+
+        def _send_eng_result(result_code):
+            nb = eng_name.encode('utf-8')
+            self._send(session, MsgType.ENGRAVING_RESULT,
+                       struct.pack('<B B', result_code, len(nb)) + nb +
+                       struct.pack('<B', len(session.engravings_active)))
+
+        if eng_name not in ENGRAVING_TABLE:
+            _send_eng_result(4)  # INVALID
+            return
+
+        if action == 0:  # Activate
+            # Check points
+            points = session.engraving_points.get(eng_name, 0)
+            if points < ENGRAVING_ACTIVATION[1]:  # need at least level 1 (5 points)
+                _send_eng_result(1)  # NOT_ENOUGH_POINTS
+                return
+            # Check max active
+            if eng_name not in session.engravings_active:
+                if len(session.engravings_active) >= ENGRAVING_MAX_ACTIVE:
+                    _send_eng_result(2)  # MAX_ACTIVE
+                    return
+                session.engravings_active.append(eng_name)
+            _send_eng_result(0)
+
+        elif action == 1:  # Deactivate
+            if eng_name in session.engravings_active:
+                session.engravings_active.remove(eng_name)
+                _send_eng_result(0)
+            else:
+                _send_eng_result(3)  # NOT_ACTIVE
+
+    async def _on_transcend_req(self, session, payload: bytes):
+        """TRANSCEND_REQ(458) -> TRANSCEND_RESULT(459)
+        Request: slot_len(u8) + slot(str) — equipment slot to transcend (e.g. "weapon")
+        Response: result(u8) + slot_len(u8) + slot(str) + new_level(u8) + gold_cost(u32) + success(u8)
+          result: 0=SUCCESS, 1=ENHANCE_TOO_LOW, 2=MAX_TRANSCEND, 3=NOT_ENOUGH_GOLD, 4=FAILED"""
+        if not session.in_game or len(payload) < 1:
+            return
+
+        slot_len = payload[0]
+        if len(payload) < 1 + slot_len:
+            return
+        slot = payload[1:1+slot_len].decode('utf-8')
+
+        current_level = session.transcend_levels.get(slot, 0)
+
+        def _send_transcend_result(result_code, new_level=0, gold=0, success=0):
+            sb = slot.encode('utf-8')
+            self._send(session, MsgType.TRANSCEND_RESULT,
+                       struct.pack('<B B', result_code, len(sb)) + sb +
+                       struct.pack('<B I B', new_level, gold, success))
+
+        # Check enhancement level (simulate: we just check if session has enhance data)
+        enhance_level = getattr(session, 'enhance_levels', {}).get(slot, 0)
+        if enhance_level < TRANSCEND_MIN_ENHANCE:
+            _send_transcend_result(1, current_level)
+            return
+
+        # Check max transcend
+        if current_level >= TRANSCEND_MAX_LEVEL:
+            _send_transcend_result(2, current_level)
+            return
+
+        # Check gold
+        gold_cost = TRANSCEND_GOLD_COST[current_level]
+        current_gold = getattr(session, 'gold', 0)
+        if current_gold < gold_cost:
+            _send_transcend_result(3, current_level, gold_cost)
+            return
+
+        # Deduct gold
+        session.gold = current_gold - gold_cost
+
+        # Roll success
+        rate = TRANSCEND_SUCCESS_RATE[current_level]
+        import random as _rng
+        if _rng.random() < rate:
+            # Success
+            new_level = current_level + 1
+            session.transcend_levels[slot] = new_level
+            _send_transcend_result(0, new_level, gold_cost, 1)
+        else:
+            # Failed (no downgrade for transcend)
+            _send_transcend_result(4, current_level, gold_cost, 0)
+
+
+
+    def _apply_enhance_pity(self, session, slot, base_rate):
+        """Apply pity bonus to enhancement rate."""
+        fail_count = session.enhance_pity.get(slot, 0)
+        bonus = min(fail_count * ENHANCE_PITY_BONUS_PER_FAIL, ENHANCE_PITY_MAX_BONUS)
+        return min(base_rate + bonus, 1.0)
+
+    def _on_enhance_success_pity(self, session, slot):
+        """Reset pity counter on success."""
+        session.enhance_pity[slot] = 0
+
+    def _on_enhance_fail_pity(self, session, slot):
+        """Increment pity counter on failure."""
+        session.enhance_pity[slot] = session.enhance_pity.get(slot, 0) + 1
 
 
     # ---- Progression Deepening (TASK 7: MsgType 440-447) ----

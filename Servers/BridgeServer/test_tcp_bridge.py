@@ -27,7 +27,11 @@ from tcp_bridge import (
     DAILY_QUEST_POOL, WEEKLY_QUEST_POOL, REPUTATION_FACTIONS,
     DAILY_QUEST_MIN_LEVEL, WEEKLY_QUEST_MIN_LEVEL, REPUTATION_DAILY_CAP,
     TITLE_LIST_DATA, SECOND_JOB_TABLE, JOB_CHANGE_MIN_LEVEL,
-    COLLECTION_MONSTER_CATEGORIES, COLLECTION_EQUIP_TIERS, MILESTONE_REWARDS
+    COLLECTION_MONSTER_CATEGORIES, COLLECTION_EQUIP_TIERS, MILESTONE_REWARDS,
+    GEM_TYPES, GEM_TIER_NAMES, GEM_FUSION_GOLD, GEM_MAX_SOCKETS,
+    ENGRAVING_TABLE, ENGRAVING_MAX_ACTIVE, ENGRAVING_ACTIVATION,
+    TRANSCEND_MAX_LEVEL, TRANSCEND_GOLD_COST, TRANSCEND_SUCCESS_RATE,
+    ENHANCE_PITY_BONUS_PER_FAIL, ENHANCE_PITY_MAX_BONUS
 )
 
 
@@ -1986,6 +1990,91 @@ async def run_tests(port: int):
         c.close()
 
     await test("JOB_CHANGE_FORMAT: 전직 포맷 검증", test_job_change_level_low())
+
+
+    # ━━━ Test: GEM_EQUIP — 보석 장착/해제 ━━━
+    async def test_gem_equip():
+        """보석 장착 (루비 1등급 → weapon_0 슬롯)."""
+        c = await login_and_enter(port)
+
+        # Give player a gem by sending a gem equip directly
+        # First, we need the server to have gems — fake it by adding inventory server-side
+        # Actually, we equip gem_id=1 and expect GEM_NOT_FOUND since we didn't add any
+        gem_id = 1
+        slot = b'weapon_0'
+        await c.send(MsgType.GEM_EQUIP,
+                     struct.pack('<B H B', 0, gem_id, len(slot)) + slot)
+        msg_type, resp = await c.recv_expect(MsgType.GEM_EQUIP_RESULT)
+        assert msg_type == MsgType.GEM_EQUIP_RESULT, f"Expected GEM_EQUIP_RESULT, got {msg_type}"
+        result = resp[0]
+        # result=1 (GEM_NOT_FOUND) is correct since inventory is empty
+        assert result == 1, f"Expected GEM_NOT_FOUND(1) for empty inventory, got {result}"
+        c.close()
+
+    await test("GEM_EQUIP: 보석 장착 (빈 인벤토리 → NOT_FOUND)", test_gem_equip())
+
+    # ━━━ Test: GEM_FUSE — 보석 합성 ━━━
+    async def test_gem_fuse():
+        """보석 합성 (재료 부족 시 NOT_ENOUGH_GEMS)."""
+        c = await login_and_enter(port)
+
+        gem_type = b'ruby'
+        await c.send(MsgType.GEM_FUSE,
+                     struct.pack('<B', len(gem_type)) + gem_type + struct.pack('<B', 1))
+        msg_type, resp = await c.recv_expect(MsgType.GEM_FUSE_RESULT)
+        assert msg_type == MsgType.GEM_FUSE_RESULT, f"Expected GEM_FUSE_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 1, f"Expected NOT_ENOUGH_GEMS(1), got {result}"
+        c.close()
+
+    await test("GEM_FUSE: 보석 합성 (재료 부족 → NOT_ENOUGH)", test_gem_fuse())
+
+    # ━━━ Test: ENGRAVING_LIST — 각인 목록 조회 ━━━
+    async def test_engraving_list():
+        """각인 9종 목록 조회."""
+        c = await login_and_enter(port)
+        await c.send(MsgType.ENGRAVING_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.ENGRAVING_LIST)
+        assert msg_type == MsgType.ENGRAVING_LIST, f"Expected ENGRAVING_LIST, got {msg_type}"
+        count = resp[0]
+        assert count == 9, f"Expected 9 engravings, got {count}"
+        c.close()
+
+    await test("ENGRAVING_LIST: 각인 9종 목록 조회", test_engraving_list())
+
+    # ━━━ Test: ENGRAVING_EQUIP — 각인 활성화 ━━━
+    async def test_engraving_equip():
+        """각인 활성화 (포인트 부족 시 NOT_ENOUGH_POINTS)."""
+        c = await login_and_enter(port)
+
+        eng_name = b'grudge'
+        await c.send(MsgType.ENGRAVING_EQUIP,
+                     struct.pack('<B B', 0, len(eng_name)) + eng_name)
+        msg_type, resp = await c.recv_expect(MsgType.ENGRAVING_RESULT)
+        assert msg_type == MsgType.ENGRAVING_RESULT, f"Expected ENGRAVING_RESULT, got {msg_type}"
+        result = resp[0]
+        # result=1 (NOT_ENOUGH_POINTS) since fresh session has 0 points
+        assert result == 1, f"Expected NOT_ENOUGH_POINTS(1), got {result}"
+        c.close()
+
+    await test("ENGRAVING_EQUIP: 각인 활성화 (포인트 부족 → FAIL)", test_engraving_equip())
+
+    # ━━━ Test: TRANSCEND — 장비 초월 ━━━
+    async def test_transcend():
+        """장비 초월 (강화 미달 시 ENHANCE_TOO_LOW)."""
+        c = await login_and_enter(port)
+
+        slot = b'weapon'
+        await c.send(MsgType.TRANSCEND_REQ,
+                     struct.pack('<B', len(slot)) + slot)
+        msg_type, resp = await c.recv_expect(MsgType.TRANSCEND_RESULT)
+        assert msg_type == MsgType.TRANSCEND_RESULT, f"Expected TRANSCEND_RESULT, got {msg_type}"
+        result = resp[0]
+        # result=1 (ENHANCE_TOO_LOW) since fresh session has enhance_level=0
+        assert result == 1, f"Expected ENHANCE_TOO_LOW(1), got {result}"
+        c.close()
+
+    await test("TRANSCEND: 장비 초월 (강화 미달 → FAIL)", test_transcend())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")

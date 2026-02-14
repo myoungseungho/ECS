@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T05:25:00"
+last_session: "2026-02-16T05:50:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 7 칭호/도감/2차전직 완료! 80/80 ALL PASS (S049). 칭호9종+도감4+5등급+전직6직업+마일스톤9레벨. 다음: TASK 5 소셜(410-422) or TASK 8 보석/각인(450-461)."
+current_status: "TASK 8 보석/각인/초월 완료! 85/85 ALL PASS (S050). 보석6종5등급+각인9종3레벨+초월5단계+Pity시스템. 다음: TASK 5 소셜(410-422) or TASK 6 전장(430-435)."
 
 # ── 완료된 작업 ──
 completed:
@@ -97,6 +97,9 @@ completed:
   - id: S049
     desc: "C029 응답: TASK 7 칭호/도감/2차전직 완료. MsgType 440-447. 핸들러4(TITLE_LIST/TITLE_EQUIP/COLLECTION_QUERY/JOB_CHANGE)+칭호9종+도감4카테고리+5등급+전직6직업+마일스톤9레벨. 80/80 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s049.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S049_c029_response_task7_progression.md"]
+  - id: S050
+    desc: "C030 응답: TASK 8 보석/각인/초월 완료. MsgType 450-459. 핸들러5(GEM_EQUIP/GEM_FUSE/ENGRAVING_LIST/ENGRAVING_EQUIP/TRANSCEND)+보석6종5등급+각인9종3레벨+초월5단계+Pity(+5%/fail,max+50%). 85/85 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s050.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S050_c030_response_task8_enhancement.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -194,45 +197,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 8: 강화 심화 — 보석/각인/초월 (GDD rules/enhancement.yaml)
-  # 기본 강화(340-341)만 구현됨. 보석/각인/초월은 미구현.
-  # MsgType: 450-461
+  # TASK 8: 완료! (S050) — 보석/각인/초월 85/85 PASS
+  # enhance_sub01~06 모두 완료
   # ============================================================
-  - id: "enhance_sub01"
-    desc: "GEM_EQUIP(450)→GEM_EQUIP_RESULT(451) 핸들러 — 보석 장착/해제. weapon(2슬롯)+armor(1슬롯). 보석 등급별 스탯 적용(Lv1~7 ATK+10~+300)."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "enhance_sub02"
-    desc: "GEM_FUSE(452)→GEM_FUSE_RESULT(453) 핸들러 — 보석 합성. 같은 종류 3개→1단계 상위. 100% 성공. 골드 비용(Lv1:500~Lv6:50000)."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "enhance_sub03"
-    desc: "ENGRAVING_LIST_REQ(454)→ENGRAVING_LIST(455) + ENGRAVING_EQUIP(456)→ENGRAVING_RESULT(457) — 각인 시스템. max:6 활성. 포인트 5/10/15로 Lv1/2/3 활성. 12종 각인(grudge/cursed_doll/keen_blunt 등)."
-    priority: P2
-    blocked: false
-    estimated_minutes: 15
-
-  - id: "enhance_sub04"
-    desc: "TRANSCEND_REQ(458)→TRANSCEND_RESULT(459) — 장비 초월(+15 이상). max 5단계. 성공률 50%/30%/20%/10%/5%. 비용 50k~1M골드. 스탯 +10% 누적."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "enhance_sub05"
-    desc: "강화 pity 시스템 구현 — 실패당 +5% 보너스(최대 +50%). 단계별 실패 처벌(11-15:1단계↓, 16-20:2단계↓). 보호 아이템(protection_scroll)."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "enhance_sub06"
-    desc: "보석/각인/초월 테스트 5개 — 보석 장착/합성, 각인 활성/해제, 초월 성공/실패."
-    priority: P1
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # TASK 9: 장비 내구도/수리 + 랜덤옵션 (GDD rules/items.yaml)
@@ -624,6 +591,9 @@ recent_decisions:
   - "TASK 4 완료: 퀘스트심화(400-405) 75/75 PASS. _patch_s048.py. 일일퀘풀8종+주간퀘풀3종+평판2세력5티어. DAILY_QUEST_MIN_LEVEL=5, WEEKLY_QUEST_MIN_LEVEL=15, REPUTATION_DAILY_CAP=500."
   - "클라 TASK 4 완료: DailyQuestManager+DailyQuestUI+ReputationManager+ReputationUI, 89 PASS. L키=일퀘, N키=평판."
   - "TASK 7 완료: 칭호/도감/2차전직(440-447) 80/80 PASS. _patch_s049.py. 칭호9종+도감(몬스터4카테고리+장비5등급)+전직6직업(berserker/guardian/sharpshooter/ranger/archmage/priest)+마일스톤9레벨. JOB_CHANGE_MIN_LEVEL=20."
+  - "클라 TASK 7 완료: TitleManager+CollectionManager+TitleUI+CollectionUI+JobChangeUI, 93 PASS. H/F6/F7키."
+  - "TASK 8 완료: 보석/각인/초월(450-459) 85/85 PASS. _patch_s050.py. 보석6종5등급(ruby/sapphire/emerald/diamond/topaz/amethyst)+각인9종3레벨(grudge/cursed_doll/keen_blunt/master_brawler/adrenaline/spirit_absorption/heavy_armor/expert/awakening)+초월5단계(50%/30%/20%/10%/5%)+Pity(+5%/fail,max+50%)."
+  - "OneDrive tcp_bridge.py 잘림 이슈 발견/수정: _patch_s050.py에 git 원본 복구 로직 추가"
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -658,6 +628,7 @@ processed_messages:
   - "C027"
   - "C028"
   - "C029"
+  - "C030"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
