@@ -188,6 +188,39 @@ class MsgType(IntEnum):
     ADMIN_GET_CONFIG = 282
     ADMIN_CONFIG_RESP = 283
 
+    # Guild (문파)
+    GUILD_CREATE = 290
+    GUILD_DISBAND = 291
+    GUILD_INVITE = 292
+    GUILD_ACCEPT = 293
+    GUILD_LEAVE = 294
+    GUILD_KICK = 295
+    GUILD_INFO_REQ = 296
+    GUILD_INFO = 297
+    GUILD_LIST_REQ = 298
+    GUILD_LIST = 299
+
+    # Trade (거래)
+    TRADE_REQUEST = 300
+    TRADE_ACCEPT = 301
+    TRADE_DECLINE = 302
+    TRADE_ADD_ITEM = 303
+    TRADE_ADD_GOLD = 304
+    TRADE_CONFIRM = 305
+    TRADE_CANCEL = 306
+    TRADE_RESULT = 307
+
+    # Mail (우편)
+    MAIL_SEND = 310
+    MAIL_LIST_REQ = 311
+    MAIL_LIST = 312
+    MAIL_READ = 313
+    MAIL_READ_RESP = 314
+    MAIL_CLAIM = 315
+    MAIL_CLAIM_RESULT = 316
+    MAIL_DELETE = 317
+    MAIL_DELETE_RESULT = 318
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -290,6 +323,11 @@ class PlayerSession:
     quests: List[dict] = field(default_factory=list)
     violation_count: int = 0  # 이동 검증 위반 횟수
     last_move_time: float = 0.0
+    guild_id: int = 0
+    trade_partner: int = 0  # entity_id of trade partner, 0=not trading
+    trade_items: List[dict] = field(default_factory=list)  # items offered
+    trade_gold: int = 0
+    trade_confirmed: bool = False
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -418,6 +456,11 @@ class BridgeServer:
         self.tick_count = 0
         self.start_time = time.time()
         self._running = False
+        self.guilds: Dict[int, dict] = {}  # guild_id -> guild data
+        self.next_guild_id = 1
+        self.trades: Dict[int, dict] = {}  # entity_id -> trade session
+        self.mails: Dict[int, List[dict]] = {}  # account_id -> mail list
+        self.next_mail_id = 1
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -470,6 +513,17 @@ class BridgeServer:
                 party["members"].remove(session.entity_id)
             if not party["members"]:
                 del self.parties[session.party_id]
+
+        # 거래 취소
+        if session.trade_partner:
+            partner_id = session.trade_partner
+            if partner_id in self.sessions:
+                partner = self.sessions[partner_id]
+                partner.trade_partner = 0
+                partner.trade_items = []
+                partner.trade_gold = 0
+                partner.trade_confirmed = False
+                self._send(partner, MsgType.TRADE_RESULT, struct.pack('<B', 4))  # cancelled
 
         # 세션 정리
         if session.entity_id in self.sessions:
@@ -576,6 +630,26 @@ class BridgeServer:
             MsgType.ADMIN_GET_CONFIG: self._on_admin_get_config,
             MsgType.SPATIAL_QUERY_REQ: self._on_spatial_query,
             MsgType.GHOST_QUERY: self._on_ghost_query,
+            MsgType.GUILD_CREATE: self._on_guild_create,
+            MsgType.GUILD_DISBAND: self._on_guild_disband,
+            MsgType.GUILD_INVITE: self._on_guild_invite,
+            MsgType.GUILD_ACCEPT: self._on_guild_accept,
+            MsgType.GUILD_LEAVE: self._on_guild_leave,
+            MsgType.GUILD_KICK: self._on_guild_kick,
+            MsgType.GUILD_INFO_REQ: self._on_guild_info_req,
+            MsgType.GUILD_LIST_REQ: self._on_guild_list_req,
+            MsgType.TRADE_REQUEST: self._on_trade_request,
+            MsgType.TRADE_ACCEPT: self._on_trade_accept,
+            MsgType.TRADE_DECLINE: self._on_trade_decline,
+            MsgType.TRADE_ADD_ITEM: self._on_trade_add_item,
+            MsgType.TRADE_ADD_GOLD: self._on_trade_add_gold,
+            MsgType.TRADE_CONFIRM: self._on_trade_confirm,
+            MsgType.TRADE_CANCEL: self._on_trade_cancel,
+            MsgType.MAIL_SEND: self._on_mail_send,
+            MsgType.MAIL_LIST_REQ: self._on_mail_list_req,
+            MsgType.MAIL_READ: self._on_mail_read,
+            MsgType.MAIL_CLAIM: self._on_mail_claim,
+            MsgType.MAIL_DELETE: self._on_mail_delete,
         }
 
         handler = handlers.get(msg_type)
@@ -1578,6 +1652,688 @@ class BridgeServer:
     async def _on_ghost_query(self, session: PlayerSession, payload: bytes):
         self._send(session, MsgType.GHOST_INFO, struct.pack('<I', 0))
 
+    # ━━━ 핸들러: 길드 (문파) ━━━
+
+    async def _on_guild_create(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 1:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 1, 0) + b'\x00' * 42)
+            return
+
+        name_len = payload[0]
+        if len(payload) < 1 + name_len or name_len == 0 or name_len > 32:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 2, 0) + b'\x00' * 42)  # invalid name
+            return
+
+        guild_name = payload[1:1+name_len].decode('utf-8', errors='replace')
+
+        if session.guild_id:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 1, 0) + b'\x00' * 42)  # already in guild
+            return
+
+        # Create guild
+        gid = self.next_guild_id
+        self.next_guild_id += 1
+        self.guilds[gid] = {
+            "id": gid,
+            "name": guild_name,
+            "master_id": session.entity_id,
+            "members": [session.entity_id],
+            "level": 1,
+            "exp": 0,
+            "created": time.time()
+        }
+        session.guild_id = gid
+
+        self.log(f"GuildCreate: {guild_name} (id={gid}, master={session.char_name})", "GAME")
+        self._send_guild_info(session)
+
+    async def _on_guild_disband(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.guild_id:
+            return
+
+        gid = session.guild_id
+        if gid not in self.guilds:
+            return
+
+        guild = self.guilds[gid]
+        if guild["master_id"] != session.entity_id:
+            return  # not master
+
+        # Notify all members
+        for member_id in guild["members"]:
+            if member_id in self.sessions:
+                member_session = self.sessions[member_id]
+                member_session.guild_id = 0
+                empty_info = struct.pack('<BI', 0, 0) + b'\x00' * 42
+                self._send(member_session, MsgType.GUILD_INFO, empty_info)
+
+        del self.guilds[gid]
+        self.log(f"GuildDisband: {guild['name']} (id={gid})", "GAME")
+
+    async def _on_guild_invite(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 8 or not session.guild_id:
+            return
+
+        target_entity = struct.unpack('<Q', payload[:8])[0]
+        if target_entity not in self.sessions:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 3, 0) + b'\x00' * 42)  # target not found
+            return
+
+        target_session = self.sessions[target_entity]
+        if not target_session.in_game:
+            return
+
+        gid = session.guild_id
+        if gid not in self.guilds:
+            return
+
+        guild = self.guilds[gid]
+        if guild["master_id"] != session.entity_id:
+            return  # not master
+
+        if target_session.guild_id:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 4, 0) + b'\x00' * 42)  # target already in guild
+            return
+
+        # Send invite to target
+        name_bytes = guild["name"].encode('utf-8')[:32].ljust(32, b'\x00')
+        invite_pkt = struct.pack('<I', gid) + name_bytes + struct.pack('<Q', session.entity_id)
+        self._send(target_session, MsgType.GUILD_INVITE, invite_pkt)
+
+        self.log(f"GuildInvite: {session.char_name} invited {target_session.char_name} to {guild['name']}", "GAME")
+
+    async def _on_guild_accept(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 4:
+            return
+
+        gid = struct.unpack('<I', payload[:4])[0]
+        if gid not in self.guilds:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 5, 0) + b'\x00' * 42)  # guild not found
+            return
+
+        if session.guild_id:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 1, 0) + b'\x00' * 42)  # already in guild
+            return
+
+        guild = self.guilds[gid]
+        if len(guild["members"]) >= 20:
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 6, 0) + b'\x00' * 42)  # guild full
+            return
+
+        # Add to guild
+        guild["members"].append(session.entity_id)
+        session.guild_id = gid
+
+        self.log(f"GuildAccept: {session.char_name} joined {guild['name']}", "GAME")
+
+        # Send updated guild info to all members
+        for member_id in guild["members"]:
+            if member_id in self.sessions:
+                self._send_guild_info(self.sessions[member_id])
+
+    async def _on_guild_leave(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.guild_id:
+            return
+
+        gid = session.guild_id
+        if gid not in self.guilds:
+            return
+
+        guild = self.guilds[gid]
+        if guild["master_id"] == session.entity_id:
+            # Master must disband, not leave
+            self._send(session, MsgType.GUILD_INFO, struct.pack('<BI', 7, gid) + b'\x00' * 42)  # master cannot leave
+            return
+
+        # Remove from guild
+        if session.entity_id in guild["members"]:
+            guild["members"].remove(session.entity_id)
+
+        session.guild_id = 0
+        empty_info = struct.pack('<BI', 0, 0) + b'\x00' * 42
+        self._send(session, MsgType.GUILD_INFO, empty_info)
+
+        # Notify remaining members
+        for member_id in guild["members"]:
+            if member_id in self.sessions:
+                self._send_guild_info(self.sessions[member_id])
+
+        self.log(f"GuildLeave: {session.char_name} left {guild['name']}", "GAME")
+
+    async def _on_guild_kick(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 8 or not session.guild_id:
+            return
+
+        target_entity = struct.unpack('<Q', payload[:8])[0]
+        gid = session.guild_id
+        if gid not in self.guilds:
+            return
+
+        guild = self.guilds[gid]
+        if guild["master_id"] != session.entity_id:
+            return  # not master
+
+        if target_entity == session.entity_id:
+            return  # cannot kick self
+
+        if target_entity not in guild["members"]:
+            return
+
+        # Remove target
+        guild["members"].remove(target_entity)
+        if target_entity in self.sessions:
+            target_session = self.sessions[target_entity]
+            target_session.guild_id = 0
+            empty_info = struct.pack('<BI', 0, 0) + b'\x00' * 42
+            self._send(target_session, MsgType.GUILD_INFO, empty_info)
+
+        # Notify remaining members
+        for member_id in guild["members"]:
+            if member_id in self.sessions:
+                self._send_guild_info(self.sessions[member_id])
+
+        self.log(f"GuildKick: {session.char_name} kicked entity {target_entity} from {guild['name']}", "GAME")
+
+    async def _on_guild_info_req(self, session: PlayerSession, payload: bytes):
+        if not session.in_game:
+            return
+        self._send_guild_info(session)
+
+    async def _on_guild_list_req(self, session: PlayerSession, payload: bytes):
+        if not session.in_game:
+            return
+
+        count = min(len(self.guilds), 255)
+        buf = struct.pack('<B', count)
+        for guild in list(self.guilds.values())[:255]:
+            name_bytes = guild["name"].encode('utf-8')[:32].ljust(32, b'\x00')
+            buf += struct.pack('<I', guild["id"])
+            buf += name_bytes
+            buf += struct.pack('<BB', len(guild["members"]), guild["level"])
+        self._send(session, MsgType.GUILD_LIST, buf)
+
+    def _send_guild_info(self, session: PlayerSession):
+        if not session.guild_id or session.guild_id not in self.guilds:
+            empty_info = struct.pack('<BI', 0, 0) + b'\x00' * 42
+            self._send(session, MsgType.GUILD_INFO, empty_info)
+            return
+
+        guild = self.guilds[session.guild_id]
+        name_bytes = guild["name"].encode('utf-8')[:32].ljust(32, b'\x00')
+        buf = struct.pack('<BI', 0, guild["id"])  # result=0 (success)
+        buf += name_bytes
+        buf += struct.pack('<QBB', guild["master_id"], len(guild["members"]), guild["level"])
+        self._send(session, MsgType.GUILD_INFO, buf)
+
+    # ━━━ 핸들러: 거래 ━━━
+
+    async def _on_trade_request(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 8:
+            return
+
+        target_entity = struct.unpack('<Q', payload[:8])[0]
+        if target_entity not in self.sessions:
+            self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 1))  # target not found
+            return
+
+        target_session = self.sessions[target_entity]
+        if not target_session.in_game or target_session.zone_id != session.zone_id:
+            self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 2))  # not in same zone
+            return
+
+        if session.trade_partner or target_session.trade_partner:
+            self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 3))  # already trading
+            return
+
+        # Create trade session for both
+        session.trade_partner = target_entity
+        session.trade_items = []
+        session.trade_gold = 0
+        session.trade_confirmed = False
+
+        target_session.trade_partner = session.entity_id
+        target_session.trade_items = []
+        target_session.trade_gold = 0
+        target_session.trade_confirmed = False
+
+        # Send request to target
+        name_bytes = session.char_name.encode('utf-8')[:32].ljust(32, b'\x00')
+        req_pkt = struct.pack('<Q', session.entity_id) + name_bytes
+        self._send(target_session, MsgType.TRADE_REQUEST, req_pkt)
+
+        # Send success to requester
+        self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 0))  # request sent
+
+        self.log(f"TradeRequest: {session.char_name} → {target_session.char_name}", "GAME")
+
+    async def _on_trade_accept(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 8:
+            return
+
+        requester_entity = struct.unpack('<Q', payload[:8])[0]
+        if session.trade_partner != requester_entity:
+            return
+
+        if requester_entity not in self.sessions:
+            return
+
+        requester = self.sessions[requester_entity]
+
+        # Send trade started to both
+        self._send(session, MsgType.TRADE_RESULT, struct.pack('<BQ', 0, requester_entity))
+        self._send(requester, MsgType.TRADE_RESULT, struct.pack('<BQ', 0, session.entity_id))
+
+        self.log(f"TradeAccept: {requester.char_name} ↔ {session.char_name}", "GAME")
+
+    async def _on_trade_decline(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.trade_partner:
+            return
+
+        partner_id = session.trade_partner
+        if partner_id in self.sessions:
+            partner = self.sessions[partner_id]
+            partner.trade_partner = 0
+            partner.trade_items = []
+            partner.trade_gold = 0
+            partner.trade_confirmed = False
+            self._send(partner, MsgType.TRADE_RESULT, struct.pack('<B', 3))  # declined
+
+        session.trade_partner = 0
+        session.trade_items = []
+        session.trade_gold = 0
+        session.trade_confirmed = False
+        self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 3))  # declined
+
+    async def _on_trade_add_item(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.trade_partner or len(payload) < 3:
+            return
+
+        slot_index, count = struct.unpack('<BH', payload[:3])
+        if slot_index >= len(session.inventory):
+            return
+
+        slot = session.inventory[slot_index]
+        if slot.item_id == 0 or slot.count < count:
+            return
+
+        # Add to trade items
+        session.trade_items.append({"slot": slot_index, "item_id": slot.item_id, "count": count})
+        session.trade_confirmed = False
+
+        partner_id = session.trade_partner
+        if partner_id in self.sessions:
+            partner = self.sessions[partner_id]
+            partner.trade_confirmed = False
+            # Send to partner
+            add_pkt = struct.pack('<BIH', slot_index, slot.item_id, count)
+            self._send(partner, MsgType.TRADE_ADD_ITEM, add_pkt)
+
+    async def _on_trade_add_gold(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.trade_partner or len(payload) < 4:
+            return
+
+        amount = struct.unpack('<I', payload[:4])[0]
+        if amount > session.gold:
+            return
+
+        session.trade_gold = amount
+        session.trade_confirmed = False
+
+        partner_id = session.trade_partner
+        if partner_id in self.sessions:
+            partner = self.sessions[partner_id]
+            partner.trade_confirmed = False
+            # Send to partner
+            self._send(partner, MsgType.TRADE_ADD_GOLD, struct.pack('<I', amount))
+
+    async def _on_trade_confirm(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.trade_partner:
+            return
+
+        session.trade_confirmed = True
+
+        partner_id = session.trade_partner
+        if partner_id not in self.sessions:
+            return
+
+        partner = self.sessions[partner_id]
+
+        # Check if both confirmed
+        if not partner.trade_confirmed:
+            # Send status to partner
+            return
+
+        # Execute trade
+        # Validate items still available
+        valid = True
+        for item in session.trade_items:
+            slot_idx = item["slot"]
+            if slot_idx >= len(session.inventory):
+                valid = False
+                break
+            slot = session.inventory[slot_idx]
+            if slot.item_id != item["item_id"] or slot.count < item["count"]:
+                valid = False
+                break
+
+        for item in partner.trade_items:
+            slot_idx = item["slot"]
+            if slot_idx >= len(partner.inventory):
+                valid = False
+                break
+            slot = partner.inventory[slot_idx]
+            if slot.item_id != item["item_id"] or slot.count < item["count"]:
+                valid = False
+                break
+
+        if not valid or session.gold < session.trade_gold or partner.gold < partner.trade_gold:
+            # Cancel trade
+            self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 5))  # validation failed
+            self._send(partner, MsgType.TRADE_RESULT, struct.pack('<B', 5))
+            session.trade_partner = 0
+            session.trade_items = []
+            session.trade_gold = 0
+            session.trade_confirmed = False
+            partner.trade_partner = 0
+            partner.trade_items = []
+            partner.trade_gold = 0
+            partner.trade_confirmed = False
+            return
+
+        # Remove items from session, give to partner
+        for item in session.trade_items:
+            slot_idx = item["slot"]
+            session.inventory[slot_idx].count -= item["count"]
+            if session.inventory[slot_idx].count <= 0:
+                session.inventory[slot_idx] = InventorySlot()
+            # Add to partner
+            empty_slot = self._find_empty_slot(partner)
+            if empty_slot >= 0:
+                partner.inventory[empty_slot].item_id = item["item_id"]
+                partner.inventory[empty_slot].count = item["count"]
+
+        # Remove items from partner, give to session
+        for item in partner.trade_items:
+            slot_idx = item["slot"]
+            partner.inventory[slot_idx].count -= item["count"]
+            if partner.inventory[slot_idx].count <= 0:
+                partner.inventory[slot_idx] = InventorySlot()
+            # Add to session
+            empty_slot = self._find_empty_slot(session)
+            if empty_slot >= 0:
+                session.inventory[empty_slot].item_id = item["item_id"]
+                session.inventory[empty_slot].count = item["count"]
+
+        # Transfer gold
+        session.gold -= session.trade_gold
+        partner.gold += session.trade_gold
+        partner.gold -= partner.trade_gold
+        session.gold += partner.trade_gold
+
+        # Send success
+        self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 0))  # complete
+        self._send(partner, MsgType.TRADE_RESULT, struct.pack('<B', 0))  # complete
+
+        self.log(f"TradeComplete: {session.char_name} ↔ {partner.char_name}", "GAME")
+
+        # Clear trade state
+        session.trade_partner = 0
+        session.trade_items = []
+        session.trade_gold = 0
+        session.trade_confirmed = False
+        partner.trade_partner = 0
+        partner.trade_items = []
+        partner.trade_gold = 0
+        partner.trade_confirmed = False
+
+    async def _on_trade_cancel(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or not session.trade_partner:
+            return
+
+        partner_id = session.trade_partner
+        if partner_id in self.sessions:
+            partner = self.sessions[partner_id]
+            partner.trade_partner = 0
+            partner.trade_items = []
+            partner.trade_gold = 0
+            partner.trade_confirmed = False
+            self._send(partner, MsgType.TRADE_RESULT, struct.pack('<B', 4))  # cancelled
+
+        session.trade_partner = 0
+        session.trade_items = []
+        session.trade_gold = 0
+        session.trade_confirmed = False
+        self._send(session, MsgType.TRADE_RESULT, struct.pack('<B', 4))  # cancelled
+
+    # ━━━ 핸들러: 우편 ━━━
+
+    async def _on_mail_send(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 3:
+            return
+
+        offset = 0
+        recipient_name_len = payload[offset]
+        offset += 1
+        if len(payload) < offset + recipient_name_len:
+            return
+        recipient_name = payload[offset:offset+recipient_name_len].decode('utf-8', errors='replace')
+        offset += recipient_name_len
+
+        if len(payload) < offset + 1:
+            return
+        subject_len = payload[offset]
+        offset += 1
+        if len(payload) < offset + subject_len:
+            return
+        subject = payload[offset:offset+subject_len].decode('utf-8', errors='replace')
+        offset += subject_len
+
+        if len(payload) < offset + 2:
+            return
+        body_len = struct.unpack_from('<H', payload, offset)[0]
+        offset += 2
+        if len(payload) < offset + body_len:
+            return
+        body = payload[offset:offset+body_len].decode('utf-8', errors='replace')
+        offset += body_len
+
+        if len(payload) < offset + 10:
+            return
+        gold, item_id, item_count = struct.unpack_from('<IIH', payload, offset)
+
+        # Find recipient
+        recipient_session = None
+        recipient_account_id = 0
+        for s in self.sessions.values():
+            if s.char_name == recipient_name:
+                recipient_session = s
+                recipient_account_id = s.account_id
+                break
+
+        if not recipient_session:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 1, 0))  # recipient not found
+            return
+
+        # Check resources
+        if gold > session.gold:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 2, 0))  # not enough gold
+            return
+
+        if item_id > 0:
+            # Check if player has item
+            has_item = False
+            for slot in session.inventory:
+                if slot.item_id == item_id and slot.count >= item_count:
+                    has_item = True
+                    slot.count -= item_count
+                    if slot.count <= 0:
+                        slot.item_id = 0
+                        slot.count = 0
+                    break
+            if not has_item:
+                self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 3, 0))  # item not found
+                return
+
+        # Deduct gold
+        session.gold -= gold
+
+        # Create mail
+        mail_id = self.next_mail_id
+        self.next_mail_id += 1
+        mail = {
+            "id": mail_id,
+            "sender_name": session.char_name,
+            "sender_account": session.account_id,
+            "subject": subject,
+            "body": body,
+            "gold": gold,
+            "item_id": item_id,
+            "item_count": item_count,
+            "read": False,
+            "claimed": False,
+            "sent_time": time.time(),
+            "expires": time.time() + 7 * 86400
+        }
+
+        if recipient_account_id not in self.mails:
+            self.mails[recipient_account_id] = []
+
+        if len(self.mails[recipient_account_id]) >= 50:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 4, 0))  # mailbox full
+            # Refund
+            session.gold += gold
+            if item_id > 0:
+                slot = self._find_empty_slot(session)
+                if slot >= 0:
+                    session.inventory[slot].item_id = item_id
+                    session.inventory[slot].count = item_count
+            return
+
+        self.mails[recipient_account_id].append(mail)
+
+        self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 0, mail_id))  # success
+        self.log(f"MailSend: {session.char_name} → {recipient_name} (id={mail_id})", "GAME")
+
+    async def _on_mail_list_req(self, session: PlayerSession, payload: bytes):
+        if not session.in_game:
+            return
+
+        account_id = session.account_id
+        if account_id not in self.mails:
+            self._send(session, MsgType.MAIL_LIST, struct.pack('<B', 0))
+            return
+
+        # Clean expired mails
+        now = time.time()
+        self.mails[account_id] = [m for m in self.mails[account_id] if m["expires"] > now]
+
+        mails = self.mails[account_id]
+        count = min(len(mails), 255)
+        buf = struct.pack('<B', count)
+        for mail in mails[:255]:
+            sender_name_bytes = mail["sender_name"].encode('utf-8')[:32].ljust(32, b'\x00')
+            subject_bytes = mail["subject"].encode('utf-8')[:64].ljust(64, b'\x00')
+            has_attachment = 1 if (mail["gold"] > 0 or mail["item_id"] > 0) else 0
+            buf += struct.pack('<I', mail["id"])
+            buf += sender_name_bytes
+            buf += subject_bytes
+            buf += struct.pack('<BBI', 1 if mail["read"] else 0, has_attachment, int(mail["sent_time"]))
+        self._send(session, MsgType.MAIL_LIST, buf)
+
+    async def _on_mail_read(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 4:
+            return
+
+        mail_id = struct.unpack('<I', payload[:4])[0]
+        account_id = session.account_id
+        if account_id not in self.mails:
+            self._send(session, MsgType.MAIL_READ_RESP, struct.pack('<BI', 1, mail_id) + b'\x00' * 200)
+            return
+
+        mail = next((m for m in self.mails[account_id] if m["id"] == mail_id), None)
+        if not mail:
+            self._send(session, MsgType.MAIL_READ_RESP, struct.pack('<BI', 1, mail_id) + b'\x00' * 200)
+            return
+
+        # Mark as read
+        mail["read"] = True
+
+        sender_name_bytes = mail["sender_name"].encode('utf-8')[:32].ljust(32, b'\x00')
+        subject_bytes = mail["subject"].encode('utf-8')[:64].ljust(64, b'\x00')
+        body_bytes = mail["body"].encode('utf-8')[:256]
+        buf = struct.pack('<BI', 0, mail_id)
+        buf += sender_name_bytes
+        buf += subject_bytes
+        buf += struct.pack('<H', len(body_bytes)) + body_bytes
+        buf += struct.pack('<IIH', mail["gold"], mail["item_id"], mail["item_count"])
+        self._send(session, MsgType.MAIL_READ_RESP, buf)
+
+    async def _on_mail_claim(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 4:
+            return
+
+        mail_id = struct.unpack('<I', payload[:4])[0]
+        account_id = session.account_id
+        if account_id not in self.mails:
+            self._send(session, MsgType.MAIL_CLAIM_RESULT, struct.pack('<BIIIH', 1, mail_id, 0, 0, 0))
+            return
+
+        mail = next((m for m in self.mails[account_id] if m["id"] == mail_id), None)
+        if not mail:
+            self._send(session, MsgType.MAIL_CLAIM_RESULT, struct.pack('<BIIIH', 1, mail_id, 0, 0, 0))
+            return
+
+        if mail["claimed"]:
+            self._send(session, MsgType.MAIL_CLAIM_RESULT, struct.pack('<BIIIH', 2, mail_id, 0, 0, 0))  # already claimed
+            return
+
+        if mail["gold"] == 0 and mail["item_id"] == 0:
+            self._send(session, MsgType.MAIL_CLAIM_RESULT, struct.pack('<BIIIH', 3, mail_id, 0, 0, 0))  # no attachment
+            return
+
+        # Give gold
+        session.gold += mail["gold"]
+
+        # Give item
+        if mail["item_id"] > 0:
+            slot = self._find_empty_slot(session)
+            if slot >= 0:
+                session.inventory[slot].item_id = mail["item_id"]
+                session.inventory[slot].count = mail["item_count"]
+            else:
+                # Inventory full, can't claim
+                session.gold -= mail["gold"]
+                self._send(session, MsgType.MAIL_CLAIM_RESULT, struct.pack('<BIIIH', 4, mail_id, 0, 0, 0))  # inventory full
+                return
+
+        mail["claimed"] = True
+        self._send(session, MsgType.MAIL_CLAIM_RESULT,
+                    struct.pack('<BIIIH', 0, mail_id, mail["gold"], mail["item_id"], mail["item_count"]))
+
+    async def _on_mail_delete(self, session: PlayerSession, payload: bytes):
+        if not session.in_game or len(payload) < 4:
+            return
+
+        mail_id = struct.unpack('<I', payload[:4])[0]
+        account_id = session.account_id
+        if account_id not in self.mails:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 1, mail_id))
+            return
+
+        mail = next((m for m in self.mails[account_id] if m["id"] == mail_id), None)
+        if not mail:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 1, mail_id))
+            return
+
+        # Check if attachment claimed
+        if (mail["gold"] > 0 or mail["item_id"] > 0) and not mail["claimed"]:
+            self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 2, mail_id))  # unclaimed attachment
+            return
+
+        # Delete mail
+        self.mails[account_id].remove(mail)
+        self._send(session, MsgType.MAIL_DELETE_RESULT, struct.pack('<BI', 0, mail_id))
+
     # ━━━ 몬스터 시스템 ━━━
 
     def _spawn_monsters(self):
@@ -1756,7 +2512,8 @@ def main():
     print(f"  Port: {args.port}")
     print(f"  Protocol: PacketComponents.h compatible")
     print(f"  Handlers: Login, Move, Chat, Shop, Skill,")
-    print(f"            Party, Inventory, Quest, Boss, AI")
+    print(f"            Party, Inventory, Quest, Boss, AI,")
+    print(f"            Guild, Trade, Mail")
     print("=" * 50)
     print()
 
