@@ -120,6 +120,9 @@ public static class SceneValidator
         Check("GameScene: PartyManager 존재", objectNames.Contains("PartyManager"));
         Check("GameScene: BuffManager 존재", objectNames.Contains("BuffManager"));
         Check("GameScene: QuestManager 존재", objectNames.Contains("QuestManager"));
+        Check("GameScene: ChatManager 존재", objectNames.Contains("ChatManager"));
+        Check("GameScene: ShopManager 존재", objectNames.Contains("ShopManager"));
+        Check("GameScene: BossManager 존재", objectNames.Contains("BossManager"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인

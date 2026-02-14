@@ -94,13 +94,14 @@ namespace Network
             return Build(MsgType.RESPAWN_REQ);
         }
 
-        /// <summary>MOVE: 위치 전송</summary>
-        public static byte[] Move(float x, float y, float z)
+        /// <summary>MOVE: 위치 전송 (Model C: +timestamp 16B)</summary>
+        public static byte[] Move(float x, float y, float z, uint timestampMs = 0)
         {
-            byte[] payload = new byte[12];
+            byte[] payload = new byte[16];
             BitConverter.GetBytes(x).CopyTo(payload, 0);
             BitConverter.GetBytes(y).CopyTo(payload, 4);
             BitConverter.GetBytes(z).CopyTo(payload, 8);
+            BitConverter.GetBytes(timestampMs).CopyTo(payload, 12);
             return Build(MsgType.MOVE, payload);
         }
 
@@ -299,7 +300,7 @@ namespace Network
             return Build(MsgType.SKILL_LIST_REQ);
         }
 
-        /// <summary>SKILL_LIST_RESP 파싱: count(1) {id(4) name(16) cd_ms(4) dmg(4) mp(4) range(4) type(1)}*N = 37B/entry</summary>
+        /// <summary>SKILL_LIST_RESP 파싱: count(1) {id(4) name(16) cd_ms(4) dmg(4) mp(4) range(4) type(1) level(1) effect(1) min_level(4)}*N = 43B/entry</summary>
         public static SkillInfo[] ParseSkillListResp(byte[] payload)
         {
             byte count = payload[0];
@@ -321,6 +322,13 @@ namespace Network
                 s.ManaCost   = BitConverter.ToUInt32(payload, off); off += 4;
                 s.Range      = BitConverter.ToUInt32(payload, off); off += 4;
                 s.SkillType  = payload[off]; off += 1;
+                // 세션 33 확장 필드 (하위호환: 43B entry일 때만)
+                if (off + 6 <= payload.Length && (off - 1 + 6) <= 1 + count * 43)
+                {
+                    s.Level    = payload[off]; off += 1;
+                    s.Effect   = (SkillEffect)payload[off]; off += 1;
+                    s.MinLevel = BitConverter.ToInt32(payload, off); off += 4;
+                }
                 skills[i] = s;
             }
 
@@ -733,6 +741,297 @@ namespace Network
             d.RewardExp       = BitConverter.ToUInt32(payload, 5);
             d.RewardItemId    = BitConverter.ToUInt32(payload, 9);
             d.RewardItemCount = BitConverter.ToUInt16(payload, 13);
+            return d;
+        }
+
+        // ━━━ 세션 35: 이동 검증 (Model C) ━━━
+
+        /// <summary>POSITION_CORRECTION 파싱: x(4f) y(4f) z(4f) = 12B</summary>
+        public static (float x, float y, float z) ParsePositionCorrection(byte[] payload)
+        {
+            float x = BitConverter.ToSingle(payload, 0);
+            float y = BitConverter.ToSingle(payload, 4);
+            float z = BitConverter.ToSingle(payload, 8);
+            return (x, y, z);
+        }
+
+        // ━━━ 세션 30: 채팅 ━━━
+
+        /// <summary>CHAT_SEND 빌드: channel(1) msg_len(1) message(N)</summary>
+        public static byte[] ChatSend(ChatChannel channel, string message)
+        {
+            byte[] msgBytes = Encoding.UTF8.GetBytes(message);
+            byte[] payload = new byte[2 + msgBytes.Length];
+            payload[0] = (byte)channel;
+            payload[1] = (byte)msgBytes.Length;
+            Buffer.BlockCopy(msgBytes, 0, payload, 2, msgBytes.Length);
+            return Build(MsgType.CHAT_SEND, payload);
+        }
+
+        /// <summary>WHISPER_SEND 빌드: target_name_len(1) target_name(N) msg_len(1) message(N)</summary>
+        public static byte[] WhisperSend(string targetName, string message)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(targetName);
+            byte[] msgBytes = Encoding.UTF8.GetBytes(message);
+            byte[] payload = new byte[1 + nameBytes.Length + 1 + msgBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            payload[1 + nameBytes.Length] = (byte)msgBytes.Length;
+            Buffer.BlockCopy(msgBytes, 0, payload, 2 + nameBytes.Length, msgBytes.Length);
+            return Build(MsgType.WHISPER_SEND, payload);
+        }
+
+        /// <summary>CHAT_MESSAGE 파싱: channel(1) sender_entity(8) sender_name(32) msg_len(1) message(N)</summary>
+        public static ChatMessageData ParseChatMessage(byte[] payload)
+        {
+            var d = new ChatMessageData();
+            d.Channel = (ChatChannel)payload[0];
+            d.SenderEntityId = BitConverter.ToUInt64(payload, 1);
+            // sender_name: 32바이트 null-terminated
+            int nameEnd = 9;
+            while (nameEnd < 9 + 32 && payload[nameEnd] != 0) nameEnd++;
+            d.SenderName = Encoding.UTF8.GetString(payload, 9, nameEnd - 9);
+            byte msgLen = payload[41];
+            d.Message = Encoding.UTF8.GetString(payload, 42, msgLen);
+            return d;
+        }
+
+        /// <summary>WHISPER_RESULT 파싱: result(1) direction(1) other_name(32) msg_len(1) message(N)</summary>
+        public static WhisperResultData ParseWhisperResult(byte[] payload)
+        {
+            var d = new WhisperResultData();
+            d.Result = (WhisperResult)payload[0];
+            d.Direction = (WhisperDirection)payload[1];
+            // other_name: 32바이트 null-terminated
+            int nameEnd = 2;
+            while (nameEnd < 2 + 32 && payload[nameEnd] != 0) nameEnd++;
+            d.OtherName = Encoding.UTF8.GetString(payload, 2, nameEnd - 2);
+            byte msgLen = payload[34];
+            d.Message = Encoding.UTF8.GetString(payload, 35, msgLen);
+            return d;
+        }
+
+        /// <summary>SYSTEM_MESSAGE 파싱: msg_len(1) message(N)</summary>
+        public static string ParseSystemMessage(byte[] payload)
+        {
+            byte msgLen = payload[0];
+            return Encoding.UTF8.GetString(payload, 1, msgLen);
+        }
+
+        // ━━━ 세션 32: NPC 상점 ━━━
+
+        /// <summary>SHOP_OPEN 빌드: npc_id(4)</summary>
+        public static byte[] ShopOpen(uint npcId)
+        {
+            return Build(MsgType.SHOP_OPEN, BitConverter.GetBytes(npcId));
+        }
+
+        /// <summary>SHOP_BUY 빌드: npc_id(4) item_id(4) count(2) = 10B</summary>
+        public static byte[] ShopBuy(uint npcId, uint itemId, ushort count)
+        {
+            byte[] payload = new byte[10];
+            BitConverter.GetBytes(npcId).CopyTo(payload, 0);
+            BitConverter.GetBytes(itemId).CopyTo(payload, 4);
+            BitConverter.GetBytes(count).CopyTo(payload, 8);
+            return Build(MsgType.SHOP_BUY, payload);
+        }
+
+        /// <summary>SHOP_SELL 빌드: slot(1) count(2) = 3B</summary>
+        public static byte[] ShopSell(byte slot, ushort count)
+        {
+            byte[] payload = new byte[3];
+            payload[0] = slot;
+            BitConverter.GetBytes(count).CopyTo(payload, 1);
+            return Build(MsgType.SHOP_SELL, payload);
+        }
+
+        /// <summary>SHOP_LIST 파싱: npc_id(4) count(1) {item_id(4) price(4) stock(2)}*N = 10B/entry</summary>
+        public static ShopListData ParseShopList(byte[] payload)
+        {
+            var d = new ShopListData();
+            d.NpcId = BitConverter.ToUInt32(payload, 0);
+            byte count = payload[4];
+            d.Items = new ShopItemInfo[count];
+            int off = 5;
+            for (int i = 0; i < count; i++)
+            {
+                var it = new ShopItemInfo();
+                it.ItemId = BitConverter.ToUInt32(payload, off); off += 4;
+                it.Price  = BitConverter.ToUInt32(payload, off); off += 4;
+                it.Stock  = BitConverter.ToInt16(payload, off); off += 2;
+                d.Items[i] = it;
+            }
+            return d;
+        }
+
+        /// <summary>SHOP_RESULT 파싱: result(1) action(1) item_id(4) count(2) gold(4) = 12B</summary>
+        public static ShopResultData ParseShopResult(byte[] payload)
+        {
+            var d = new ShopResultData();
+            d.Result = (ShopResult)payload[0];
+            d.Action = (ShopAction)payload[1];
+            d.ItemId = BitConverter.ToUInt32(payload, 2);
+            d.Count  = BitConverter.ToUInt16(payload, 6);
+            d.Gold   = BitConverter.ToUInt32(payload, 8);
+            return d;
+        }
+
+        // ━━━ 세션 33: 스킬 레벨업 ━━━
+
+        /// <summary>SKILL_LEVEL_UP 빌드: skill_id(4)</summary>
+        public static byte[] SkillLevelUp(uint skillId)
+        {
+            return Build(MsgType.SKILL_LEVEL_UP, BitConverter.GetBytes(skillId));
+        }
+
+        /// <summary>SKILL_LEVEL_UP_RESULT 파싱: result(1) skill_id(4) new_level(1) skill_points(4) = 10B</summary>
+        public static SkillLevelUpResultData ParseSkillLevelUpResult(byte[] payload)
+        {
+            var d = new SkillLevelUpResultData();
+            d.Result      = (SkillLevelUpResult)payload[0];
+            d.SkillId     = BitConverter.ToUInt32(payload, 1);
+            d.NewLevel    = payload[5];
+            d.SkillPoints = BitConverter.ToUInt32(payload, 6);
+            return d;
+        }
+
+        /// <summary>SKILL_POINT_INFO 파싱: skill_points(4) total_spent(4) = 8B</summary>
+        public static SkillPointInfoData ParseSkillPointInfo(byte[] payload)
+        {
+            var d = new SkillPointInfoData();
+            d.SkillPoints = BitConverter.ToUInt32(payload, 0);
+            d.TotalSpent  = BitConverter.ToUInt32(payload, 4);
+            return d;
+        }
+
+        // ━━━ 세션 34: 보스 메카닉 ━━━
+
+        /// <summary>BOSS_SPAWN 파싱: entity(8) boss_id(4) name(32) level(4) hp(4) max_hp(4) phase(1) = 57B</summary>
+        public static BossSpawnData ParseBossSpawn(byte[] payload)
+        {
+            var d = new BossSpawnData();
+            d.EntityId = BitConverter.ToUInt64(payload, 0);
+            d.BossId   = BitConverter.ToUInt32(payload, 8);
+            // name: 32바이트 null-terminated
+            int nameEnd = 12;
+            while (nameEnd < 12 + 32 && payload[nameEnd] != 0) nameEnd++;
+            d.Name = Encoding.UTF8.GetString(payload, 12, nameEnd - 12);
+            d.Level = BitConverter.ToInt32(payload, 44);
+            d.HP    = BitConverter.ToInt32(payload, 48);
+            d.MaxHP = BitConverter.ToInt32(payload, 52);
+            d.Phase = payload[56];
+            return d;
+        }
+
+        /// <summary>BOSS_PHASE_CHANGE 파싱: entity(8) boss_id(4) new_phase(1) hp(4) max_hp(4) = 21B</summary>
+        public static BossPhaseChangeData ParseBossPhaseChange(byte[] payload)
+        {
+            var d = new BossPhaseChangeData();
+            d.EntityId = BitConverter.ToUInt64(payload, 0);
+            d.BossId   = BitConverter.ToUInt32(payload, 8);
+            d.NewPhase = payload[12];
+            d.HP       = BitConverter.ToInt32(payload, 13);
+            d.MaxHP    = BitConverter.ToInt32(payload, 17);
+            return d;
+        }
+
+        /// <summary>BOSS_SPECIAL_ATTACK 파싱: entity(8) boss_id(4) attack_type(1) damage(4) = 17B</summary>
+        public static BossSpecialAttackData ParseBossSpecialAttack(byte[] payload)
+        {
+            var d = new BossSpecialAttackData();
+            d.EntityId   = BitConverter.ToUInt64(payload, 0);
+            d.BossId     = BitConverter.ToUInt32(payload, 8);
+            d.AttackType = (BossAttackType)payload[12];
+            d.Damage     = BitConverter.ToInt32(payload, 13);
+            return d;
+        }
+
+        /// <summary>BOSS_ENRAGE 파싱: entity(8) boss_id(4) = 12B</summary>
+        public static BossEnrageData ParseBossEnrage(byte[] payload)
+        {
+            var d = new BossEnrageData();
+            d.EntityId = BitConverter.ToUInt64(payload, 0);
+            d.BossId   = BitConverter.ToUInt32(payload, 8);
+            return d;
+        }
+
+        /// <summary>BOSS_DEFEATED 파싱: entity(8) boss_id(4) killer_entity(8) = 20B</summary>
+        public static BossDefeatedData ParseBossDefeated(byte[] payload)
+        {
+            var d = new BossDefeatedData();
+            d.EntityId       = BitConverter.ToUInt64(payload, 0);
+            d.BossId         = BitConverter.ToUInt32(payload, 8);
+            d.KillerEntityId = BitConverter.ToUInt64(payload, 12);
+            return d;
+        }
+
+        // ━━━ 세션 36: 몬스터 AI ━━━
+
+        /// <summary>MONSTER_MOVE 파싱: entity(8) x(4f) y(4f) z(4f) = 20B</summary>
+        public static MonsterMoveData ParseMonsterMove(byte[] payload)
+        {
+            var d = new MonsterMoveData();
+            d.EntityId = BitConverter.ToUInt64(payload, 0);
+            d.X = BitConverter.ToSingle(payload, 8);
+            d.Y = BitConverter.ToSingle(payload, 12);
+            d.Z = BitConverter.ToSingle(payload, 16);
+            return d;
+        }
+
+        /// <summary>MONSTER_AGGRO 파싱: monster_entity(8) target_entity(8) = 16B</summary>
+        public static MonsterAggroData ParseMonsterAggro(byte[] payload)
+        {
+            var d = new MonsterAggroData();
+            d.MonsterEntityId = BitConverter.ToUInt64(payload, 0);
+            d.TargetEntityId  = BitConverter.ToUInt64(payload, 8);
+            return d;
+        }
+
+        // ━━━ 세션 37: 어드민/핫리로드 ━━━
+
+        /// <summary>ADMIN_RELOAD 빌드: name_len(1) name(N)</summary>
+        public static byte[] AdminReload(string configName = "")
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(configName);
+            byte[] payload = new byte[1 + nameBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            if (nameBytes.Length > 0)
+                Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            return Build(MsgType.ADMIN_RELOAD, payload);
+        }
+
+        /// <summary>ADMIN_GET_CONFIG 빌드: name_len(1) name(N) key_len(1) key(N)</summary>
+        public static byte[] AdminGetConfig(string configName, string key)
+        {
+            byte[] nameBytes = Encoding.UTF8.GetBytes(configName);
+            byte[] keyBytes = Encoding.UTF8.GetBytes(key);
+            byte[] payload = new byte[1 + nameBytes.Length + 1 + keyBytes.Length];
+            payload[0] = (byte)nameBytes.Length;
+            Buffer.BlockCopy(nameBytes, 0, payload, 1, nameBytes.Length);
+            payload[1 + nameBytes.Length] = (byte)keyBytes.Length;
+            Buffer.BlockCopy(keyBytes, 0, payload, 2 + nameBytes.Length, keyBytes.Length);
+            return Build(MsgType.ADMIN_GET_CONFIG, payload);
+        }
+
+        /// <summary>ADMIN_RELOAD_RESULT 파싱: result(1) version(4) reload_count(4) name_len(1) name(N)</summary>
+        public static AdminReloadResultData ParseAdminReloadResult(byte[] payload)
+        {
+            var d = new AdminReloadResultData();
+            d.Result      = payload[0];
+            d.Version     = BitConverter.ToUInt32(payload, 1);
+            d.ReloadCount = BitConverter.ToUInt32(payload, 5);
+            byte nameLen = payload[9];
+            d.Name = nameLen > 0 ? Encoding.UTF8.GetString(payload, 10, nameLen) : "";
+            return d;
+        }
+
+        /// <summary>ADMIN_CONFIG_RESP 파싱: found(1) value_len(2) value(N)</summary>
+        public static AdminConfigRespData ParseAdminConfigResp(byte[] payload)
+        {
+            var d = new AdminConfigRespData();
+            d.Found = payload[0] == 1;
+            ushort valueLen = BitConverter.ToUInt16(payload, 1);
+            d.Value = valueLen > 0 ? Encoding.UTF8.GetString(payload, 3, valueLen) : "";
             return d;
         }
     }

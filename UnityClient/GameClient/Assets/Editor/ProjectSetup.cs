@@ -229,6 +229,9 @@ public static class ProjectSetup
         var partyManagerGo = CreateManagerObject("PartyManager", typeof(PartyManager));
         var buffManagerGo = CreateManagerObject("BuffManager", typeof(BuffManager));
         var questManagerGo = CreateManagerObject("QuestManager", typeof(QuestManager));
+        var chatManagerGo = CreateManagerObject("ChatManager", typeof(ChatManager));
+        var shopManagerGo = CreateManagerObject("ShopManager", typeof(ShopManager));
+        var bossManagerGo = CreateManagerObject("BossManager", typeof(BossManager));
 
         // --- UI Canvas ---
         CreateUICanvas(scene);

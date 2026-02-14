@@ -120,6 +120,38 @@ class Msg:
     QUEST_ACCEPT_RESULT  = 233
     QUEST_COMPLETE       = 235
     QUEST_COMPLETE_RESULT = 236
+    # Session 30: Chat
+    CHAT_SEND            = 240
+    CHAT_MESSAGE         = 241
+    WHISPER_SEND         = 242
+    WHISPER_RESULT       = 243
+    SYSTEM_MESSAGE       = 244
+    # Session 30: Shop
+    SHOP_OPEN            = 250
+    SHOP_LIST            = 251
+    SHOP_BUY             = 252
+    SHOP_SELL            = 253
+    SHOP_RESULT          = 254
+    # Session 30: Skill Expansion
+    SKILL_LEVEL_UP       = 260
+    SKILL_LEVEL_UP_RESULT = 261
+    SKILL_POINT_INFO     = 262
+    # Session 30: Boss
+    BOSS_SPAWN           = 270
+    BOSS_PHASE_CHANGE    = 271
+    BOSS_SPECIAL_ATTACK  = 272
+    BOSS_ENRAGE          = 273
+    BOSS_DEFEATED        = 274
+    # Session 30: Movement Validation
+    POSITION_CORRECTION  = 15
+    # Session 30: Monster AI
+    MONSTER_MOVE         = 111
+    MONSTER_AGGRO        = 112
+    # Session 30: Admin
+    ADMIN_RELOAD         = 280
+    ADMIN_RELOAD_RESULT  = 281
+    ADMIN_GET_CONFIG     = 282
+    ADMIN_CONFIG_RESP    = 283
 
     _NAMES = {
         1: "ECHO", 2: "PING",
@@ -153,6 +185,16 @@ class Msg:
         230: "QUEST_LIST_REQ", 231: "QUEST_LIST_RESP",
         232: "QUEST_ACCEPT", 233: "QUEST_ACCEPT_RESULT",
         235: "QUEST_COMPLETE", 236: "QUEST_COMPLETE_RESULT",
+        240: "CHAT_SEND", 241: "CHAT_MESSAGE", 242: "WHISPER_SEND",
+        243: "WHISPER_RESULT", 244: "SYSTEM_MESSAGE",
+        250: "SHOP_OPEN", 251: "SHOP_LIST", 252: "SHOP_BUY",
+        253: "SHOP_SELL", 254: "SHOP_RESULT",
+        260: "SKILL_LEVEL_UP", 261: "SKILL_LEVEL_UP_RESULT", 262: "SKILL_POINT_INFO",
+        270: "BOSS_SPAWN", 271: "BOSS_PHASE_CHANGE", 272: "BOSS_SPECIAL_ATTACK",
+        273: "BOSS_ENRAGE", 274: "BOSS_DEFEATED",
+        15: "POSITION_CORRECTION", 111: "MONSTER_MOVE", 112: "MONSTER_AGGRO",
+        280: "ADMIN_RELOAD", 281: "ADMIN_RELOAD_RESULT",
+        282: "ADMIN_GET_CONFIG", 283: "ADMIN_CONFIG_RESP",
     }
 
     @classmethod
@@ -235,6 +277,31 @@ QUEST_TEMPLATES = {
     1: {"name": "Slime Hunt",     "target": 5,  "reward_exp": 100, "reward_item_id": 1001, "reward_count": 3},
     2: {"name": "Wolf Extermination", "target": 3,  "reward_exp": 300, "reward_item_id": 1003, "reward_count": 1},
     3: {"name": "Exploration",    "target": 1,  "reward_exp": 50,  "reward_item_id": 0,    "reward_count": 0},
+}
+
+# ━━━ Shop (session 30) ━━━
+SHOP_ITEMS = {
+    1: [  # General Shop (npc_id=1)
+        {"item_id": 1001, "price": 50,  "stock": -1},  # HP Potion, infinite
+        {"item_id": 1002, "price": 80,  "stock": -1},  # MP Potion, infinite
+        {"item_id": 1003, "price": 200, "stock": 10},   # Elixir, limited
+    ],
+    2: [  # Weapon Shop (npc_id=2)
+        {"item_id": 2001, "price": 500,  "stock": 5},   # Iron Sword
+        {"item_id": 2002, "price": 1200, "stock": 3},   # Steel Sword
+    ],
+    3: [  # Armor Shop (npc_id=3)
+        {"item_id": 3001, "price": 400,  "stock": 5},   # Leather Armor
+        {"item_id": 3002, "price": 1000, "stock": 3},   # Chain Mail
+    ],
+}
+SELL_PRICE_RATIO = 0.4
+
+# ━━━ Boss (session 30) ━━━
+BOSS_TEMPLATES = {
+    100: {"name": "AncientGolem", "level": 20, "hp": 5000, "max_hp": 5000, "phases": 3},
+    101: {"name": "Dragon",       "level": 30, "hp": 10000, "max_hp": 10000, "phases": 4},
+    102: {"name": "DemonKing",    "level": 50, "hp": 20000, "max_hp": 20000, "phases": 5},
 }
 
 
@@ -435,6 +502,111 @@ def build_quest_complete_result(result, quest_id, reward_exp, reward_item_id, re
         struct.pack("<BIIIH", result, quest_id, reward_exp, reward_item_id, reward_item_count))
 
 
+def build_chat_message(channel, sender_name, message):
+    """CHAT_MESSAGE(241): channel(u8) sender_len(u8) sender(var) msg_len(u16) msg(var)"""
+    sender_bytes = sender_name.encode("utf-8")
+    msg_bytes = message.encode("utf-8")
+    payload = struct.pack("<BB", channel, len(sender_bytes)) + sender_bytes
+    payload += struct.pack("<H", len(msg_bytes)) + msg_bytes
+    return build_packet(Msg.CHAT_MESSAGE, payload)
+
+
+def build_whisper_result(result, direction, partner_name, message):
+    """WHISPER_RESULT(243): result(u8) direction(u8) name_len(u8) name(var) msg_len(u16) msg(var)"""
+    name_bytes = partner_name.encode("utf-8")
+    msg_bytes = message.encode("utf-8")
+    payload = struct.pack("<BBB", result, direction, len(name_bytes)) + name_bytes
+    payload += struct.pack("<H", len(msg_bytes)) + msg_bytes
+    return build_packet(Msg.WHISPER_RESULT, payload)
+
+
+def build_system_message(message):
+    """SYSTEM_MESSAGE(244): msg_len(u16) msg(var)"""
+    msg_bytes = message.encode("utf-8")
+    payload = struct.pack("<H", len(msg_bytes)) + msg_bytes
+    return build_packet(Msg.SYSTEM_MESSAGE, payload)
+
+
+def build_shop_list(npc_id, items):
+    """SHOP_LIST(251): npc_id(u32) count(u8) + {item_id(u32) price(u32) stock(i16)}*N = 10B/entry"""
+    payload = struct.pack("<IB", npc_id, len(items))
+    for it in items:
+        payload += struct.pack("<IIh", it["item_id"], it["price"], it["stock"])
+    return build_packet(Msg.SHOP_LIST, payload)
+
+
+def build_shop_result(result, action, item_id, count, gold):
+    """SHOP_RESULT(254): result(u8) action(u8) item_id(u32) count(u8) gold(u32) = 11B"""
+    return build_packet(Msg.SHOP_RESULT, struct.pack("<BBIBI", result, action, item_id, count, gold))
+
+
+def build_skill_level_up_result(result, skill_id, new_level):
+    """SKILL_LEVEL_UP_RESULT(261): result(u8) skill_id(u32) new_level(u8) = 6B"""
+    return build_packet(Msg.SKILL_LEVEL_UP_RESULT, struct.pack("<BIB", result, skill_id, new_level))
+
+
+def build_skill_point_info(skill_points, total_used):
+    """SKILL_POINT_INFO(262): skill_points(u32) total_used(u32) = 8B"""
+    return build_packet(Msg.SKILL_POINT_INFO, struct.pack("<II", skill_points, total_used))
+
+
+def build_boss_spawn(entity_id, boss_id, name, level, hp, max_hp, phase, x, y, z):
+    """BOSS_SPAWN(270): entity(u64) boss_id(u32) name(32B) level(u32) hp(i32) max_hp(i32) phase(u8) x(f32) y(f32) z(f32)"""
+    name_bytes = name.encode("utf-8")[:32]
+    name_fixed = name_bytes + b"\x00" * (32 - len(name_bytes))
+    payload = struct.pack("<QI", entity_id, boss_id) + name_fixed
+    payload += struct.pack("<IiiBfff", level, hp, max_hp, phase, x, y, z)
+    return build_packet(Msg.BOSS_SPAWN, payload)
+
+
+def build_boss_phase_change(entity_id, new_phase, hp, max_hp):
+    """BOSS_PHASE_CHANGE(271): entity(u64) new_phase(u8) hp(i32) max_hp(i32) = 17B"""
+    return build_packet(Msg.BOSS_PHASE_CHANGE, struct.pack("<QBii", entity_id, new_phase, hp, max_hp))
+
+
+def build_boss_special_attack(entity_id, attack_type, damage, x, y, z, radius):
+    """BOSS_SPECIAL_ATTACK(272): entity(u64) attack_type(u8) damage(i32) x(f32) y(f32) z(f32) radius(f32)"""
+    return build_packet(Msg.BOSS_SPECIAL_ATTACK,
+        struct.pack("<QBiffff", entity_id, attack_type, damage, x, y, z, radius))
+
+
+def build_boss_enrage(entity_id, hp, max_hp):
+    """BOSS_ENRAGE(273): entity(u64) hp(i32) max_hp(i32) = 16B"""
+    return build_packet(Msg.BOSS_ENRAGE, struct.pack("<Qii", entity_id, hp, max_hp))
+
+
+def build_boss_defeated(entity_id, killer_id, reward_exp):
+    """BOSS_DEFEATED(274): entity(u64) killer(u64) reward_exp(u32) = 20B"""
+    return build_packet(Msg.BOSS_DEFEATED, struct.pack("<QQI", entity_id, killer_id, reward_exp))
+
+
+def build_monster_move(entity_id, x, y, z, speed):
+    """MONSTER_MOVE(111): entity(u64) x(f32) y(f32) z(f32) speed(f32) = 24B"""
+    return build_packet(Msg.MONSTER_MOVE, struct.pack("<Qffff", entity_id, x, y, z, speed))
+
+
+def build_monster_aggro(monster_entity, target_entity):
+    """MONSTER_AGGRO(112): monster(u64) target(u64) = 16B"""
+    return build_packet(Msg.MONSTER_AGGRO, struct.pack("<QQ", monster_entity, target_entity))
+
+
+def build_position_correction(x, y, z):
+    """POSITION_CORRECTION(15): x(f32) y(f32) z(f32) = 12B"""
+    return build_packet(Msg.POSITION_CORRECTION, struct.pack("<fff", x, y, z))
+
+
+def build_admin_reload_result(result, message):
+    """ADMIN_RELOAD_RESULT(281): result(u8) msg_len(u16) msg(var)"""
+    msg_bytes = message.encode("utf-8")
+    return build_packet(Msg.ADMIN_RELOAD_RESULT, struct.pack("<BH", result, len(msg_bytes)) + msg_bytes)
+
+
+def build_admin_config_resp(config_json):
+    """ADMIN_CONFIG_RESP(283): json_len(u32) json(var)"""
+    json_bytes = config_json.encode("utf-8")
+    return build_packet(Msg.ADMIN_CONFIG_RESP, struct.pack("<I", len(json_bytes)) + json_bytes)
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Monster Entity (NPC)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -564,6 +736,10 @@ class ClientSession:
         self.in_instance = False
         self.instance_id = 0
         self.in_queue = False
+        self.gold = 1000               # starting gold
+        self.skill_points = 5          # starting skill points
+        self.skill_levels = {}         # skill_id -> level
+        self.char_name = "Unknown"     # for chat
 
     def send_safe(self, data):
         """Thread-safe send."""
@@ -727,6 +903,30 @@ class ClientSession:
         elif msg_type == Msg.QUEST_COMPLETE:
             self._on_quest_complete(payload)
 
+        # Session 30: Chat
+        elif msg_type == Msg.CHAT_SEND:
+            self._on_chat_send(payload)
+        elif msg_type == Msg.WHISPER_SEND:
+            self._on_whisper_send(payload)
+
+        # Session 30: Shop
+        elif msg_type == Msg.SHOP_OPEN:
+            self._on_shop_open(payload)
+        elif msg_type == Msg.SHOP_BUY:
+            self._on_shop_buy(payload)
+        elif msg_type == Msg.SHOP_SELL:
+            self._on_shop_sell(payload)
+
+        # Session 30: Skill Expansion
+        elif msg_type == Msg.SKILL_LEVEL_UP:
+            self._on_skill_level_up(payload)
+
+        # Session 30: Admin
+        elif msg_type == Msg.ADMIN_RELOAD:
+            self._on_admin_reload(payload)
+        elif msg_type == Msg.ADMIN_GET_CONFIG:
+            self._on_admin_get_config(payload)
+
         else:
             print(f"[{self.addr}] Unhandled: {name} (len={len(payload)})")
 
@@ -772,6 +972,7 @@ class ClientSession:
             return
 
         self.char_id = char_id
+        self.char_name = char["name"]
         self.entity_id = self.world.alloc_entity_id()
         self.stats = dict(CHAR_STATS.get(char_id, {
             "level": 1, "hp": 100, "max_hp": 100, "mp": 50, "max_mp": 50,
@@ -817,6 +1018,10 @@ class ClientSession:
 
     def _on_move(self, payload):
         x, y, z = struct.unpack_from("<fff", payload, 0)
+        # Model C: optional timestamp_ms at offset 12
+        timestamp_ms = 0
+        if len(payload) >= 16:
+            timestamp_ms = struct.unpack_from("<I", payload, 12)[0]
         self.pos = (x, y, z)
         if self.entity_id:
             self.world.broadcast_zone(self.zone,
@@ -1133,6 +1338,116 @@ class ClientSession:
             0, quest_id, tmpl["reward_exp"], tmpl["reward_item_id"], tmpl["reward_count"]))
         self.send_safe(build_stat_sync(self.stats))
         print(f"[{self.addr}] QuestComplete: {tmpl['name']} (+{tmpl['reward_exp']} EXP)")
+
+    # ── Chat (session 30) ──
+
+    def _on_chat_send(self, payload):
+        channel = payload[0]
+        msg_len = struct.unpack_from("<H", payload, 1)[0]
+        message = payload[3:3 + msg_len].decode("utf-8")
+        # Echo back as CHAT_MESSAGE + broadcast to zone
+        pkt = build_chat_message(channel, self.char_name, message)
+        self.world.broadcast_zone(self.zone, pkt)
+        print(f"[{self.addr}] Chat[ch={channel}]: {self.char_name}: {message}")
+
+    def _on_whisper_send(self, payload):
+        name_len = payload[0]
+        target_name = payload[1:1 + name_len].decode("utf-8")
+        msg_off = 1 + name_len
+        msg_len = struct.unpack_from("<H", payload, msg_off)[0]
+        message = payload[msg_off + 2:msg_off + 2 + msg_len].decode("utf-8")
+        # Find target player by name
+        target_session = None
+        with self.world.lock:
+            for eid, s in self.world.players.items():
+                if s.char_name == target_name:
+                    target_session = s
+                    break
+        if target_session is None:
+            self.send_safe(build_whisper_result(1, 1, target_name, message))  # TARGET_NOT_FOUND, SENT
+            print(f"[{self.addr}] Whisper FAIL: target '{target_name}' not found")
+            return
+        # Send to sender (direction=SENT=1)
+        self.send_safe(build_whisper_result(0, 1, target_name, message))
+        # Send to target (direction=RECEIVED=0)
+        target_session.send_safe(build_whisper_result(0, 0, self.char_name, message))
+        print(f"[{self.addr}] Whisper: {self.char_name} -> {target_name}: {message}")
+
+    # ── Shop (session 30) ──
+
+    def _on_shop_open(self, payload):
+        npc_id = struct.unpack_from("<I", payload, 0)[0]
+        items = SHOP_ITEMS.get(npc_id, [])
+        self.send_safe(build_shop_list(npc_id, items))
+        print(f"[{self.addr}] ShopOpen: npc={npc_id}, items={len(items)}")
+
+    def _on_shop_buy(self, payload):
+        item_id = struct.unpack_from("<I", payload, 0)[0]
+        count = payload[4]
+        # Find item in any shop
+        price = 0
+        for npc_items in SHOP_ITEMS.values():
+            for it in npc_items:
+                if it["item_id"] == item_id:
+                    price = it["price"]
+                    break
+            if price > 0:
+                break
+        if price == 0:
+            self.send_safe(build_shop_result(3, 0, item_id, count, self.gold))  # ITEM_NOT_FOUND
+            return
+        total_cost = price * count
+        if self.gold < total_cost:
+            self.send_safe(build_shop_result(2, 0, item_id, count, self.gold))  # NOT_ENOUGH_GOLD
+            return
+        self.gold -= total_cost
+        self.send_safe(build_shop_result(0, 0, item_id, count, self.gold))  # SUCCESS, action=BUY(0)
+        print(f"[{self.addr}] ShopBuy: item={item_id}, count={count}, cost={total_cost}, gold={self.gold}")
+
+    def _on_shop_sell(self, payload):
+        slot = payload[0]
+        item = next((it for it in self.inventory if it["slot"] == slot), None)
+        if not item:
+            self.send_safe(build_shop_result(4, 1, 0, 0, self.gold))  # INVALID_SLOT
+            return
+        sell_price = int(50 * SELL_PRICE_RATIO)  # simplified
+        self.gold += sell_price
+        item["count"] -= 1
+        if item["count"] <= 0:
+            self.inventory.remove(item)
+        self.send_safe(build_shop_result(0, 1, item["item_id"], 1, self.gold))  # SUCCESS, action=SELL(1)
+        print(f"[{self.addr}] ShopSell: slot={slot}, +{sell_price}G, gold={self.gold}")
+
+    # ── Skill Expansion (session 30) ──
+
+    def _on_skill_level_up(self, payload):
+        skill_id = struct.unpack_from("<I", payload, 0)[0]
+        skill = next((s for s in SKILLS if s["id"] == skill_id), None)
+        if not skill:
+            self.send_safe(build_skill_level_up_result(1, skill_id, 0))  # SKILL_NOT_FOUND
+            return
+        if self.skill_points <= 0:
+            self.send_safe(build_skill_level_up_result(2, skill_id, 0))  # NOT_ENOUGH_POINTS
+            return
+        self.skill_points -= 1
+        cur_level = self.skill_levels.get(skill_id, 1)
+        cur_level += 1
+        self.skill_levels[skill_id] = cur_level
+        self.send_safe(build_skill_level_up_result(0, skill_id, cur_level))
+        self.send_safe(build_skill_point_info(self.skill_points, 5 - self.skill_points))
+        print(f"[{self.addr}] SkillLevelUp: skill={skill_id}, new_level={cur_level}, points_left={self.skill_points}")
+
+    # ── Admin (session 30) ──
+
+    def _on_admin_reload(self, payload):
+        config_type = payload[0] if len(payload) > 0 else 0
+        self.send_safe(build_admin_reload_result(0, f"Reloaded config type {config_type}"))
+        print(f"[{self.addr}] AdminReload: type={config_type}")
+
+    def _on_admin_get_config(self, payload):
+        config_json = '{"base_speed":200,"sprint_multiplier":1.5,"tolerance":1.5,"max_monsters":100}'
+        self.send_safe(build_admin_config_resp(config_json))
+        print(f"[{self.addr}] AdminGetConfig")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

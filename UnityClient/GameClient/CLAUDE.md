@@ -34,7 +34,10 @@ Assets/
 │   │   ├── InventoryManager.cs # 인벤토리 (아이템 목록/사용/장착)
 │   │   ├── PartyManager.cs     # 파티 시스템 (생성/초대/탈퇴)
 │   │   ├── BuffManager.cs      # 버프 시스템 (목록/적용/제거/타이머)
-│   │   └── QuestManager.cs     # 퀘스트 시스템 (목록/수락/완료)
+│   │   ├── QuestManager.cs     # 퀘스트 시스템 (목록/수락/완료)
+│   │   ├── ChatManager.cs      # 채팅 시스템 (Zone/Party/Whisper/System)
+│   │   ├── ShopManager.cs      # NPC 상점 (구매/판매/골드)
+│   │   └── BossManager.cs      # 보스 시스템 (페이즈/특수공격/인레이지)
 │   ├── Network/             # 네트워크 레이어 (namespace: Network)
 │   │   ├── NetworkManager.cs     # Gate→Field 연결 + 패킷 디스패치
 │   │   ├── TCPClient.cs          # TCP 소켓 + 백그라운드 수신 스레드
@@ -54,7 +57,10 @@ Assets/
 │   │   ├── InventoryUI.cs   # 인벤토리 패널 (I키 토글)
 │   │   ├── PartyUI.cs       # 파티 패널 (P키 토글)
 │   │   ├── BuffUI.cs        # 버프 아이콘 (우상단)
-│   │   └── QuestUI.cs       # 퀘스트 패널 (Q키 토글)
+│   │   ├── QuestUI.cs       # 퀘스트 패널 (Q키 토글)
+│   │   ├── ChatUI.cs        # 채팅 창 (Enter 토글, Tab 채널, /w 귓속말)
+│   │   ├── ShopUI.cs        # 상점 패널 (ESC 닫기, 아이템/골드)
+│   │   └── BossUI.cs        # 보스 UI (HP바/페이즈/알림)
 │   └── interaction-map.yaml # 매니저 의존성 맵
 └── Settings/                # URP 렌더링 설정
 ```
@@ -104,6 +110,9 @@ private void Awake()
 | PartyManager | X | Scene-bound — Scene 로드 시 파티 리셋 |
 | BuffManager | X | Scene-bound — Scene 로드 시 버프 리셋 |
 | QuestManager | X | Scene-bound — Scene 로드 시 퀘스트 리셋 |
+| ChatManager | X | Scene-bound — Scene 로드 시 채팅 리셋 |
+| ShopManager | X | Scene-bound — Scene 로드 시 상점 리셋 |
+| BossManager | X | Scene-bound — Scene 로드 시 보스 리셋 |
 
 ## 데이터 흐름
 
@@ -152,9 +161,21 @@ private void Awake()
    │       버프 목록/타이머 관리 (자동 BUFF_LIST_REQ)
    │       └──▶ [BuffUI]  ← OnBuffListChanged — 우상단 버프 아이콘
    │
-   └──▶ [QuestManager]    ← OnQuestList, OnQuestAcceptResult, OnQuestCompleteResult, OnEnterGame
-           퀘스트 상태 관리 (자동 QUEST_LIST_REQ)
-           └──▶ [QuestUI]  ← OnQuestListChanged — Q키 토글 퀘스트 패널
+   ├──▶ [QuestManager]    ← OnQuestList, OnQuestAcceptResult, OnQuestCompleteResult, OnEnterGame
+   │       퀘스트 상태 관리 (자동 QUEST_LIST_REQ)
+   │       └──▶ [QuestUI]  ← OnQuestListChanged — Q키 토글 퀘스트 패널
+   │
+   ├──▶ [ChatManager]     ← OnChatMessage, OnWhisperResult, OnSystemMessage
+   │       채팅 메시지 관리 (Zone/Party/Whisper/System)
+   │       └──▶ [ChatUI]  ← OnNewMessage — Enter 토글 채팅창
+   │
+   ├──▶ [ShopManager]     ← OnShopList, OnShopResult
+   │       NPC 상점 관리 (구매/판매/골드)
+   │       └──▶ [ShopUI]  ← OnShopOpened/Closed — ESC 닫기 상점 패널
+   │
+   └──▶ [BossManager]     ← OnBossSpawn, OnBossPhaseChange, OnBossSpecialAttack, OnBossEnrage, OnBossDefeated, OnAttackResult
+           보스 시스템 관리 (페이즈/특수공격/인레이지)
+           └──▶ [BossUI]  ← OnBossAppeared/PhaseChanged/Enraged/Killed — 보스 HP바 + 알림
 
 [LocalPlayer]
    │ Update() — WASD 입력

@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_28_ui
+version: session_30_phase1_complete
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -102,7 +102,7 @@ managers:
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "몬스터 엔티티 생명주기 관리 (스폰/사망/리스폰/이동/HP 갱신)"
+    purpose: "몬스터 엔티티 생명주기 관리 (스폰/사망/리스폰/이동/HP 갱신/어그로)"
     reads:
       - CoordConverter (서버→Unity 좌표 변환)
     writes:
@@ -111,6 +111,7 @@ managers:
       - OnMonsterSpawned(MonsterEntity)
       - OnMonsterDied(ulong)
       - OnMonsterUpdated(MonsterEntity)
+      - OnMonsterAggroChanged(ulong, ulong)
     subscribes_to:
       - NetworkManager.OnMonsterSpawn → 몬스터 생성
       - NetworkManager.OnMonsterRespawn → 몬스터 리스폰 (HP 리셋 + 재배치)
@@ -118,6 +119,8 @@ managers:
       - NetworkManager.OnEntityMove → 몬스터 위치 업데이트
       - NetworkManager.OnAttackResult → 몬스터 HP 갱신
       - NetworkManager.OnDisconnected → 전체 몬스터 정리
+      - NetworkManager.OnMonsterMove → 몬스터 이동 (서버 AI)
+      - NetworkManager.OnMonsterAggro → 몬스터 어그로 변경
     public_api:
       - GetMonster(ulong) → MonsterEntity
       - IsMonster(ulong) → bool
@@ -170,24 +173,32 @@ managers:
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "스킬 시스템 관리 — 스킬 목록, 쿨다운, 사용"
+    purpose: "스킬 시스템 관리 — 스킬 목록, 쿨다운, 사용, 레벨업"
     reads: []
     writes:
       - _skills (Dictionary<uint, SkillInfo>)
       - _cooldowns (Dictionary<uint, float>)
+      - _skillPoints (uint)
     fires_events:
       - OnSkillListChanged()
       - OnSkillUsed(SkillResultData)
       - OnCooldownStarted(uint)
+      - OnSkillLeveledUp(SkillLevelUpResultData)
+      - OnSkillPointsChanged(uint)
     subscribes_to:
       - NetworkManager.OnSkillList → 스킬 목록 갱신
       - NetworkManager.OnSkillResult → 스킬 결과 + 쿨다운 시작
       - NetworkManager.OnEnterGame → 자동 SKILL_LIST_REQ
+      - NetworkManager.OnSkillLevelUpResult → 스킬 레벨업 결과
+      - NetworkManager.OnSkillPointInfo → 스킬 포인트 갱신
     public_api:
       - UseSkill(uint, ulong)
       - IsOnCooldown(uint) → bool
       - GetCooldownRemaining(uint) → float
       - GetSkill(uint) → SkillInfo
+      - LevelUpSkill(uint)
+    computed_properties:
+      - SkillPoints (uint)
 
   - name: InventoryManager
     namespace: (global)
@@ -259,6 +270,83 @@ managers:
       - RemoveBuff(uint)
       - HasBuff(uint) → bool
       - GetBuff(uint) → BuffInfo
+
+  - name: ChatManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "채팅 시스템 관리 — Zone/Party/Whisper/System 메시지 송수신"
+    reads: []
+    writes:
+      - _messages (List<ChatEntry>)
+    fires_events:
+      - OnNewMessage(ChatEntry)
+    subscribes_to:
+      - NetworkManager.OnChatMessage → 채팅 메시지 수신
+      - NetworkManager.OnWhisperResult → 귓속말 결과
+      - NetworkManager.OnSystemMessage → 시스템 메시지
+    public_api:
+      - SendZoneChat(string)
+      - SendPartyChat(string)
+      - SendWhisper(string, string)
+    computed_properties:
+      - Messages (IReadOnlyList<ChatEntry>)
+
+  - name: ShopManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "NPC 상점 관리 — 아이템 목록, 구매/판매, 골드 추적"
+    reads: []
+    writes:
+      - _isShopOpen (bool)
+      - _currentNpcId (uint)
+      - _currentItems (ShopItemInfo[])
+      - _gold (uint)
+    fires_events:
+      - OnShopOpened(ShopListData)
+      - OnShopClosed()
+      - OnTransactionResult(ShopResultData)
+      - OnGoldChanged(uint)
+    subscribes_to:
+      - NetworkManager.OnShopList → 상점 아이템 목록 수신
+      - NetworkManager.OnShopResult → 거래 결과
+    public_api:
+      - OpenShop(uint)
+      - BuyItem(uint, byte)
+      - SellItem(byte)
+      - CloseShop()
+    computed_properties:
+      - IsShopOpen (bool)
+      - CurrentNpcId (uint)
+      - CurrentItems (ShopItemInfo[])
+      - Gold (uint)
+
+  - name: BossManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "보스 시스템 관리 — HP 추적, 페이즈 전환, 특수 공격, 인레이지"
+    reads: []
+    writes:
+      - _bosses (Dictionary<ulong, BossState>)
+    fires_events:
+      - OnBossAppeared(BossState)
+      - OnBossPhaseChanged(BossState)
+      - OnBossSpecialAttacked(BossSpecialAttackData)
+      - OnBossEnraged(BossState)
+      - OnBossKilled(BossDefeatedData)
+      - OnBossHPChanged(BossState)
+    subscribes_to:
+      - NetworkManager.OnBossSpawn → 보스 출현
+      - NetworkManager.OnBossPhaseChange → 페이즈 전환
+      - NetworkManager.OnBossSpecialAttack → 특수 공격
+      - NetworkManager.OnBossEnrage → 인레이지
+      - NetworkManager.OnBossDefeated → 보스 처치
+      - NetworkManager.OnAttackResult → 보스 HP 갱신
+    public_api:
+      - GetBoss(ulong) → BossState
+      - IsBoss(ulong) → bool
 
   - name: QuestManager
     namespace: (global)
@@ -403,8 +491,8 @@ data_flows:
 
   - from: NetworkManager
     to: MonsterManager
-    via: "C# events (OnMonsterSpawn, OnMonsterRespawn, OnCombatDied, OnEntityMove, OnAttackResult)"
-    description: "몬스터 스폰/리스폰/사망/이동/HP 갱신"
+    via: "C# events (OnMonsterSpawn, OnMonsterRespawn, OnCombatDied, OnEntityMove, OnAttackResult, OnMonsterMove, OnMonsterAggro)"
+    description: "몬스터 스폰/리스폰/사망/이동/HP 갱신/어그로"
 
   - from: MonsterManager
     to: MonsterEntity
@@ -455,6 +543,36 @@ data_flows:
     to: QuestUI
     via: "C# event (OnQuestListChanged)"
     description: "퀘스트 변경 → 리스트 + 진행 상황 갱신"
+
+  - from: NetworkManager
+    to: ChatManager
+    via: "C# events (OnChatMessage, OnWhisperResult, OnSystemMessage)"
+    description: "채팅/귓속말/시스템 메시지 수신"
+
+  - from: ChatManager
+    to: ChatUI
+    via: "C# event (OnNewMessage)"
+    description: "새 메시지 → 채팅 창 갱신"
+
+  - from: NetworkManager
+    to: ShopManager
+    via: "C# events (OnShopList, OnShopResult)"
+    description: "상점 아이템 목록/거래 결과"
+
+  - from: ShopManager
+    to: ShopUI
+    via: "C# events (OnShopOpened, OnShopClosed, OnTransactionResult, OnGoldChanged)"
+    description: "상점 패널 토글 + 아이템/골드 갱신"
+
+  - from: NetworkManager
+    to: BossManager
+    via: "C# events (OnBossSpawn, OnBossPhaseChange, OnBossSpecialAttack, OnBossEnrage, OnBossDefeated, OnAttackResult)"
+    description: "보스 출현/페이즈/특수공격/인레이지/처치/HP 갱신"
+
+  - from: BossManager
+    to: BossUI
+    via: "C# events (OnBossAppeared, OnBossPhaseChanged, OnBossSpecialAttacked, OnBossEnraged, OnBossKilled, OnBossHPChanged)"
+    description: "보스 HP바, 페이즈 표시, 알림 팝업"
 
   - from: LocalPlayer
     to: NetworkManager

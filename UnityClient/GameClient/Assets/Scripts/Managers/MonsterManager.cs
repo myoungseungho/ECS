@@ -21,6 +21,7 @@ public class MonsterManager : MonoBehaviour
     public event Action<MonsterEntity> OnMonsterSpawned;
     public event Action<ulong> OnMonsterDied;
     public event Action<MonsterEntity> OnMonsterUpdated;
+    public event Action<ulong, ulong> OnMonsterAggroChanged;   // monsterEntity, targetEntity (0=해제)
 
     // ━━━ 싱글톤 (Scene-bound) ━━━
     public static MonsterManager Instance { get; private set; }
@@ -44,6 +45,8 @@ public class MonsterManager : MonoBehaviour
         net.OnEntityMove += HandleEntityMove;
         net.OnAttackResult += HandleAttackResult;
         net.OnDisconnected += HandleDisconnected;
+        net.OnMonsterMove += HandleMonsterMove;
+        net.OnMonsterAggro += HandleMonsterAggro;
     }
 
     private void OnDestroy()
@@ -57,6 +60,8 @@ public class MonsterManager : MonoBehaviour
         net.OnEntityMove -= HandleEntityMove;
         net.OnAttackResult -= HandleAttackResult;
         net.OnDisconnected -= HandleDisconnected;
+        net.OnMonsterMove -= HandleMonsterMove;
+        net.OnMonsterAggro -= HandleMonsterAggro;
 
         if (Instance == this) Instance = null;
     }
@@ -168,6 +173,19 @@ public class MonsterManager : MonoBehaviour
                 Destroy(kvp.Value.gameObject);
         }
         _monsterMap.Clear();
+    }
+
+    private void HandleMonsterMove(MonsterMoveData data)
+    {
+        if (!_monsterMap.TryGetValue(data.EntityId, out var monster)) return;
+
+        Vector3 pos = CoordConverter.ServerToUnity(data.X, data.Y);
+        monster.SetTargetPosition(pos);
+    }
+
+    private void HandleMonsterAggro(MonsterAggroData data)
+    {
+        OnMonsterAggroChanged?.Invoke(data.MonsterEntityId, data.TargetEntityId);
     }
 
     // ━━━ 유틸 ━━━

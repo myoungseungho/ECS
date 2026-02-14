@@ -76,6 +76,31 @@ namespace Network
         public event Action<QuestInfo[]> OnQuestList;
         public event Action<QuestAcceptResultData> OnQuestAcceptResult;
         public event Action<QuestCompleteResultData> OnQuestCompleteResult;
+        // 세션 35: 이동 검증
+        public event Action<float, float, float> OnPositionCorrection;
+        // 세션 30: 채팅
+        public event Action<ChatMessageData> OnChatMessage;
+        public event Action<WhisperResultData> OnWhisperResult;
+        public event Action<string> OnSystemMessage;
+        // 세션 32: 상점
+        public event Action<ShopListData> OnShopList;
+        public event Action<ShopResultData> OnShopResult;
+        // 세션 33: 스킬 확장
+        public event Action<SkillLevelUpResultData> OnSkillLevelUpResult;
+        public event Action<SkillPointInfoData> OnSkillPointInfo;
+        // 세션 34: 보스
+        public event Action<BossSpawnData> OnBossSpawn;
+        public event Action<BossPhaseChangeData> OnBossPhaseChange;
+        public event Action<BossSpecialAttackData> OnBossSpecialAttack;
+        public event Action<BossEnrageData> OnBossEnrage;
+        public event Action<BossDefeatedData> OnBossDefeated;
+        // 세션 36: 몬스터 AI
+        public event Action<MonsterMoveData> OnMonsterMove;
+        public event Action<MonsterAggroData> OnMonsterAggro;
+        // 세션 37: 어드민
+        public event Action<AdminReloadResultData> OnAdminReloadResult;
+        public event Action<AdminConfigRespData> OnAdminConfigResp;
+        // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
 
@@ -161,10 +186,10 @@ namespace Network
             _field?.Send(PacketBuilder.ChannelJoin(channelId));
         }
 
-        /// <summary>이동 전송</summary>
-        public void SendMove(float x, float y, float z)
+        /// <summary>이동 전송 (Model C: timestamp 포함)</summary>
+        public void SendMove(float x, float y, float z, uint timestampMs = 0)
         {
-            _field?.Send(PacketBuilder.Move(x, y, z));
+            _field?.Send(PacketBuilder.Move(x, y, z, timestampMs));
         }
 
         /// <summary>존 이동</summary>
@@ -347,6 +372,62 @@ namespace Network
         public void CompleteQuest(uint questId)
         {
             _field?.Send(PacketBuilder.QuestComplete(questId));
+        }
+
+        // ━━━ 세션 30: 채팅 API ━━━
+
+        /// <summary>채팅 메시지 전송</summary>
+        public void SendChat(ChatChannel channel, string message)
+        {
+            _field?.Send(PacketBuilder.ChatSend(channel, message));
+        }
+
+        /// <summary>귓속말 전송</summary>
+        public void SendWhisper(string targetName, string message)
+        {
+            _field?.Send(PacketBuilder.WhisperSend(targetName, message));
+        }
+
+        // ━━━ 세션 32: 상점 API ━━━
+
+        /// <summary>상점 열기</summary>
+        public void OpenShop(uint npcId)
+        {
+            _field?.Send(PacketBuilder.ShopOpen(npcId));
+        }
+
+        /// <summary>상점 구매</summary>
+        public void ShopBuy(uint npcId, uint itemId, ushort count)
+        {
+            _field?.Send(PacketBuilder.ShopBuy(npcId, itemId, count));
+        }
+
+        /// <summary>상점 판매</summary>
+        public void ShopSell(byte slot, ushort count)
+        {
+            _field?.Send(PacketBuilder.ShopSell(slot, count));
+        }
+
+        // ━━━ 세션 33: 스킬 레벨업 API ━━━
+
+        /// <summary>스킬 레벨업</summary>
+        public void SkillLevelUp(uint skillId)
+        {
+            _field?.Send(PacketBuilder.SkillLevelUp(skillId));
+        }
+
+        // ━━━ 세션 37: 어드민 API ━━━
+
+        /// <summary>설정 리로드 요청</summary>
+        public void AdminReload(string configName = "")
+        {
+            _field?.Send(PacketBuilder.AdminReload(configName));
+        }
+
+        /// <summary>설정값 조회</summary>
+        public void AdminGetConfig(string configName, string key)
+        {
+            _field?.Send(PacketBuilder.AdminGetConfig(configName, key));
         }
 
         /// <summary>연결 끊기</summary>
@@ -709,6 +790,155 @@ namespace Network
                     var data = PacketBuilder.ParseQuestCompleteResult(payload);
                     Debug.Log($"[Net] QuestComplete: result={data.Result}, questId={data.QuestId}, exp={data.RewardExp}");
                     OnQuestCompleteResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ 세션 35: 이동 검증 ━━━
+
+                case MsgType.POSITION_CORRECTION:
+                {
+                    var (x, y, z) = PacketBuilder.ParsePositionCorrection(payload);
+                    Debug.Log($"[Net] PositionCorrection: ({x},{y},{z})");
+                    OnPositionCorrection?.Invoke(x, y, z);
+                    break;
+                }
+
+                // ━━━ 세션 30: 채팅 ━━━
+
+                case MsgType.CHAT_MESSAGE:
+                {
+                    var data = PacketBuilder.ParseChatMessage(payload);
+                    Debug.Log($"[Net] ChatMessage: [{data.Channel}] {data.SenderName}: {data.Message}");
+                    OnChatMessage?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.WHISPER_RESULT:
+                {
+                    var data = PacketBuilder.ParseWhisperResult(payload);
+                    Debug.Log($"[Net] WhisperResult: {data.Result}, dir={data.Direction}, from={data.OtherName}");
+                    OnWhisperResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SYSTEM_MESSAGE:
+                {
+                    string msg = PacketBuilder.ParseSystemMessage(payload);
+                    Debug.Log($"[Net] SystemMessage: {msg}");
+                    OnSystemMessage?.Invoke(msg);
+                    break;
+                }
+
+                // ━━━ 세션 32: 상점 ━━━
+
+                case MsgType.SHOP_LIST:
+                {
+                    var data = PacketBuilder.ParseShopList(payload);
+                    Debug.Log($"[Net] ShopList: npc={data.NpcId}, items={data.Items.Length}");
+                    OnShopList?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SHOP_RESULT:
+                {
+                    var data = PacketBuilder.ParseShopResult(payload);
+                    Debug.Log($"[Net] ShopResult: {data.Result}, action={data.Action}, item={data.ItemId}, gold={data.Gold}");
+                    OnShopResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ 세션 33: 스킬 확장 ━━━
+
+                case MsgType.SKILL_LEVEL_UP_RESULT:
+                {
+                    var data = PacketBuilder.ParseSkillLevelUpResult(payload);
+                    Debug.Log($"[Net] SkillLevelUp: {data.Result}, skill={data.SkillId}, lv={data.NewLevel}, points={data.SkillPoints}");
+                    OnSkillLevelUpResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SKILL_POINT_INFO:
+                {
+                    var data = PacketBuilder.ParseSkillPointInfo(payload);
+                    Debug.Log($"[Net] SkillPointInfo: points={data.SkillPoints}, spent={data.TotalSpent}");
+                    OnSkillPointInfo?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ 세션 34: 보스 ━━━
+
+                case MsgType.BOSS_SPAWN:
+                {
+                    var data = PacketBuilder.ParseBossSpawn(payload);
+                    Debug.Log($"[Net] BossSpawn: {data.Name} (id={data.BossId}), lv={data.Level}, hp={data.HP}/{data.MaxHP}, phase={data.Phase}");
+                    OnBossSpawn?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOSS_PHASE_CHANGE:
+                {
+                    var data = PacketBuilder.ParseBossPhaseChange(payload);
+                    Debug.Log($"[Net] BossPhaseChange: boss={data.BossId}, phase={data.NewPhase}, hp={data.HP}/{data.MaxHP}");
+                    OnBossPhaseChange?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOSS_SPECIAL_ATTACK:
+                {
+                    var data = PacketBuilder.ParseBossSpecialAttack(payload);
+                    Debug.Log($"[Net] BossSpecialAttack: boss={data.BossId}, type={data.AttackType}, dmg={data.Damage}");
+                    OnBossSpecialAttack?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOSS_ENRAGE:
+                {
+                    var data = PacketBuilder.ParseBossEnrage(payload);
+                    Debug.Log($"[Net] BossEnrage: boss={data.BossId}");
+                    OnBossEnrage?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.BOSS_DEFEATED:
+                {
+                    var data = PacketBuilder.ParseBossDefeated(payload);
+                    Debug.Log($"[Net] BossDefeated: boss={data.BossId}, killer={data.KillerEntityId}");
+                    OnBossDefeated?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ 세션 36: 몬스터 AI ━━━
+
+                case MsgType.MONSTER_MOVE:
+                {
+                    var data = PacketBuilder.ParseMonsterMove(payload);
+                    OnMonsterMove?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.MONSTER_AGGRO:
+                {
+                    var data = PacketBuilder.ParseMonsterAggro(payload);
+                    Debug.Log($"[Net] MonsterAggro: monster={data.MonsterEntityId}, target={data.TargetEntityId}");
+                    OnMonsterAggro?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ 세션 37: 어드민 ━━━
+
+                case MsgType.ADMIN_RELOAD_RESULT:
+                {
+                    var data = PacketBuilder.ParseAdminReloadResult(payload);
+                    Debug.Log($"[Net] AdminReload: result={data.Result}, version={data.Version}, name={data.Name}");
+                    OnAdminReloadResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.ADMIN_CONFIG_RESP:
+                {
+                    var data = PacketBuilder.ParseAdminConfigResp(payload);
+                    Debug.Log($"[Net] AdminConfig: found={data.Found}, value={data.Value}");
+                    OnAdminConfigResp?.Invoke(data);
                     break;
                 }
 

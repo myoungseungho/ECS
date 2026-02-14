@@ -12,13 +12,17 @@ public class SkillManager : MonoBehaviour
     // ━━━ 스킬 데이터 ━━━
     private readonly Dictionary<uint, SkillInfo> _skills = new Dictionary<uint, SkillInfo>();
     private readonly Dictionary<uint, float> _cooldowns = new Dictionary<uint, float>();
+    private uint _skillPoints;
 
     public IReadOnlyDictionary<uint, SkillInfo> Skills => _skills;
+    public uint SkillPoints => _skillPoints;
 
     // ━━━ 이벤트 ━━━
     public event Action OnSkillListChanged;
     public event Action<SkillResultData> OnSkillUsed;
     public event Action<uint> OnCooldownStarted;
+    public event Action<SkillLevelUpResultData> OnSkillLeveledUp;
+    public event Action<uint> OnSkillPointsChanged;
 
     // ━━━ 싱글톤 (Scene-bound) ━━━
     public static SkillManager Instance { get; private set; }
@@ -39,6 +43,8 @@ public class SkillManager : MonoBehaviour
         net.OnSkillList += HandleSkillList;
         net.OnSkillResult += HandleSkillResult;
         net.OnEnterGame += HandleEnterGame;
+        net.OnSkillLevelUpResult += HandleSkillLevelUpResult;
+        net.OnSkillPointInfo += HandleSkillPointInfo;
     }
 
     private void OnDestroy()
@@ -49,6 +55,8 @@ public class SkillManager : MonoBehaviour
         net.OnSkillList -= HandleSkillList;
         net.OnSkillResult -= HandleSkillResult;
         net.OnEnterGame -= HandleEnterGame;
+        net.OnSkillLevelUpResult -= HandleSkillLevelUpResult;
+        net.OnSkillPointInfo -= HandleSkillPointInfo;
 
         if (Instance == this) Instance = null;
     }
@@ -99,6 +107,12 @@ public class SkillManager : MonoBehaviour
         return skill;
     }
 
+    /// <summary>스킬 레벨업 요청</summary>
+    public void LevelUpSkill(uint skillId)
+    {
+        NetworkManager.Instance.SkillLevelUp(skillId);
+    }
+
     // ━━━ 핸들러 ━━━
 
     private void HandleSkillList(SkillInfo[] skills)
@@ -130,5 +144,24 @@ public class SkillManager : MonoBehaviour
     {
         if (result.ResultCode != 0) return;
         NetworkManager.Instance.RequestSkillList();
+    }
+
+    private void HandleSkillLevelUpResult(SkillLevelUpResultData data)
+    {
+        if (data.Result == SkillLevelUpResult.SUCCESS && _skills.TryGetValue(data.SkillId, out var skill))
+        {
+            skill.Level = data.NewLevel;
+            _skillPoints = data.SkillPoints;
+            OnSkillListChanged?.Invoke();
+        }
+
+        OnSkillLeveledUp?.Invoke(data);
+        OnSkillPointsChanged?.Invoke(_skillPoints);
+    }
+
+    private void HandleSkillPointInfo(SkillPointInfoData data)
+    {
+        _skillPoints = data.SkillPoints;
+        OnSkillPointsChanged?.Invoke(_skillPoints);
     }
 }

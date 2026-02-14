@@ -14,13 +14,16 @@ namespace Network
         PING            = 2,
 
         // 이동
-        MOVE            = 10,   // C→S: x(4f) y(4f) z(4f)
+        MOVE            = 10,   // C→S: x(4f) y(4f) z(4f) [timestamp(4)] (Model C: 16B 권장)
         MOVE_BROADCAST  = 11,   // S→C: entity(8u64) x(4f) y(4f) z(4f)
         POS_QUERY       = 12,
 
         // AOI
         APPEAR          = 13,   // S→C: entity(8u64) x(4f) y(4f) z(4f)
         DISAPPEAR       = 14,   // S→C: entity(8u64)
+
+        // 이동 검증 (세션 35: Model C)
+        POSITION_CORRECTION = 15, // S→C: x(4f) y(4f) z(4f) = 12B (강제 위치 보정)
 
         // 채널
         CHANNEL_JOIN    = 20,   // C→S: channel_id(4i32)
@@ -63,8 +66,10 @@ namespace Network
         RESPAWN_REQ     = 103,  // C→S: 빈 페이로드
         RESPAWN_RESULT  = 104,  // S→C: result(1) hp(4i) mp(4i) x(4f) y(4f) z(4f)
 
-        // 몬스터 (세션 14)
+        // 몬스터 (세션 14 + 세션 36 AI 확장)
         MONSTER_SPAWN   = 110,  // S→C: entity(8u64) monster_id(4u32) level(4u32) hp(4i) max_hp(4i) x(4f) y(4f) z(4f) = 36B
+        MONSTER_MOVE    = 111,  // S→C: entity(8) x(4f) y(4f) z(4f) = 20B (몬스터 이동)
+        MONSTER_AGGRO   = 112,  // S→C: monster_entity(8) target_entity(8) = 16B (어그로 변경, target=0이면 해제)
         MONSTER_RESPAWN = 113,  // S→C: entity(8u64) hp(4i) max_hp(4i) x(4f) y(4f) z(4f) = 28B
 
         // 존 이동 (세션 16)
@@ -77,9 +82,9 @@ namespace Network
         GATE_SERVER_LIST     = 133,  // C→S: empty
         GATE_SERVER_LIST_RESP = 134, // S→C: count(1) {port(2) ccu(4) max_ccu(4) status(1)}*N
 
-        // 스킬 (세션 19)
+        // 스킬 (세션 19 + 세션 33 확장)
         SKILL_LIST_REQ  = 150,  // C→S: empty
-        SKILL_LIST_RESP = 151,  // S→C: count(1) {id(4) name(16) cd_ms(4) dmg(4) mp(4) range(4) type(1)}*N = 37B/entry
+        SKILL_LIST_RESP = 151,  // S→C: count(1) {id(4) name(16) cd_ms(4) dmg(4) mp(4) range(4) type(1) level(1) effect(1) min_level(4)}*N = 43B/entry
         SKILL_USE       = 152,  // C→S: skill_id(4u32) target_entity(8u64) = 12B
         SKILL_RESULT    = 153,  // S→C: result(1) skill_id(4) caster(8) target(8) damage(4i) target_hp(4i) = 29B
 
@@ -144,6 +149,38 @@ namespace Network
         QUEST_PROGRESS       = 234,  // C→S: quest_id(4u32)
         QUEST_COMPLETE       = 235,  // C→S: quest_id(4u32)
         QUEST_COMPLETE_RESULT = 236, // S→C: result(1) quest_id(4) reward_exp(4) reward_item_id(4) reward_item_count(2) = 15B
+
+        // 채팅 (세션 30)
+        CHAT_SEND       = 240,  // C→S: channel(1) msg_len(1) message(N)
+        CHAT_MESSAGE    = 241,  // S→C: channel(1) sender_entity(8) sender_name(32) msg_len(1) message(N)
+        WHISPER_SEND    = 242,  // C→S: target_name_len(1) target_name(N) msg_len(1) message(N)
+        WHISPER_RESULT  = 243,  // S→C: result(1) direction(1) other_name(32) msg_len(1) message(N)
+        SYSTEM_MESSAGE  = 244,  // S→C: msg_len(1) message(N)
+
+        // NPC 상점 (세션 32)
+        SHOP_OPEN       = 250,  // C→S: npc_id(4)
+        SHOP_LIST       = 251,  // S→C: npc_id(4) count(1) {item_id(4) price(4) stock(2)}*N = 10B/entry
+        SHOP_BUY        = 252,  // C→S: npc_id(4) item_id(4) count(2) = 10B
+        SHOP_SELL       = 253,  // C→S: slot(1) count(2) = 3B
+        SHOP_RESULT     = 254,  // S→C: result(1) action(1) item_id(4) count(2) gold(4) = 12B
+
+        // 스킬 확장 (세션 33)
+        SKILL_LEVEL_UP        = 260,  // C→S: skill_id(4)
+        SKILL_LEVEL_UP_RESULT = 261,  // S→C: result(1) skill_id(4) new_level(1) skill_points(4) = 10B
+        SKILL_POINT_INFO      = 262,  // S→C: skill_points(4) total_spent(4) = 8B
+
+        // 보스 메카닉 (세션 34)
+        BOSS_SPAWN            = 270,  // S→C: entity(8) boss_id(4) name(32) level(4) hp(4) max_hp(4) phase(1) = 57B
+        BOSS_PHASE_CHANGE     = 271,  // S→C: entity(8) boss_id(4) new_phase(1) hp(4) max_hp(4) = 21B
+        BOSS_SPECIAL_ATTACK   = 272,  // S→C: entity(8) boss_id(4) attack_type(1) damage(4) = 17B
+        BOSS_ENRAGE           = 273,  // S→C: entity(8) boss_id(4) = 12B
+        BOSS_DEFEATED         = 274,  // S→C: entity(8) boss_id(4) killer_entity(8) = 20B
+
+        // 어드민/핫리로드 (세션 37)
+        ADMIN_RELOAD        = 280,  // C→S: name_len(1) name(N) (빈 name=전체 리로드)
+        ADMIN_RELOAD_RESULT = 281,  // S→C: result(1) version(4) reload_count(4) name_len(1) name(N)
+        ADMIN_GET_CONFIG    = 282,  // C→S: name_len(1) name(N) key_len(1) key(N)
+        ADMIN_CONFIG_RESP   = 283,  // S→C: found(1) value_len(2) value(N)
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -323,7 +360,7 @@ namespace Network
         public float X, Y, Z;
     }
 
-    /// <summary>스킬 정보 (SKILL_LIST_RESP 파싱용)</summary>
+    /// <summary>스킬 정보 (SKILL_LIST_RESP 파싱용, 세션 33 확장: 43B/entry)</summary>
     public class SkillInfo
     {
         public uint SkillId;
@@ -333,6 +370,9 @@ namespace Network
         public uint ManaCost;
         public uint Range;
         public byte SkillType;
+        public byte Level;          // 세션 33: 스킬 레벨 (0~5)
+        public SkillEffect Effect;  // 세션 33: 효과 타입
+        public int MinLevel;        // 세션 33: 습득 가능 최소 레벨
     }
 
     /// <summary>스킬 사용 결과 (SKILL_RESULT 파싱용)</summary>
@@ -499,5 +539,216 @@ namespace Network
         public uint RewardExp;
         public uint RewardItemId;
         public ushort RewardItemCount;
+    }
+
+    // ━━━ 세션 30~37 Enums ━━━
+
+    /// <summary>채팅 채널 타입</summary>
+    public enum ChatChannel : byte
+    {
+        GENERAL = 0,    // 존 채팅
+        PARTY   = 1,    // 파티 채팅
+        WHISPER = 2,    // 귓속말
+        SYSTEM  = 3,    // 시스템 메시지
+    }
+
+    /// <summary>귓속말 결과 코드</summary>
+    public enum WhisperResult : byte
+    {
+        SUCCESS         = 0,
+        TARGET_NOT_FOUND = 1,
+        TARGET_OFFLINE  = 2,
+    }
+
+    /// <summary>귓속말 방향</summary>
+    public enum WhisperDirection : byte
+    {
+        RECEIVED = 0,   // 수신한 귓속말
+        SENT     = 1,   // 보낸 귓속말 에코
+    }
+
+    /// <summary>상점 거래 결과 코드</summary>
+    public enum ShopResult : byte
+    {
+        SUCCESS         = 0,
+        SHOP_NOT_FOUND  = 1,
+        ITEM_NOT_FOUND  = 2,
+        NOT_ENOUGH_GOLD = 3,
+        INVENTORY_FULL  = 4,
+        OUT_OF_STOCK    = 5,
+        EMPTY_SLOT      = 6,
+        INVALID_COUNT   = 7,
+    }
+
+    /// <summary>상점 거래 방향</summary>
+    public enum ShopAction : byte
+    {
+        BUY  = 0,
+        SELL = 1,
+    }
+
+    /// <summary>스킬 레벨업 결과 코드</summary>
+    public enum SkillLevelUpResult : byte
+    {
+        SUCCESS         = 0,
+        SKILL_NOT_FOUND = 1,
+        MAX_LEVEL       = 2,
+        NO_SKILL_POINTS = 3,
+    }
+
+    /// <summary>스킬 효과 타입 (세션 33)</summary>
+    public enum SkillEffect : byte
+    {
+        DAMAGE      = 0,
+        SELF_HEAL   = 1,
+        SELF_BUFF   = 2,
+        AOE_DAMAGE  = 3,
+        DOT_DAMAGE  = 4,
+    }
+
+    /// <summary>보스 특수 공격 타입</summary>
+    public enum BossAttackType : byte
+    {
+        GROUND_SLAM  = 0,
+        FIRE_BREATH  = 1,
+        TAIL_SWIPE   = 2,
+        SUMMON_ADDS  = 3,
+        STOMP        = 4,
+        DARK_NOVA    = 5,
+    }
+
+    // ━━━ 세션 30~37 Data Classes ━━━
+
+    /// <summary>채팅 메시지 데이터 (CHAT_MESSAGE 파싱용)</summary>
+    public class ChatMessageData
+    {
+        public ChatChannel Channel;
+        public ulong SenderEntityId;
+        public string SenderName;
+        public string Message;
+    }
+
+    /// <summary>귓속말 결과 데이터 (WHISPER_RESULT 파싱용)</summary>
+    public class WhisperResultData
+    {
+        public WhisperResult Result;
+        public WhisperDirection Direction;
+        public string OtherName;
+        public string Message;
+    }
+
+    /// <summary>상점 아이템 항목 (SHOP_LIST 파싱용)</summary>
+    public class ShopItemInfo
+    {
+        public uint ItemId;
+        public uint Price;
+        public short Stock;     // -1 = 무한
+    }
+
+    /// <summary>상점 목록 데이터 (SHOP_LIST 파싱용)</summary>
+    public class ShopListData
+    {
+        public uint NpcId;
+        public ShopItemInfo[] Items;
+    }
+
+    /// <summary>상점 거래 결과 데이터 (SHOP_RESULT 파싱용)</summary>
+    public class ShopResultData
+    {
+        public ShopResult Result;
+        public ShopAction Action;
+        public uint ItemId;
+        public ushort Count;
+        public uint Gold;       // 거래 후 남은 골드
+    }
+
+    /// <summary>스킬 레벨업 결과 데이터 (SKILL_LEVEL_UP_RESULT 파싱용)</summary>
+    public class SkillLevelUpResultData
+    {
+        public SkillLevelUpResult Result;
+        public uint SkillId;
+        public byte NewLevel;
+        public uint SkillPoints;
+    }
+
+    /// <summary>스킬 포인트 정보 (SKILL_POINT_INFO 파싱용)</summary>
+    public class SkillPointInfoData
+    {
+        public uint SkillPoints;
+        public uint TotalSpent;
+    }
+
+    /// <summary>보스 스폰 데이터 (BOSS_SPAWN 파싱용)</summary>
+    public class BossSpawnData
+    {
+        public ulong EntityId;
+        public uint BossId;
+        public string Name;
+        public int Level;
+        public int HP, MaxHP;
+        public byte Phase;
+    }
+
+    /// <summary>보스 페이즈 변경 데이터 (BOSS_PHASE_CHANGE 파싱용)</summary>
+    public class BossPhaseChangeData
+    {
+        public ulong EntityId;
+        public uint BossId;
+        public byte NewPhase;
+        public int HP, MaxHP;
+    }
+
+    /// <summary>보스 특수 공격 데이터 (BOSS_SPECIAL_ATTACK 파싱용)</summary>
+    public class BossSpecialAttackData
+    {
+        public ulong EntityId;
+        public uint BossId;
+        public BossAttackType AttackType;
+        public int Damage;
+    }
+
+    /// <summary>보스 인레이지 데이터 (BOSS_ENRAGE 파싱용)</summary>
+    public class BossEnrageData
+    {
+        public ulong EntityId;
+        public uint BossId;
+    }
+
+    /// <summary>보스 처치 데이터 (BOSS_DEFEATED 파싱용)</summary>
+    public class BossDefeatedData
+    {
+        public ulong EntityId;
+        public uint BossId;
+        public ulong KillerEntityId;
+    }
+
+    /// <summary>몬스터 이동 데이터 (MONSTER_MOVE 파싱용)</summary>
+    public class MonsterMoveData
+    {
+        public ulong EntityId;
+        public float X, Y, Z;
+    }
+
+    /// <summary>몬스터 어그로 데이터 (MONSTER_AGGRO 파싱용)</summary>
+    public class MonsterAggroData
+    {
+        public ulong MonsterEntityId;
+        public ulong TargetEntityId;    // 0이면 어그로 해제
+    }
+
+    /// <summary>어드민 리로드 결과 (ADMIN_RELOAD_RESULT 파싱용)</summary>
+    public class AdminReloadResultData
+    {
+        public byte Result;
+        public uint Version;
+        public uint ReloadCount;
+        public string Name;
+    }
+
+    /// <summary>어드민 설정 응답 (ADMIN_CONFIG_RESP 파싱용)</summary>
+    public class AdminConfigRespData
+    {
+        public bool Found;
+        public string Value;
     }
 }
