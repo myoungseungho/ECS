@@ -516,6 +516,9 @@ public static class ProjectSetup
         var secretRealmManagerGo = CreateManagerObject("SecretRealmManager", typeof(SecretRealmManager));
         var secretRealmPortalUIGo = CreateManagerObject("SecretRealmPortalUI", typeof(SecretRealmPortalUI));
         var secretRealmUIGo = CreateManagerObject("SecretRealmUI", typeof(SecretRealmUI));
+        var mentorManagerGo = CreateManagerObject("MentorManager", typeof(MentorManager));
+        var mentorUIGo = CreateManagerObject("MentorUI", typeof(MentorUI));
+        var mentorShopUIGo = CreateManagerObject("MentorShopUI", typeof(MentorShopUI));
 
         // 신규 매니저
         var soundManagerGo = CreateManagerObject("SoundManager", typeof(SoundManager));

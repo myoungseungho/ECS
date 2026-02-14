@@ -222,6 +222,14 @@ namespace Network
         public event Action<SecretRealmEnterResultData> OnSecretRealmEnterResult;
         public event Action<SecretRealmCompleteData> OnSecretRealmComplete;
         public event Action<SecretRealmFailData> OnSecretRealmFail;
+        // S056: 사제 시스템 (TASK 18)
+        public event Action<MentorListEntry[]> OnMentorList;
+        public event Action<MentorRequestResult> OnMentorRequestResult;
+        public event Action<MentorAcceptResultData> OnMentorAcceptResult;
+        public event Action<MentorQuestEntry[]> OnMentorQuests;
+        public event Action<MentorGraduateData> OnMentorGraduate;
+        public event Action<MentorShopListData> OnMentorShopList;
+        public event Action<MentorShopBuyResultData> OnMentorShopBuyResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1190,6 +1198,50 @@ namespace Network
         public void RequestSecretRealmFail()
         {
             _field?.Send(PacketBuilder.SecretRealmFail());
+        }
+
+        // ━━━ S056: 사제 시스템 API ━━━
+
+        /// <summary>사부/제자 검색 (searchType: 0=사부검색, 1=제자검색)</summary>
+        public void RequestMentorSearch(byte searchType)
+        {
+            _field?.Send(PacketBuilder.MentorSearch(searchType));
+        }
+
+        /// <summary>사제 요청 (role: 0=나=제자, 1=나=사부)</summary>
+        public void RequestMentorRequest(uint targetEid, byte role)
+        {
+            _field?.Send(PacketBuilder.MentorRequest(targetEid, role));
+        }
+
+        /// <summary>사제 수락/거절 (accept: 0=거절, 1=수락)</summary>
+        public void RequestMentorAccept(byte accept)
+        {
+            _field?.Send(PacketBuilder.MentorAccept(accept));
+        }
+
+        /// <summary>사제 퀘스트 목록 요청</summary>
+        public void RequestMentorQuestList()
+        {
+            _field?.Send(PacketBuilder.MentorQuestListReq());
+        }
+
+        /// <summary>졸업 요청 (discipleEid: 0=자기자신(제자))</summary>
+        public void RequestMentorGraduate(uint discipleEid)
+        {
+            _field?.Send(PacketBuilder.MentorGraduate(discipleEid));
+        }
+
+        /// <summary>기여도 상점 목록 요청</summary>
+        public void RequestMentorShopList()
+        {
+            _field?.Send(PacketBuilder.MentorShopListReq());
+        }
+
+        /// <summary>기여도 상점 구매</summary>
+        public void RequestMentorShopBuy(byte itemId)
+        {
+            _field?.Send(PacketBuilder.MentorShopBuy(itemId));
         }
 
         /// <summary>연결 끊기</summary>
@@ -2535,6 +2587,58 @@ namespace Network
                     var data = PacketBuilder.ParseSecretRealmFail(payload);
                     Debug.Log($"[Net] SecretRealmFail: consolation={data.ConsolationGold}");
                     OnSecretRealmFail?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S056: 사제 시스템 (TASK 18) ━━━
+
+                case MsgType.MENTOR_LIST:
+                {
+                    var entries = PacketBuilder.ParseMentorList(payload);
+                    Debug.Log($"[Net] MentorList: count={entries.Length}");
+                    OnMentorList?.Invoke(entries);
+                    break;
+                }
+                case MsgType.MENTOR_REQUEST_RESULT:
+                {
+                    var result = PacketBuilder.ParseMentorRequestResult(payload);
+                    Debug.Log($"[Net] MentorRequestResult: {result}");
+                    OnMentorRequestResult?.Invoke(result);
+                    break;
+                }
+                case MsgType.MENTOR_ACCEPT_RESULT:
+                {
+                    var data = PacketBuilder.ParseMentorAcceptResult(payload);
+                    Debug.Log($"[Net] MentorAcceptResult: result={data.Result}, master={data.MasterEid}, disciple={data.DiscipleEid}");
+                    OnMentorAcceptResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.MENTOR_QUESTS:
+                {
+                    var quests = PacketBuilder.ParseMentorQuests(payload);
+                    Debug.Log($"[Net] MentorQuests: count={quests.Length}");
+                    OnMentorQuests?.Invoke(quests);
+                    break;
+                }
+                case MsgType.MENTOR_GRADUATE:
+                {
+                    var data = PacketBuilder.ParseMentorGraduate(payload);
+                    Debug.Log($"[Net] MentorGraduate: result={data.Result}, masterGold={data.MasterGold}, discipleGold={data.DiscipleGold}");
+                    OnMentorGraduate?.Invoke(data);
+                    break;
+                }
+                case MsgType.MENTOR_SHOP_LIST:
+                {
+                    var data = PacketBuilder.ParseMentorShopList(payload);
+                    Debug.Log($"[Net] MentorShopList: contribution={data.Contribution}, items={data.Items.Length}");
+                    OnMentorShopList?.Invoke(data);
+                    break;
+                }
+                case MsgType.MENTOR_SHOP_BUY:
+                {
+                    var data = PacketBuilder.ParseMentorShopBuy(payload);
+                    Debug.Log($"[Net] MentorShopBuy: result={data.Result}, remaining={data.RemainingContribution}");
+                    OnMentorShopBuyResult?.Invoke(data);
                     break;
                 }
 

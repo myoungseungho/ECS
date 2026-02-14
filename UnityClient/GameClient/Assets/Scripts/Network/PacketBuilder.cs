@@ -3377,5 +3377,156 @@ namespace Network
             d.ConsolationGold = BitConverter.ToUInt32(payload, 0);
             return d;
         }
+
+        // ━━━ S056: 사제 시스템 (TASK 18, MsgType 550-560) ━━━
+
+        /// <summary>MENTOR_SEARCH 빌더: search_type(1)</summary>
+        public static byte[] MentorSearch(byte searchType)
+        {
+            return Build(MsgType.MENTOR_SEARCH, new byte[] { searchType });
+        }
+
+        /// <summary>MENTOR_REQUEST 빌더: target_eid(4)+role(1)</summary>
+        public static byte[] MentorRequest(uint targetEid, byte role)
+        {
+            byte[] payload = new byte[5];
+            BitConverter.GetBytes(targetEid).CopyTo(payload, 0);
+            payload[4] = role;
+            return Build(MsgType.MENTOR_REQUEST, payload);
+        }
+
+        /// <summary>MENTOR_ACCEPT 빌더: accept(1)</summary>
+        public static byte[] MentorAccept(byte accept)
+        {
+            return Build(MsgType.MENTOR_ACCEPT, new byte[] { accept });
+        }
+
+        /// <summary>MENTOR_QUEST_LIST 빌더: 빈 페이로드</summary>
+        public static byte[] MentorQuestListReq()
+        {
+            return Build(MsgType.MENTOR_QUEST_LIST);
+        }
+
+        /// <summary>MENTOR_GRADUATE 빌더: disciple_eid(4)</summary>
+        public static byte[] MentorGraduate(uint discipleEid)
+        {
+            return Build(MsgType.MENTOR_GRADUATE, BitConverter.GetBytes(discipleEid));
+        }
+
+        /// <summary>MENTOR_SHOP_LIST 빌더: 빈 페이로드</summary>
+        public static byte[] MentorShopListReq()
+        {
+            return Build(MsgType.MENTOR_SHOP_LIST);
+        }
+
+        /// <summary>MENTOR_SHOP_BUY 빌더: item_id(1)</summary>
+        public static byte[] MentorShopBuy(byte itemId)
+        {
+            return Build(MsgType.MENTOR_SHOP_BUY, new byte[] { itemId });
+        }
+
+        /// <summary>MENTOR_LIST 파싱: count(1)+[entity_id(4)+level(2)+name_len(1)+name(utf8)]*N</summary>
+        public static MentorListEntry[] ParseMentorList(byte[] payload)
+        {
+            int off = 0;
+            byte count = payload[off]; off += 1;
+            var list = new MentorListEntry[count];
+            for (int i = 0; i < count; i++)
+            {
+                var e = new MentorListEntry();
+                e.EntityId = BitConverter.ToUInt32(payload, off); off += 4;
+                e.Level = BitConverter.ToUInt16(payload, off); off += 2;
+                byte nameLen = payload[off]; off += 1;
+                e.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                list[i] = e;
+            }
+            return list;
+        }
+
+        /// <summary>MENTOR_REQUEST_RESULT 파싱: result(1)</summary>
+        public static MentorRequestResult ParseMentorRequestResult(byte[] payload)
+        {
+            return (MentorRequestResult)payload[0];
+        }
+
+        /// <summary>MENTOR_ACCEPT_RESULT 파싱: result(1)+master_eid(4)+disciple_eid(4)</summary>
+        public static MentorAcceptResultData ParseMentorAcceptResult(byte[] payload)
+        {
+            var d = new MentorAcceptResultData();
+            d.Result = (MentorAcceptResult)payload[0];
+            if (payload.Length >= 9)
+            {
+                d.MasterEid = BitConverter.ToUInt32(payload, 1);
+                d.DiscipleEid = BitConverter.ToUInt32(payload, 5);
+            }
+            return d;
+        }
+
+        /// <summary>MENTOR_QUESTS 파싱: count(1)+[quest_id_len(1)+quest_id+name_len(1)+name+type_len(1)+type+count_needed(2)+progress(2)]*N</summary>
+        public static MentorQuestEntry[] ParseMentorQuests(byte[] payload)
+        {
+            int off = 0;
+            byte count = payload[off]; off += 1;
+            var list = new MentorQuestEntry[count];
+            for (int i = 0; i < count; i++)
+            {
+                var q = new MentorQuestEntry();
+                byte qidLen = payload[off]; off += 1;
+                q.QuestId = Encoding.UTF8.GetString(payload, off, qidLen); off += qidLen;
+                byte nameLen = payload[off]; off += 1;
+                q.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                byte typeLen = payload[off]; off += 1;
+                q.Type = Encoding.UTF8.GetString(payload, off, typeLen); off += typeLen;
+                q.CountNeeded = BitConverter.ToUInt16(payload, off); off += 2;
+                q.Progress = BitConverter.ToUInt16(payload, off); off += 2;
+                list[i] = q;
+            }
+            return list;
+        }
+
+        /// <summary>MENTOR_GRADUATE 파싱(서버응답): result(1)+master_eid(4)+disciple_eid(4)+master_gold(4)+disciple_gold(4)</summary>
+        public static MentorGraduateData ParseMentorGraduate(byte[] payload)
+        {
+            var d = new MentorGraduateData();
+            d.Result = (MentorGraduateResult)payload[0];
+            if (payload.Length >= 17)
+            {
+                d.MasterEid = BitConverter.ToUInt32(payload, 1);
+                d.DiscipleEid = BitConverter.ToUInt32(payload, 5);
+                d.MasterGold = BitConverter.ToUInt32(payload, 9);
+                d.DiscipleGold = BitConverter.ToUInt32(payload, 13);
+            }
+            return d;
+        }
+
+        /// <summary>MENTOR_SHOP_LIST 파싱: contribution(4)+count(1)+[item_id(1)+cost(2)+name_len(1)+name(utf8)]*N</summary>
+        public static MentorShopListData ParseMentorShopList(byte[] payload)
+        {
+            var d = new MentorShopListData();
+            int off = 0;
+            d.Contribution = BitConverter.ToUInt32(payload, off); off += 4;
+            byte count = payload[off]; off += 1;
+            d.Items = new MentorShopItem[count];
+            for (int i = 0; i < count; i++)
+            {
+                var item = new MentorShopItem();
+                item.ItemId = payload[off]; off += 1;
+                item.Cost = BitConverter.ToUInt16(payload, off); off += 2;
+                byte nameLen = payload[off]; off += 1;
+                item.Name = Encoding.UTF8.GetString(payload, off, nameLen); off += nameLen;
+                d.Items[i] = item;
+            }
+            return d;
+        }
+
+        /// <summary>MENTOR_SHOP_BUY 파싱(서버응답): result(1)+remaining_contribution(4)</summary>
+        public static MentorShopBuyResultData ParseMentorShopBuy(byte[] payload)
+        {
+            var d = new MentorShopBuyResultData();
+            d.Result = (MentorShopBuyResult)payload[0];
+            if (payload.Length >= 5)
+                d.RemainingContribution = BitConverter.ToUInt32(payload, 1);
+            return d;
+        }
     }
 }

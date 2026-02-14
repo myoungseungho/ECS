@@ -1708,6 +1708,94 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: MentorManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "사제(師弟) 시스템 관리 — S056 TASK 18 (MsgType 550-560) 검색/요청/수락/퀘스트/졸업/상점"
+    reads: []
+    writes:
+      - _masterEid (uint)
+      - _discipleEids (List<uint>)
+      - _contribution (uint)
+      - _lastSearchResults (MentorListEntry[])
+      - _currentQuests (MentorQuestEntry[])
+      - _shopItems (MentorShopItem[])
+      - _hasMaster (bool)
+      - _isMentorUIOpen (bool)
+      - _isMentorShopOpen (bool)
+      - _pendingRequest (bool)
+    fires_events:
+      - OnSearchResult(MentorListEntry[])
+      - OnRequestResult(MentorRequestResult)
+      - OnAcceptResult(MentorAcceptResultData)
+      - OnQuestsUpdated(MentorQuestEntry[])
+      - OnGraduated(MentorGraduateData)
+      - OnShopListReceived(MentorShopListData)
+      - OnShopBuyResult(MentorShopBuyResultData)
+      - OnMentorUIOpened()
+      - OnMentorUIClosed()
+      - OnMentorShopOpened()
+      - OnMentorShopClosed()
+    subscribes_to:
+      - NetworkManager.OnMentorList → 검색 결과 수신
+      - NetworkManager.OnMentorRequestResult → 요청 결과 수신
+      - NetworkManager.OnMentorAcceptResult → 수락 결과 수신
+      - NetworkManager.OnMentorQuests → 퀘스트 목록 수신
+      - NetworkManager.OnMentorGraduate → 졸업 결과 수신
+      - NetworkManager.OnMentorShopList → 상점 목록 수신
+      - NetworkManager.OnMentorShopBuyResult → 상점 구매 결과 수신
+    public_api:
+      - SearchMentor(searchType)
+      - SendRequest(targetEid, role)
+      - AcceptRequest(accept)
+      - RequestQuestList()
+      - Graduate(discipleEid)
+      - RequestShopList()
+      - BuyShopItem(itemId)
+      - OpenMentorUI()
+      - CloseMentorUI()
+      - OpenMentorShop()
+      - CloseMentorShop()
+    computed_properties:
+      - MasterEid, DiscipleEids, Contribution, LastSearchResults, CurrentQuests
+      - ShopItems, HasMaster, IsMentorUIOpen, IsMentorShopOpen, PendingRequest
+
+  - name: MentorUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "사제 메인 UI — S056 TASK 18 (Shift+M키 토글) 검색/요청/퀘스트/졸업"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - MentorManager.OnMentorUIOpened → UI 표시
+      - MentorManager.OnMentorUIClosed → UI 숨김
+      - MentorManager.OnSearchResult → 검색 결과 표시
+      - MentorManager.OnRequestResult → 요청 결과 표시
+      - MentorManager.OnAcceptResult → 수락 결과 표시
+      - MentorManager.OnQuestsUpdated → 퀘스트 갱신
+      - MentorManager.OnGraduated → 졸업 결과 표시
+    public_api: []
+    computed_properties: []
+
+  - name: MentorShopUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "사제 기여도 상점 UI — S056 TASK 18 기여도 상점 아이템 구매"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - MentorManager.OnMentorShopOpened → 상점 표시
+      - MentorManager.OnMentorShopClosed → 상점 숨김
+      - MentorManager.OnShopListReceived → 상점 목록 갱신
+      - MentorManager.OnShopBuyResult → 구매 결과 표시
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -2307,6 +2395,22 @@ data_flows:
     to: SecretRealmUI
     via: "C# events (OnRealmUIOpened, OnRealmUIClosed, OnTimerUpdated, OnRealmCompleted, OnRealmFailed, OnEnterResult)"
     description: "비경 내부 UI 갱신 (F12키 토글)"
+
+  # S056: 사제 시스템 (TASK 18)
+  - from: NetworkManager
+    to: MentorManager
+    via: "C# events (OnMentorList, OnMentorRequestResult, OnMentorAcceptResult, OnMentorQuests, OnMentorGraduate, OnMentorShopList, OnMentorShopBuyResult)"
+    description: "사제 검색/요청/수락/퀘스트/졸업/상점 수신 (550-560)"
+
+  - from: MentorManager
+    to: MentorUI
+    via: "C# events (OnMentorUIOpened, OnMentorUIClosed, OnSearchResult, OnRequestResult, OnAcceptResult, OnQuestsUpdated, OnGraduated)"
+    description: "사제 메인 UI 갱신 (Shift+M키 토글)"
+
+  - from: MentorManager
+    to: MentorShopUI
+    via: "C# events (OnMentorShopOpened, OnMentorShopClosed, OnShopListReceived, OnShopBuyResult)"
+    description: "기여도 상점 UI 갱신"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

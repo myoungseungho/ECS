@@ -431,6 +431,19 @@ namespace Network
         SECRET_REALM_ENTER_RESULT   = 542,  // S→C: result(1)+instance_id(2u16)+realm_type(1)+time_limit(2u16)+is_special(1)+multiplier(2u16)
         SECRET_REALM_COMPLETE       = 543,  // C→S: score_value(2u16)+extra_data(1) | S→C: grade(1)+gold_reward(4u32)+bonus_info_len(1)+bonus_info(utf8)
         SECRET_REALM_FAIL           = 544,  // C→S: empty | S→C: consolation_gold(4u32)
+
+        // ━━━ S056: 사제 시스템 (TASK 18, MsgType 550-560) ━━━
+        MENTOR_SEARCH               = 550,  // C→S: search_type(1u8) — 0=사부검색, 1=제자검색
+        MENTOR_LIST                 = 551,  // S→C: count(1u8)+[entity_id(4u32)+level(2u16)+name_len(1u8)+name(utf8)]*N
+        MENTOR_REQUEST              = 552,  // C→S: target_eid(4u32)+role(1u8) — 0=나=제자, 1=나=사부
+        MENTOR_REQUEST_RESULT       = 553,  // S→C: result(1u8)
+        MENTOR_ACCEPT               = 554,  // C→S: accept(1u8) — 0=거절, 1=수락
+        MENTOR_ACCEPT_RESULT        = 555,  // S→C: result(1u8)+master_eid(4u32)+disciple_eid(4u32)
+        MENTOR_QUEST_LIST           = 556,  // C→S: empty
+        MENTOR_QUESTS               = 557,  // S→C: count(1u8)+[quest_id_len(1)+quest_id(str)+name_len(1)+name(str)+type_len(1)+type(str)+count_needed(2u16)+progress(2u16)]*N
+        MENTOR_GRADUATE             = 558,  // C→S: disciple_eid(4u32) — 0=자기자신(제자) | S→C: result(1u8)+master_eid(4u32)+disciple_eid(4u32)+master_gold(4u32)+disciple_gold(4u32)
+        MENTOR_SHOP_LIST            = 559,  // C→S: empty | S→C: contribution(4u32)+count(1u8)+[item_id(1u8)+cost(2u16)+name_len(1u8)+name(utf8)]*N
+        MENTOR_SHOP_BUY             = 560,  // C→S: item_id(1u8) | S→C: result(1u8)+remaining_contribution(4u32)
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -2641,5 +2654,103 @@ namespace Network
     public class SecretRealmFailData
     {
         public uint ConsolationGold;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S056: 사제 시스템 (TASK 18, MsgType 550-560)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>사제 요청 결과 코드</summary>
+    public enum MentorRequestResult : byte
+    {
+        SENT          = 0,
+        LV_LOW        = 1,
+        LV_HIGH       = 2,
+        HAS_MASTER    = 3,
+        FULL          = 4,
+        NOT_FOUND     = 5,
+        SELF          = 6,
+        ALREADY       = 7,
+    }
+
+    /// <summary>사제 수락 결과 코드</summary>
+    public enum MentorAcceptResult : byte
+    {
+        SUCCESS = 0,
+        FAILED  = 1,
+    }
+
+    /// <summary>졸업 결과 코드</summary>
+    public enum MentorGraduateResult : byte
+    {
+        SUCCESS   = 0,
+        NOT_READY = 1,
+        NOT_FOUND = 2,
+    }
+
+    /// <summary>기여도 상점 구매 결과 코드</summary>
+    public enum MentorShopBuyResult : byte
+    {
+        SUCCESS               = 0,
+        INSUFFICIENT_CONTRIB  = 1,
+        INVALID_ITEM          = 2,
+    }
+
+    /// <summary>사부/제자 검색 결과 항목</summary>
+    public class MentorListEntry
+    {
+        public uint EntityId;
+        public ushort Level;
+        public string Name;
+    }
+
+    /// <summary>사제 수락 결과 데이터 (MENTOR_ACCEPT_RESULT 파싱용)</summary>
+    public class MentorAcceptResultData
+    {
+        public MentorAcceptResult Result;
+        public uint MasterEid;
+        public uint DiscipleEid;
+    }
+
+    /// <summary>사제 퀘스트 항목</summary>
+    public class MentorQuestEntry
+    {
+        public string QuestId;
+        public string Name;
+        public string Type;
+        public ushort CountNeeded;
+        public ushort Progress;
+    }
+
+    /// <summary>졸업 결과 데이터 (MENTOR_GRADUATE 파싱용)</summary>
+    public class MentorGraduateData
+    {
+        public MentorGraduateResult Result;
+        public uint MasterEid;
+        public uint DiscipleEid;
+        public uint MasterGold;
+        public uint DiscipleGold;
+    }
+
+    /// <summary>기여도 상점 아이템 항목</summary>
+    public class MentorShopItem
+    {
+        public byte ItemId;
+        public ushort Cost;
+        public string Name;
+    }
+
+    /// <summary>기여도 상점 목록 데이터 (MENTOR_SHOP_LIST 파싱용)</summary>
+    public class MentorShopListData
+    {
+        public uint Contribution;
+        public MentorShopItem[] Items;
+    }
+
+    /// <summary>기여도 상점 구매 결과 데이터 (MENTOR_SHOP_BUY 파싱용)</summary>
+    public class MentorShopBuyResultData
+    {
+        public MentorShopBuyResult Result;
+        public uint RemainingContribution;
     }
 }

@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T07:55:00"
+last_session: "2026-02-15T08:15:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 16 비경 탐험 구현 완료 — SecretRealmManager + SecretRealmPortalUI + SecretRealmUI + 패킷 5종(540-544) + TCP 테스트 10건 | 111 PASS 0 FAIL"
+current_status: "Phase 17 사제 시스템 구현 완료 — MentorManager + MentorUI + MentorShopUI + 패킷 11종(550-560) + TCP 테스트 10건 | 113 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -296,6 +296,19 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase16_secret_realm_tcp.py"
+  - id: A31
+    desc: "S056 Phase 17 사제 시스템 — MentorManager + MentorUI + MentorShopUI + 패킷 11종(550-560) + TCP 테스트 10건"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/MentorManager.cs"
+      - "Assets/Scripts/UI/MentorUI.cs"
+      - "Assets/Scripts/UI/MentorShopUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase17_mentor_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -409,10 +422,11 @@ pending_tasks:
     blocked_reason: "완료 (A30)"
     status: done
   - id: "gdd_task18_mentor_ui"
-    desc: "사제 시스템 UI — MentorUI (서버 TASK 18 MsgType 550-560)"
+    desc: "사제 시스템 UI — MentorManager + MentorUI + MentorShopUI (서버 TASK 18 MsgType 550-560)"
     priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 18 (사제 핸들러) 구현 대기 — S044 신규"
+    blocked: false
+    blocked_reason: "완료 (A31)"
+    status: done
 
 # ── 최근 중요 결정 ──
 recent_decisions:
@@ -471,6 +485,12 @@ recent_decisions:
   - "S055 TASK 17: 비경 5종(trial/wisdom/treasure/training/fortune) + 특수 4종(유령시련/뇌신수련/수정보물/운명정원) + unlock_lv20 + daily_limit3"
   - "비경 UI 단축키: F12=비경내부UI, 포탈알림=자동팝업(8초)"
   - "비경 등급: S/A/B/C, 위로보상 100골드, multiplier x100 포맷(100=1.0x)"
+  - "Phase 17: 사제 시스템(550-560) MentorManager+MentorUI+MentorShopUI 클라 구현 완료 — S056 응답"
+  - "S056 TASK 18: 사부 Lv40+/제자 Lv1-20/졸업 Lv30/제자max3/퀘스트주3/상점8종/EXP파티+30%솔로+10%/사부공유10%"
+  - "사제 UI 단축키: Shift+M=사제패널, 기여도상점=패널 내 버튼"
+  - "사제 요청 결과코드: 0=SENT/1=LV_LOW/2=LV_HIGH/3=HAS_MASTER/4=FULL/5=NOT_FOUND/6=SELF/7=ALREADY"
+  - "졸업 보상: 사부 기여도500+골드10000, 제자 골드5000+EXP10000"
+  - "S056이 마지막 브레인스토밍 TASK — 이후 남은 TASK 11/12/13/14는 서버측 미완료 상태"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -526,6 +546,7 @@ processed_messages:
   - "S053"
   - "S054"
   - "S055"
+  - "S056"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
