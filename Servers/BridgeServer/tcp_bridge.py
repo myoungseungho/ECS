@@ -383,6 +383,19 @@ class MsgType(IntEnum):
     SECRET_REALM_COMPLETE = 543
     SECRET_REALM_FAIL = 544
 
+    # Mentorship System (TASK 18)
+    MENTOR_SEARCH = 550
+    MENTOR_LIST = 551
+    MENTOR_REQUEST = 552
+    MENTOR_REQUEST_RESULT = 553
+    MENTOR_ACCEPT = 554
+    MENTOR_ACCEPT_RESULT = 555
+    MENTOR_QUEST_LIST = 556
+    MENTOR_QUESTS = 557
+    MENTOR_GRADUATE = 558
+    MENTOR_SHOP_LIST = 559
+    MENTOR_SHOP_BUY = 560
+
 
 # ━━━ 패킷 빌드/파싱 유틸 ━━━
 
@@ -573,6 +586,10 @@ class PlayerSession:
     # ---- Secret Realm (TASK 17) ----
     realm_daily_count: int = 0                  # 오늘 비경 입장 횟수
     realm_instance_id: int = 0                  # 현재 비경 인스턴스 (0=없음)
+    # ---- Mentorship (TASK 18) ----
+    mentor_master_eid: int = 0                # 내 사부 entity_id (0=없음)
+    mentor_contribution: int = 0              # 사문 기여도
+    mentor_graduation_count: int = 0          # 졸업시킨 제자 수
 
 
 # ━━━ 게임 데이터 정의 ━━━
@@ -1831,6 +1848,74 @@ SPECIAL_REALM_SPAWN_CHANCE = 0.5  # 50% when condition met
 _REALM_PORTALS = {}
 _REALM_INSTANCES = {}  # instance_id -> {players: [sid], realm_type, start_time, special_multiplier}
 _REALM_NEXT_ID = 1
+
+# ---- Mentorship System Data (GDD mentorship.yaml) ----
+MENTOR_MASTER_MIN_LEVEL = 40
+MENTOR_MASTER_MAX_DISCIPLES = 3
+MENTOR_DISCIPLE_LEVEL_RANGE = (1, 20)
+MENTOR_DISCIPLE_MAX_MASTERS = 1
+MENTOR_GRADUATION_LEVEL = 30
+
+# EXP buff rates
+MENTOR_EXP_BUFF_PARTY = 0.30   # 사부와 파티 시 +30%
+MENTOR_EXP_BUFF_SOLO = 0.10    # 사부 있을 때 솔로 +10%
+MENTOR_MASTER_EXP_SHARE = 0.10 # 제자 처치 EXP의 10% 사부 추가
+
+# Contribution rewards
+MENTOR_CONTRIB_LEVEL_UP = 10       # 제자 레벨업당 10
+MENTOR_CONTRIB_QUEST_COMPLETE = 50 # 사제 퀘스트 완료당 50
+MENTOR_CONTRIB_DUNGEON_CLEAR = 20  # 제자 던전 클리어 20
+MENTOR_CONTRIB_GRADUATION = 500    # 졸업 보너스
+
+# Quest pool (5종, 주 3회)
+MENTOR_QUEST_WEEKLY_COUNT = 3
+MENTOR_QUEST_POOL = [
+    {"id": "mq_hunt_together", "name": "사냥 수련", "type": "kill", "count": 30,
+     "condition": "same_party",
+     "reward_master": {"contribution": 50, "gold": 2000},
+     "reward_disciple": {"exp": 3000, "gold": 1000}},
+    {"id": "mq_dungeon_together", "name": "던전 돌파", "type": "dungeon_clear", "count": 1,
+     "condition": "same_party",
+     "reward_master": {"contribution": 80, "gold": 3000, "dungeon_token": 5},
+     "reward_disciple": {"exp": 5000, "gold": 2000}},
+    {"id": "mq_gather_together", "name": "채집 수업", "type": "gather", "count": 10,
+     "condition": "same_zone",
+     "reward_master": {"contribution": 30},
+     "reward_disciple": {"exp": 1000}},
+    {"id": "mq_explore_together", "name": "세계 탐험", "type": "discover_area", "count": 3,
+     "condition": "same_party",
+     "reward_master": {"contribution": 40, "gold": 1500},
+     "reward_disciple": {"exp": 2000}},
+    {"id": "mq_boss_together", "name": "보스 도전", "type": "kill_boss", "count": 1,
+     "condition": "same_party",
+     "reward_master": {"contribution": 100, "gold": 5000},
+     "reward_disciple": {"exp": 8000, "gold": 3000}},
+]
+
+# Mentor shop (8종 아이템)
+MENTOR_SHOP_ITEMS = [
+    {"id": 1, "name": "대사부의 증표",       "type": "material",    "cost": 200},
+    {"id": 2, "name": "사부의 비단 깃발",    "type": "cosmetic",    "cost": 100},
+    {"id": 3, "name": "제자 모집 문패",      "type": "cosmetic",    "cost": 50},
+    {"id": 4, "name": "미확인 비급 (희귀)",  "type": "scroll",      "cost": 150},
+    {"id": 5, "name": "미확인 비급 (영웅)",  "type": "scroll",      "cost": 400},
+    {"id": 6, "name": "사문의 축복 부적",    "type": "consumable",  "cost": 30},
+    {"id": 7, "name": "사부의 회복약",       "type": "consumable",  "cost": 20},
+    {"id": 8, "name": "탈것: 사문의 학",     "type": "mount",       "cost": 500},
+]
+
+# Graduation rewards
+MENTOR_GRADUATION_REWARDS_MASTER = {"contribution": 500, "gold": 10000}
+MENTOR_GRADUATION_REWARDS_DISCIPLE = {"gold": 5000, "exp": 10000}
+
+# Global mentorship state
+_MENTOR_RELATIONS = {}   # master_eid -> [disciple_eid, ...]
+_DISCIPLE_MASTERS = {}   # disciple_eid -> master_eid
+_MENTOR_REQUESTS = {}    # target_eid -> {from_eid, role, timestamp}
+_MENTOR_QUESTS = {}      # pair_key (master_eid, disciple_eid) -> [quest_dict, ...]
+_MENTOR_QUEST_WEEK = {}  # pair_key -> week_number (to track weekly reset)
+_MENTOR_CONTRIBUTION = {} # eid -> contribution_points
+_MENTOR_GRADUATION_COUNT = {} # master_eid -> graduation_count
 # Equipment type by item_id range for random option pool
 def _get_equip_type_by_id(item_id):
     """Map item_id to equipment type for random option pool lookup."""
@@ -2257,6 +2342,13 @@ class BridgeServer:
             MsgType.SECRET_REALM_ENTER: self._on_secret_realm_enter,
             MsgType.SECRET_REALM_COMPLETE: self._on_secret_realm_complete,
             MsgType.SECRET_REALM_FAIL: self._on_secret_realm_fail,
+            MsgType.MENTOR_SEARCH: self._on_mentor_search,
+            MsgType.MENTOR_REQUEST: self._on_mentor_request,
+            MsgType.MENTOR_ACCEPT: self._on_mentor_accept,
+            MsgType.MENTOR_QUEST_LIST: self._on_mentor_quest_list,
+            MsgType.MENTOR_GRADUATE: self._on_mentor_graduate,
+            MsgType.MENTOR_SHOP_LIST: self._on_mentor_shop_list,
+            MsgType.MENTOR_SHOP_BUY: self._on_mentor_shop_buy,
         }
 
         handler = handlers.get(msg_type)
@@ -4724,6 +4816,450 @@ class BridgeServer:
 
 
 
+
+
+    # ---- Mentorship System (TASK 18: MsgType 550-560) ----
+
+    def _mentor_get_contribution(self, eid: int) -> int:
+        """Get contribution points for a player."""
+        # Check session first
+        for s in self.sessions.values():
+            if s.entity_id == eid:
+                return s.mentor_contribution
+        return _MENTOR_CONTRIBUTION.get(eid, 0)
+
+    def _mentor_add_contribution(self, eid: int, amount: int):
+        """Add contribution points to a player."""
+        for s in self.sessions.values():
+            if s.entity_id == eid:
+                s.mentor_contribution += amount
+                _MENTOR_CONTRIBUTION[eid] = s.mentor_contribution
+                return
+        _MENTOR_CONTRIBUTION[eid] = _MENTOR_CONTRIBUTION.get(eid, 0) + amount
+
+    def _mentor_exp_multiplier(self, session) -> float:
+        """Calculate EXP multiplier from mentorship.
+        Disciple: +30% if in party with master, +10% otherwise (if has master).
+        """
+        if not session.in_game:
+            return 1.0
+        eid = session.entity_id
+        master_eid = _DISCIPLE_MASTERS.get(eid, 0)
+        if master_eid == 0:
+            return 1.0
+        # Check if in same party
+        party_id = getattr(session, 'party_id', 0)
+        if party_id:
+            for s in self.sessions.values():
+                if s.entity_id == master_eid and s.in_game and getattr(s, 'party_id', 0) == party_id:
+                    return 1.0 + MENTOR_EXP_BUFF_PARTY  # +30%
+        return 1.0 + MENTOR_EXP_BUFF_SOLO  # +10%
+
+    def _mentor_on_mob_kill(self, killer_session, base_exp: int):
+        """Hook: when disciple kills a mob, give master 10% of EXP."""
+        eid = killer_session.entity_id
+        master_eid = _DISCIPLE_MASTERS.get(eid, 0)
+        if master_eid == 0:
+            return
+        bonus = int(base_exp * MENTOR_MASTER_EXP_SHARE)
+        if bonus <= 0:
+            return
+        for s in self.sessions.values():
+            if s.entity_id == master_eid and s.in_game:
+                s.stats.exp += bonus
+                break
+
+    async def _on_mentor_search(self, session, payload: bytes):
+        """MENTOR_SEARCH(550) -> MENTOR_LIST(551)
+        Request: search_type(u8) — 0=search_masters, 1=search_disciples
+        Response: count(u8) + [entity_id(u32) + level(u16) + name_len(u8) + name(utf8)] * count
+        """
+        if not session.in_game or len(payload) < 1:
+            return
+        search_type = payload[0]
+        results = []
+
+        if search_type == 0:
+            # Search available masters: Lv40+, disciples < 3
+            for s in self.sessions.values():
+                if not s.in_game or s.entity_id == session.entity_id:
+                    continue
+                if s.stats.level < MENTOR_MASTER_MIN_LEVEL:
+                    continue
+                current_disciples = _MENTOR_RELATIONS.get(s.entity_id, [])
+                if len(current_disciples) >= MENTOR_MASTER_MAX_DISCIPLES:
+                    continue
+                results.append(s)
+        else:
+            # Search available disciples: Lv1~20, no master
+            for s in self.sessions.values():
+                if not s.in_game or s.entity_id == session.entity_id:
+                    continue
+                lv = s.stats.level
+                if lv < MENTOR_DISCIPLE_LEVEL_RANGE[0] or lv > MENTOR_DISCIPLE_LEVEL_RANGE[1]:
+                    continue
+                if s.entity_id in _DISCIPLE_MASTERS:
+                    continue
+                results.append(s)
+
+        results = results[:20]  # Max 20 results
+        data = struct.pack('<B', len(results))
+        for s in results:
+            name_bytes = s.char_name.encode('utf-8')[:30]
+            data += struct.pack('<I H B', s.entity_id, s.stats.level, len(name_bytes))
+            data += name_bytes
+
+        self._send(session, MsgType.MENTOR_LIST, data)
+
+    async def _on_mentor_request(self, session, payload: bytes):
+        """MENTOR_REQUEST(552) -> MENTOR_REQUEST_RESULT(553)
+        Request: target_eid(u32) + role(u8) — role: 0=I want to be disciple, 1=I want to be master
+        Response: result(u8)
+          0=REQUEST_SENT, 1=LEVEL_TOO_LOW (master needs 40+),
+          2=LEVEL_TOO_HIGH (disciple needs 1~20), 3=ALREADY_HAS_MASTER,
+          4=FULL_DISCIPLES, 5=TARGET_NOT_FOUND, 6=SELF_REQUEST, 7=ALREADY_IN_RELATION
+        """
+        if not session.in_game or len(payload) < 5:
+            return
+        target_eid = struct.unpack('<I', payload[0:4])[0]
+        role = payload[4]  # 0=requestor wants to be disciple, 1=requestor wants to be master
+
+        def _send_result(code):
+            self._send(session, MsgType.MENTOR_REQUEST_RESULT, struct.pack('<B', code))
+
+        # Self check
+        if target_eid == session.entity_id:
+            _send_result(6)
+            return
+
+        # Find target
+        target = None
+        for s in self.sessions.values():
+            if s.entity_id == target_eid and s.in_game:
+                target = s
+                break
+        if not target:
+            _send_result(5)
+            return
+
+        if role == 0:
+            # I want to be disciple -> target is master
+            master_session = target
+            disciple_session = session
+        else:
+            # I want to be master -> target is disciple
+            master_session = session
+            disciple_session = target
+
+        master_eid = master_session.entity_id
+        disciple_eid = disciple_session.entity_id
+
+        # Check already in relation
+        if disciple_eid in _DISCIPLE_MASTERS:
+            if _DISCIPLE_MASTERS[disciple_eid] == master_eid:
+                _send_result(7)  # ALREADY_IN_RELATION
+                return
+            _send_result(3)  # ALREADY_HAS_MASTER
+            return
+
+        # Master level check
+        if master_session.stats.level < MENTOR_MASTER_MIN_LEVEL:
+            _send_result(1)
+            return
+
+        # Disciple level check
+        d_lv = disciple_session.stats.level
+        if d_lv < MENTOR_DISCIPLE_LEVEL_RANGE[0] or d_lv > MENTOR_DISCIPLE_LEVEL_RANGE[1]:
+            _send_result(2)
+            return
+
+        # Master full check
+        if len(_MENTOR_RELATIONS.get(master_eid, [])) >= MENTOR_MASTER_MAX_DISCIPLES:
+            _send_result(4)
+            return
+
+        # Store pending request
+        _MENTOR_REQUESTS[target_eid] = {
+            "from_eid": session.entity_id,
+            "master_eid": master_eid,
+            "disciple_eid": disciple_eid,
+            "timestamp": time.time(),
+        }
+
+        _send_result(0)  # REQUEST_SENT
+
+    async def _on_mentor_accept(self, session, payload: bytes):
+        """MENTOR_ACCEPT(554) -> MENTOR_ACCEPT_RESULT(555)
+        Request: accept(u8) — 0=reject, 1=accept
+        Response: result(u8) + master_eid(u32) + disciple_eid(u32)
+          result: 0=ACCEPTED, 1=REJECTED, 2=NO_PENDING_REQUEST, 3=CONDITIONS_CHANGED
+        """
+        if not session.in_game or len(payload) < 1:
+            return
+        accept = payload[0]
+
+        def _send_result(code, m_eid=0, d_eid=0):
+            self._send(session, MsgType.MENTOR_ACCEPT_RESULT,
+                       struct.pack('<B I I', code, m_eid, d_eid))
+
+        # Check pending request for this session
+        req = _MENTOR_REQUESTS.pop(session.entity_id, None)
+        if not req:
+            _send_result(2)
+            return
+
+        master_eid = req["master_eid"]
+        disciple_eid = req["disciple_eid"]
+
+        if accept == 0:
+            _send_result(1, master_eid, disciple_eid)  # REJECTED
+            return
+
+        # Re-validate conditions
+        master_s = None
+        disciple_s = None
+        for s in self.sessions.values():
+            if s.entity_id == master_eid and s.in_game:
+                master_s = s
+            if s.entity_id == disciple_eid and s.in_game:
+                disciple_s = s
+
+        if not master_s or not disciple_s:
+            _send_result(3, master_eid, disciple_eid)
+            return
+
+        if master_s.stats.level < MENTOR_MASTER_MIN_LEVEL:
+            _send_result(3, master_eid, disciple_eid)
+            return
+
+        d_lv = disciple_s.stats.level
+        if d_lv < MENTOR_DISCIPLE_LEVEL_RANGE[0] or d_lv > MENTOR_DISCIPLE_LEVEL_RANGE[1]:
+            _send_result(3, master_eid, disciple_eid)
+            return
+
+        if disciple_eid in _DISCIPLE_MASTERS:
+            _send_result(3, master_eid, disciple_eid)
+            return
+
+        if len(_MENTOR_RELATIONS.get(master_eid, [])) >= MENTOR_MASTER_MAX_DISCIPLES:
+            _send_result(3, master_eid, disciple_eid)
+            return
+
+        # Establish relation
+        if master_eid not in _MENTOR_RELATIONS:
+            _MENTOR_RELATIONS[master_eid] = []
+        _MENTOR_RELATIONS[master_eid].append(disciple_eid)
+        _DISCIPLE_MASTERS[disciple_eid] = master_eid
+
+        # Set on disciple session
+        disciple_s.mentor_master_eid = master_eid
+
+        _send_result(0, master_eid, disciple_eid)  # ACCEPTED
+
+        # Also notify the other party
+        from_s = None
+        for s in self.sessions.values():
+            if s.entity_id == req["from_eid"] and s.in_game:
+                from_s = s
+                break
+        if from_s and from_s.entity_id != session.entity_id:
+            self._send(from_s, MsgType.MENTOR_ACCEPT_RESULT,
+                       struct.pack('<B I I', 0, master_eid, disciple_eid))
+
+    async def _on_mentor_quest_list(self, session, payload: bytes):
+        """MENTOR_QUEST_LIST(556) -> MENTOR_QUESTS(557)
+        Request: (empty)
+        Response: count(u8) + [quest_id_len(u8) + quest_id(utf8) + name_len(u8) + name(utf8) +
+                  type_len(u8) + type(utf8) + count_needed(u16) + progress(u16)] * count
+        """
+        if not session.in_game:
+            return
+
+        eid = session.entity_id
+        # Find the mentor pair
+        master_eid = _DISCIPLE_MASTERS.get(eid, 0)
+        if master_eid == 0:
+            # Maybe this session is a master — pick first disciple
+            disciples = _MENTOR_RELATIONS.get(eid, [])
+            if not disciples:
+                self._send(session, MsgType.MENTOR_QUESTS, struct.pack('<B', 0))
+                return
+            disciple_eid = disciples[0]
+            master_eid = eid
+        else:
+            disciple_eid = eid
+
+        pair_key = (master_eid, disciple_eid)
+
+        # Generate quests for this week if needed
+        import random as _random
+        week_num = int(time.time()) // (7 * 86400)
+        if pair_key not in _MENTOR_QUESTS or _MENTOR_QUEST_WEEK.get(pair_key) != week_num:
+            selected = _random.sample(MENTOR_QUEST_POOL, min(MENTOR_QUEST_WEEKLY_COUNT, len(MENTOR_QUEST_POOL)))
+            quests = []
+            for q in selected:
+                quests.append({
+                    "id": q["id"], "name": q["name"], "type": q["type"],
+                    "count_needed": q["count"], "progress": 0,
+                    "condition": q["condition"],
+                    "reward_master": q["reward_master"],
+                    "reward_disciple": q["reward_disciple"],
+                    "completed": False,
+                })
+            _MENTOR_QUESTS[pair_key] = quests
+            _MENTOR_QUEST_WEEK[pair_key] = week_num
+
+        quests = _MENTOR_QUESTS[pair_key]
+        data = struct.pack('<B', len(quests))
+        for q in quests:
+            qid = q["id"].encode('utf-8')[:30]
+            qname = q["name"].encode('utf-8')[:30]
+            qtype = q["type"].encode('utf-8')[:20]
+            data += struct.pack('<B', len(qid)) + qid
+            data += struct.pack('<B', len(qname)) + qname
+            data += struct.pack('<B', len(qtype)) + qtype
+            data += struct.pack('<H H', q["count_needed"], q["progress"])
+
+        self._send(session, MsgType.MENTOR_QUESTS, data)
+
+    async def _on_mentor_graduate(self, session, payload: bytes):
+        """MENTOR_GRADUATE(558) — auto-triggered when disciple reaches Lv30.
+        Can also be called explicitly to check & trigger graduation.
+        Request: disciple_eid(u32) — 0 means check self (if disciple)
+        Response: result(u8) + master_eid(u32) + disciple_eid(u32) + master_gold(u32) + disciple_gold(u32)
+          result: 0=GRADUATED, 1=NOT_IN_RELATION, 2=LEVEL_NOT_REACHED, 3=NOT_YOUR_DISCIPLE
+        """
+        if not session.in_game:
+            return
+
+        def _send_result(code, m_eid=0, d_eid=0, m_gold=0, d_gold=0):
+            self._send(session, MsgType.MENTOR_GRADUATE,
+                       struct.pack('<B I I I I', code, m_eid, d_eid, m_gold, d_gold))
+
+        eid = session.entity_id
+        disciple_eid = 0
+        if len(payload) >= 4:
+            disciple_eid = struct.unpack('<I', payload[0:4])[0]
+
+        if disciple_eid == 0:
+            # Check self as disciple
+            disciple_eid = eid
+
+        master_eid = _DISCIPLE_MASTERS.get(disciple_eid, 0)
+        if master_eid == 0:
+            _send_result(1)
+            return
+
+        # Verify the caller is either the master or the disciple
+        if eid != master_eid and eid != disciple_eid:
+            _send_result(3)
+            return
+
+        # Check disciple level
+        disciple_s = None
+        for s in self.sessions.values():
+            if s.entity_id == disciple_eid and s.in_game:
+                disciple_s = s
+                break
+
+        if not disciple_s:
+            _send_result(1)
+            return
+
+        if disciple_s.stats.level < MENTOR_GRADUATION_LEVEL:
+            _send_result(2, master_eid, disciple_eid)
+            return
+
+        # Graduate!
+        # Master rewards
+        m_gold = MENTOR_GRADUATION_REWARDS_MASTER.get("gold", 0)
+        m_contrib = MENTOR_GRADUATION_REWARDS_MASTER.get("contribution", 0)
+        self._mentor_add_contribution(master_eid, m_contrib)
+
+        master_s = None
+        for s in self.sessions.values():
+            if s.entity_id == master_eid and s.in_game:
+                master_s = s
+                break
+        if master_s:
+            master_s.gold = min(master_s.gold + m_gold, 999999999)
+            master_s.mentor_graduation_count += 1
+            _MENTOR_GRADUATION_COUNT[master_eid] = master_s.mentor_graduation_count
+
+        # Disciple rewards
+        d_gold = MENTOR_GRADUATION_REWARDS_DISCIPLE.get("gold", 0)
+        d_exp = MENTOR_GRADUATION_REWARDS_DISCIPLE.get("exp", 0)
+        disciple_s.gold = min(disciple_s.gold + d_gold, 999999999)
+        disciple_s.stats.exp += d_exp
+
+        # Clear relation
+        if master_eid in _MENTOR_RELATIONS:
+            if disciple_eid in _MENTOR_RELATIONS[master_eid]:
+                _MENTOR_RELATIONS[master_eid].remove(disciple_eid)
+        _DISCIPLE_MASTERS.pop(disciple_eid, None)
+        disciple_s.mentor_master_eid = 0
+
+        # Clear quests
+        pair_key = (master_eid, disciple_eid)
+        _MENTOR_QUESTS.pop(pair_key, None)
+        _MENTOR_QUEST_WEEK.pop(pair_key, None)
+
+        _send_result(0, master_eid, disciple_eid, m_gold, d_gold)
+
+        # Broadcast graduation
+        grad_msg = f"[사제졸업] 축하합니다!"
+        grad_bytes = grad_msg.encode('utf-8')[:100]
+        broadcast_data = struct.pack('<I I B', master_eid, disciple_eid, len(grad_bytes)) + grad_bytes
+        for s in self.sessions.values():
+            if s.in_game:
+                self._send(s, MsgType.MENTOR_GRADUATE, broadcast_data)
+
+    async def _on_mentor_shop_list(self, session, payload: bytes):
+        """MENTOR_SHOP_LIST(559) -> MENTOR_SHOP(560 as list response reuse)
+        Request: (empty)
+        Response: contribution(u32) + count(u8) + [item_id(u8) + cost(u16) + name_len(u8) + name(utf8)] * count
+        """
+        if not session.in_game:
+            return
+        contrib = session.mentor_contribution
+        data = struct.pack('<I B', contrib, len(MENTOR_SHOP_ITEMS))
+        for item in MENTOR_SHOP_ITEMS:
+            name_bytes = item["name"].encode('utf-8')[:30]
+            data += struct.pack('<B H B', item["id"], item["cost"], len(name_bytes))
+            data += name_bytes
+        self._send(session, MsgType.MENTOR_SHOP_LIST, data)
+
+    async def _on_mentor_shop_buy(self, session, payload: bytes):
+        """MENTOR_SHOP_BUY(560)
+        Request: item_id(u8)
+        Response: result(u8) + remaining_contribution(u32)
+          result: 0=SUCCESS, 1=NOT_ENOUGH_CONTRIBUTION, 2=INVALID_ITEM
+        """
+        if not session.in_game or len(payload) < 1:
+            return
+        item_id = payload[0]
+
+        shop_item = None
+        for it in MENTOR_SHOP_ITEMS:
+            if it["id"] == item_id:
+                shop_item = it
+                break
+
+        if not shop_item:
+            self._send(session, MsgType.MENTOR_SHOP_BUY,
+                       struct.pack('<B I', 2, session.mentor_contribution))
+            return
+
+        if session.mentor_contribution < shop_item["cost"]:
+            self._send(session, MsgType.MENTOR_SHOP_BUY,
+                       struct.pack('<B I', 1, session.mentor_contribution))
+            return
+
+        session.mentor_contribution -= shop_item["cost"]
+        _MENTOR_CONTRIBUTION[session.entity_id] = session.mentor_contribution
+
+        self._send(session, MsgType.MENTOR_SHOP_BUY,
+                   struct.pack('<B I', 0, session.mentor_contribution))
 
     # ---- Secret Realm System (TASK 17: MsgType 540-544) ----
 

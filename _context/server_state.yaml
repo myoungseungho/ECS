@@ -6,10 +6,10 @@
 
 agent: server
 project_root: "C:\\Users\\gnidev0095\\OneDrive\\바탕 화면\\Lost\\GameServerSkeleton"
-last_session: "2026-02-16T07:42:00"
+last_session: "2026-02-16T08:03:00"
 
 # ── 현재 상태 ──
-current_status: "TASK 17 비경탐험 완료! 108/108 ALL PASS (S055). 비경5종(trial/wisdom/treasure/training/fortune)+특수비경4종(night_fog/storm_noon/snow_dawn/clear_evening)+등급S/A/B/C보상+일일3회제한 핸들러3+헬퍼3(MsgType 540-544). 다음: TASK 18 사제시스템(550-560)."
+current_status: "TASK 18 사제시스템 완료! 117/117 ALL PASS (S056). 핸들러7(SEARCH/REQUEST/ACCEPT/QUEST_LIST/GRADUATE/SHOP_LIST/SHOP_BUY)+헬퍼4(contribution/exp_multiplier/mob_kill)+퀘스트풀5종+기여도상점8종+EXP버프(파티+30%/솔로+10%). MsgType 550-560. 다음: TASK 11~14 중 선택."
 
 # ── 완료된 작업 ──
 completed:
@@ -115,6 +115,9 @@ completed:
   - id: S055
     desc: "C035 응답: TASK 17 비경탐험 완료. MsgType 540-544. 핸들러3(ENTER/COMPLETE/FAIL)+헬퍼3(_realm_grade/_realm_rewards/_check_special_realm)+포탈스폰. 비경5종(trial/wisdom/treasure/training/fortune)+특수4종(night_fog/storm_noon/snow_dawn/clear_evening)+등급S/A/B/C+일일3회. 108/108 ALL PASS."
     files: ["Servers/BridgeServer/_patch_s055.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_gdd/data/secret_realm_conditions.yaml", "_comms/server_to_client/S055_c035_response_task17_secret_realm.md"]
+  - id: S056
+    desc: "C036 응답: TASK 18 사제시스템 완료. MsgType 550-560. 핸들러7(SEARCH/LIST/REQUEST/ACCEPT/QUEST_LIST/GRADUATE/SHOP_LIST/SHOP_BUY)+헬퍼4(contribution/exp_multiplier/mob_kill). 사부Lv40+/제자3max/제자Lv1~20/졸업Lv30. 퀘스트풀5종(사냥/던전/채집/탐험/보스)+기여도상점8종+EXP버프(파티+30%/솔로+10%)+졸업보상(사부500기여+10Kg/제자5Kg+10KEXP). 117/117 ALL PASS."
+    files: ["Servers/BridgeServer/_patch_s056.py", "Servers/BridgeServer/tcp_bridge.py", "Servers/BridgeServer/test_tcp_bridge.py", "_comms/server_to_client/S056_c036_response_task18_mentorship.md"]
 
 # ── 대기 중 (클라이언트 응답 필요) ──
 blocked: []
@@ -182,51 +185,9 @@ pending_tasks:
   # ============================================================
 
   # ============================================================
-  # TASK 18: 사제(師弟) 시스템 (GDD rules/mentorship.yaml) [브레인스토밍 신규]
-  # 사부-제자 관계 + 전용 퀘스트 + 졸업
-  # MsgType: 550-560
+  # TASK 18: 완료! (S056) — 사제 시스템 117/117 PASS
+  # mentor_sub01~07 모두 완료
   # ============================================================
-  - id: "mentor_sub01"
-    desc: "MENTOR_SEARCH(550)→MENTOR_LIST(551) 핸들러 — 사부/제자 검색. 사부: Lv.40+/제자3명미만, 제자: Lv.1~20/사부없음."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub02"
-    desc: "MENTOR_REQUEST(552)→MENTOR_REQUEST_RESULT(553) + MENTOR_ACCEPT(554)→MENTOR_ACCEPT_RESULT(555) — 사제 요청/수락/거절."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub03"
-    desc: "MENTOR_QUEST_LIST(556)→MENTOR_QUESTS(557) 핸들러 — 사제 전용 퀘스트 3개/주. 사냥/던전/채집/탐험/보스 중 랜덤 3개. same_party 조건 체크."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub04"
-    desc: "MENTOR_GRADUATE(558) 핸들러 — 제자 Lv.30 도달 시 자동 졸업. 양쪽 보상 지급 + 서버 브로드캐스트. 사문 기여도 500 추가."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub05"
-    desc: "MENTOR_SHOP_LIST(559)→MENTOR_SHOP(560) 핸들러 — 사문 기여도 상점. 칭호재료/외형/비급/소모품/탈것 교환."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub06"
-    desc: "사제 경험치 버프 로직 — 사부와 같은 파티 시 제자 EXP+30%, 솔로 EXP+10%. 사부에게 제자 처치 EXP의 10% 추가."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
-
-  - id: "mentor_sub07"
-    desc: "사제 테스트 5개 — 사부검색/요청/수락, 사제퀘스트, 졸업, 기여도 상점."
-    priority: P2
-    blocked: false
-    estimated_minutes: 10
 
   # ============================================================
   # ============================================================
@@ -469,6 +430,8 @@ recent_decisions:
   - "TASK 10 완료: 보조화폐/토큰상점(468-473) 104/104 PASS. _patch_s054.py. 핸들러3(CURRENCY_QUERY/TOKEN_SHOP_LIST/TOKEN_SHOP_BUY). 화폐5종(gold:999M/silver:99M/dt:99K/pt:99K/gc:99K)+토큰상점3종(던전4+PvP4+길드3아이템)+토큰획득훅(레이드클리어→dt/전장종료→pt)."
   - "클라 TASK 10 보조화폐 완료 확인: CurrencyManager+CurrencyUI(F9)+TokenShopUI(Shift+F9), 109 PASS."
   - "TASK 17 완료: 비경탐험(540-544) 108/108 PASS. _patch_s055.py. 핸들러3(SECRET_REALM_ENTER/COMPLETE/FAIL)+헬퍼3(_realm_grade/_realm_rewards/_check_special_realm)+포탈스폰. 비경5종(trial/wisdom/treasure/training/fortune)+특수4종(night_fog x2.0/storm_noon x1.5/snow_dawn x1.5/clear_evening x1.5)+등급S/A/B/C+일일3회제한+Lv20+. secret_realm_conditions.yaml."
+  - "TASK 18 완료: 사제시스템(550-560) 117/117 PASS. _patch_s056.py. 핸들러7(SEARCH/LIST/REQUEST/ACCEPT/QUEST_LIST/GRADUATE/SHOP_LIST/SHOP_BUY)+헬퍼4(contribution/exp_multiplier/mob_kill). 사부Lv40+/제자3max/Lv1~20/졸업Lv30. 퀘스트풀5종(사냥/던전/채집/탐험/보스)주3회+기여도상점8종+EXP버프(파티+30%/솔로+10%/사부share10%)+졸업보상(사부500기여+10Kg/제자5Kg+10KEXP)."
+  - "클라 TASK 17 비경 완료 확인: SecretRealmManager+SecretRealmPortalUI+SecretRealmUI(F12), 111 PASS."
 
 # ── 처리된 클라이언트 메시지 ──
 processed_messages:
@@ -509,6 +472,7 @@ processed_messages:
   - "C033"
   - "C034"
   - "C035"
+  - "C036"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
@@ -524,4 +488,4 @@ rules:
 # ── 중요 참고: tcp_bridge.py 패칭 방법 ──
 # OneDrive 동기화가 Edit 도구 변경을 되돌리는 문제가 있음
 # Servers/BridgeServer/_patch.py를 사용하여 수정해야 함
-# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python _patch_s054.py && python _patch_s055.py && python test_tcp_bridge.py
+# 실행: python _patch.py && python _patch_s034.py && python _patch_s035.py && python _patch_s036.py && python _patch_s037.py && python _patch_s040.py && python _patch_s042.py && python _patch_s044.py && python _patch_s046.py && python _patch_s047.py && python _patch_s048.py && python _patch_s049.py && python _patch_s050.py && python _patch_s051.py && python _patch_s052.py && python _patch_s053.py && python _patch_s054.py && python _patch_s055.py && python _patch_s056.py && python test_tcp_bridge.py
