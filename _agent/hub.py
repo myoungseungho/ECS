@@ -78,6 +78,45 @@ def git_run(args, cwd):
         return 1, "", str(e)
 
 
+def fix_git_index(root):
+    """git 인덱스 손상/잠김 자동 복구"""
+    # 1. index.lock 삭제 (다른 git 프로세스가 남긴 잠금)
+    lock_path = os.path.join(root, ".git", "index.lock")
+    if os.path.exists(lock_path):
+        try:
+            os.remove(lock_path)
+            log("  [FIX] removed .git/index.lock")
+        except Exception as e:
+            log(f"  [FIX] failed to remove index.lock: {e}")
+
+    # 2. 진행 중인 merge/rebase 정리
+    merge_head = os.path.join(root, ".git", "MERGE_HEAD")
+    if os.path.exists(merge_head):
+        git_run(["merge", "--abort"], root)
+        log("  [FIX] aborted pending merge")
+
+    rebase_dir = os.path.join(root, ".git", "rebase-merge")
+    if os.path.exists(rebase_dir):
+        git_run(["rebase", "--abort"], root)
+        log("  [FIX] aborted pending rebase")
+
+    # 3. 인덱스 리셋 (작업 트리는 유지, 인덱스만 HEAD로 복원)
+    code, _, _ = git_run(["reset", "--mixed", "HEAD"], root)
+    if code == 0:
+        log("  [FIX] git index reset OK")
+    else:
+        # 최후 수단: 인덱스 파일 삭제 후 다시 reset
+        index_path = os.path.join(root, ".git", "index")
+        try:
+            if os.path.exists(index_path):
+                os.remove(index_path)
+                log("  [FIX] deleted corrupted .git/index")
+            git_run(["reset", "--mixed", "HEAD"], root)
+            log("  [FIX] git index rebuilt from scratch")
+        except Exception as e:
+            log(f"  [FIX] last resort failed: {e}")
+
+
 def detect_role_from_root(root):
     """이 머신이 client인지 server인지 판별"""
     client_state = os.path.join(root, "_context", "client_state.yaml")
@@ -134,7 +173,15 @@ def auto_resolve_conflicts(root):
 
 
 def git_pull(root):
-    """stash -> pull (merge) -> auto-resolve conflicts -> stash pop"""
+    """stash -> pull (merge) -> auto-resolve conflicts -> stash pop
+    인덱스 손상 시 자동 복구 후 재시도."""
+
+    # 0. 인덱스 상태 사전 점검
+    pre_code, _, pre_err = git_run(["status", "--porcelain"], root)
+    if pre_code != 0:
+        log("  [FIX] git status failed — fixing index before pull")
+        fix_git_index(root)
+
     # 1. unstaged 변경 stash (log 파일 등 제외하기 위해 tracked만)
     _, status_out, _ = git_run(["status", "--porcelain"], root)
     has_changes = bool(status_out.strip())
@@ -144,22 +191,40 @@ def git_pull(root):
     # 2. rebase 대신 merge 사용 (충돌 해결이 더 쉬움)
     code, out, err = git_run(["pull", "--no-rebase"], root)
 
-    # 3. 충돌 시 자동 해결
+    # 3. 충돌/에러 처리
     combined = f"{out} {err}"
     if code != 0:
-        if "CONFLICT" in combined or "conflict" in combined.lower() or "merge conflict" in combined.lower():
+        # 3a. 인덱스 손상 계열 에러 → 복구 후 재시도
+        index_errors = ["could not write index", "index.lock", "unable to write",
+                        "unmerged", "not possible", "unstaged"]
+        if any(ie in combined.lower() for ie in index_errors):
+            log(f"  [FIX] index error detected, auto-recovering...")
+            fix_git_index(root)
+            # stash 다시 (fix_git_index가 reset하면서 stash 상태가 바뀔 수 있음)
+            _, status_out2, _ = git_run(["status", "--porcelain"], root)
+            if status_out2 and status_out2.strip():
+                git_run(["stash", "--include-untracked"], root)
+                has_changes = True
+            else:
+                has_changes = False
+            # pull 재시도
+            code, out, err = git_run(["pull", "--no-rebase"], root)
+            combined = f"{out} {err}"
+
+        # 3b. merge 충돌 → 소유권 기반 자동 해결
+        if code != 0 and ("CONFLICT" in combined or "conflict" in combined.lower()):
             log(f"  [CONFLICT] auto-resolving...")
             resolved = auto_resolve_conflicts(root)
             if resolved:
                 git_run(["commit", "--no-edit", "-m", "auto-merge: conflict resolved by hub"], root)
                 code = 0
             else:
-                # 해결 못하면 merge abort
                 log(f"  [WARN] could not auto-resolve, aborting merge")
                 git_run(["merge", "--abort"], root)
-        elif "rebase" in combined.lower():
+
+        # 3c. rebase 상태 잔존 → abort 후 merge로
+        elif code != 0 and "rebase" in combined.lower():
             git_run(["rebase", "--abort"], root)
-            # merge로 재시도
             code, out, err = git_run(["pull", "--no-rebase"], root)
             combined2 = f"{out} {err}"
             if code != 0 and ("CONFLICT" in combined2 or "conflict" in combined2.lower()):
@@ -169,18 +234,11 @@ def git_pull(root):
                     code = 0
                 else:
                     git_run(["merge", "--abort"], root)
-        elif "not possible" in combined.lower() or "unstaged" in combined.lower():
-            # unstaged changes blocking pull - force stash
-            log(f"  [WARN] unstaged changes blocking pull, force stashing")
-            git_run(["stash", "--include-untracked"], root)
-            code, out, err = git_run(["pull", "--no-rebase"], root)
-            git_run(["stash", "pop"], root)
 
     # 4. stash pop (실패해도 무시 - 대부분 log 파일 충돌)
     if has_changes:
         pop_code, _, pop_err = git_run(["stash", "pop"], root)
         if pop_code != 0:
-            # stash pop 충돌 시 stash drop하고 진행
             log(f"  [WARN] stash pop failed, dropping stash")
             git_run(["checkout", "--", "."], root)
             git_run(["stash", "drop"], root)
@@ -672,12 +730,15 @@ class Hub:
         log(f"SESSION #{self.session_count} | {elapsed_h:.1f}h elapsed | "
             f"pushes: {self.stats['pushes']}")
 
-        # 1. Git pull
+        # 1. Git pull (실패 시 인덱스 복구 후 1회 재시도)
         log("git pull...")
         if not git_pull(self.root):
-            log("[WARN] git pull failed")
-            time.sleep(10)
-            return None
+            log("[WARN] git pull failed, attempting index recovery...")
+            fix_git_index(self.root)
+            if not git_pull(self.root):
+                log("[WARN] git pull still failed after recovery")
+                time.sleep(10)
+                return None
 
         # 2. 스케줄
         action = schedule(self.root, self.session_count, self.consecutive_idle)
