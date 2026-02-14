@@ -48,3 +48,6 @@ _comms/daemon_logs/
 _agent/daemon.log
 _agent/daemon_err.log
 _agent/last_run.log
+_agent/hub.log
+_agent/hub_err.log
+_agent/hub_stats.json
