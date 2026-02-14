@@ -59,22 +59,28 @@ ROLES = {
 # ============================================================
 
 def git_run(args, cwd):
-    """git 명령 실행, 결과 반환"""
-    result = subprocess.run(
-        ["git"] + args,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    stdout = result.stdout.strip() if result.stdout else ""
-    stderr = result.stderr.strip() if result.stderr else ""
-    return result.returncode, stdout, stderr
+    """git 명령 실행, 결과 반환. 실패 시에도 안전하게 반환."""
+    try:
+        result = subprocess.run(
+            ["git"] + args,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        stdout = result.stdout.strip() if result.stdout else ""
+        stderr = result.stderr.strip() if result.stderr else ""
+        return result.returncode, stdout, stderr
+    except subprocess.TimeoutExpired:
+        print(f"  [WARN] git {' '.join(args)} timeout (60s)")
+        return 1, "", "timeout"
+    except Exception as e:
+        print(f"  [WARN] git {' '.join(args)} exception: {e}")
+        return 1, "", str(e)
 
 
 def git_pull(project_root):
     """git stash -> pull --rebase -> stash pop"""
-    # unstaged 변경이 있으면 stash
     _, status_out, _ = git_run(["status", "--porcelain"], project_root)
     has_changes = bool(status_out.strip())
     if has_changes:
@@ -82,15 +88,14 @@ def git_pull(project_root):
 
     code, out, err = git_run(["pull", "--rebase"], project_root)
     if code != 0:
-        print(f"  [WARN] git pull rebase 실패: {err}")
+        print(f"  [WARN] git pull rebase failed: {err}")
         git_run(["rebase", "--abort"], project_root)
         code, out, err = git_run(["pull"], project_root)
 
     if has_changes:
         pop_code, _, pop_err = git_run(["stash", "pop"], project_root)
         if pop_code != 0:
-            print(f"  [WARN] stash pop 충돌: {pop_err}")
-
+            print(f"  [WARN] stash pop conflict: {pop_err}")
     return code == 0, out
 
 
@@ -99,7 +104,7 @@ def git_push(project_root, message):
     git_run(["add", "-A"], project_root)
 
     code, out, _ = git_run(["status", "--porcelain"], project_root)
-    if not out.strip():
+    if not out or not out.strip():
         print("  [INFO] 변경사항 없음, push 스킵")
         return False
 
