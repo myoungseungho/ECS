@@ -66,7 +66,8 @@ def git_run(args, cwd):
     try:
         result = subprocess.run(
             ["git"] + args, cwd=cwd,
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=60,
         )
         stdout = result.stdout.strip() if result.stdout else ""
         stderr = result.stderr.strip() if result.stderr else ""
@@ -210,12 +211,18 @@ def get_unblocked_tasks(role, root):
 
 
 def check_ask_user_pending(root):
-    """ask_user.yaml에 미답변 질문 있는지"""
+    """ask_user.yaml에 미답변 질문 있는지 (주석 제외)"""
     path = os.path.join(root, "_context", "ask_user.yaml")
     if not os.path.exists(path):
         return False
     with open(path, "r", encoding="utf-8") as f:
-        return "status: pending" in f.read()
+        for line in f:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if "status: pending" in stripped:
+                return True
+    return False
 
 
 # ============================================================
