@@ -233,6 +233,8 @@ def run_claude(prompt, project_root):
             cwd=project_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=MAX_CLAUDE_TIMEOUT,
             env=env,
         )
