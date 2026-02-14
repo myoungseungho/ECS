@@ -513,6 +513,9 @@ public static class ProjectSetup
         var currencyManagerGo = CreateManagerObject("CurrencyManager", typeof(CurrencyManager));
         var currencyUIGo = CreateManagerObject("CurrencyUI", typeof(CurrencyUI));
         var tokenShopUIGo = CreateManagerObject("TokenShopUI", typeof(TokenShopUI));
+        var secretRealmManagerGo = CreateManagerObject("SecretRealmManager", typeof(SecretRealmManager));
+        var secretRealmPortalUIGo = CreateManagerObject("SecretRealmPortalUI", typeof(SecretRealmPortalUI));
+        var secretRealmUIGo = CreateManagerObject("SecretRealmUI", typeof(SecretRealmUI));
 
         // 신규 매니저
         var soundManagerGo = CreateManagerObject("SoundManager", typeof(SoundManager));

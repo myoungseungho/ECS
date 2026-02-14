@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-16T07:22:00"
+last_session: "2026-02-15T07:55:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 15 보조화폐/토큰상점 구현 완료 — CurrencyManager + CurrencyUI + TokenShopUI + 패킷 6종(468-473) + TCP 테스트 10건 | 109 PASS 0 FAIL"
+current_status: "Phase 16 비경 탐험 구현 완료 — SecretRealmManager + SecretRealmPortalUI + SecretRealmUI + 패킷 5종(540-544) + TCP 테스트 10건 | 111 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -149,18 +149,6 @@ completed:
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase5_world_tcp.py"
   - id: A20
-    desc: "S043 패킷 포맷 동기화 — 제작/채집/요리/인챈트 S043 서버 포맷 반영 (문자열 recipe_id, 가변길이 파싱, 조건부 필드, 카테고리 필터)"
-    files:
-      - "Assets/Scripts/Network/PacketDefinitions.cs"
-      - "Assets/Scripts/Network/PacketBuilder.cs"
-      - "Assets/Scripts/Network/NetworkManager.cs"
-      - "Assets/Scripts/Managers/CraftingManager.cs"
-      - "Assets/Scripts/Managers/GatheringManager.cs"
-      - "Assets/Scripts/UI/CraftingUI.cs"
-      - "Assets/Scripts/UI/GatheringUI.cs"
-      - "Assets/Scripts/interaction-map.yaml"
-      - "UnityClient/GameClient/test_phase4_crafting_tcp.py"
-  - id: A21
     desc: "S045 Phase 6 거래소 — AuctionManager + AuctionUI + 패킷 8종(390-397) + TCP 테스트 8건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -172,7 +160,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase6_auction_tcp.py"
-  - id: A22
+  - id: A21
     desc: "S046 Phase 7 비급&트라이포드 — TripodManager + TripodUI + 패킷 5종(520-524) + TCP 테스트 8건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -184,7 +172,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase7_tripod_tcp.py"
-  - id: A23
+  - id: A22
     desc: "S047 Phase 8 현상금 시스템 — BountyManager + BountyUI + 패킷 8종(530-537) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -196,7 +184,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase8_bounty_tcp.py"
-  - id: A24
+  - id: A23
     desc: "S048 Phase 9 퀘스트 심화 — DailyQuestManager + ReputationManager + DailyQuestUI + ReputationUI + 패킷 6종(400-405) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -210,7 +198,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase9_quest_tcp.py"
-  - id: A25
+  - id: A24
     desc: "S049 Phase 10 칭호/도감/2차전직 — TitleManager + CollectionManager + JobChangeUI + TitleUI + CollectionUI + 패킷 8종(440-447) + TCP 테스트 12건 + S047 BuildPacket 버그 수정"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -226,7 +214,7 @@ completed:
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase10_progression_tcp.py"
       - "UnityClient/GameClient/validate_client.py"
-  - id: A26
+  - id: A25
     desc: "S050 Phase 11 각인/초월 — EngravingManager + EngravingUI + TranscendUI + 패킷 6종(454-459) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -239,7 +227,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase11_engraving_tcp.py"
-  - id: A27
+  - id: A26
     desc: "S051 Phase 12 소셜 심화 — FriendManager + BlockManager + PartyFinderManager + FriendUI + BlockUI + PartyFinderUI + 패킷 13종(410-422) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -255,7 +243,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase12_social_tcp.py"
-  - id: A28
+  - id: A27
     desc: "S052 Phase 13 내구도/수리/리롤 — DurabilityManager + RepairUI + RerollUI + 패킷 6종(462-467) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -268,7 +256,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase13_durability_tcp.py"
-  - id: A29
+  - id: A28
     desc: "S053 Phase 14 전장/길드전/PvP시즌 — BattlegroundManager + GuildWarManager + BattlegroundUI + GuildWarUI + 패킷 6종(430-435) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -282,7 +270,7 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase14_battleground_tcp.py"
-  - id: A30
+  - id: A29
     desc: "S054 Phase 15 보조화폐/토큰상점 — CurrencyManager + CurrencyUI + TokenShopUI + 패킷 6종(468-473) + TCP 테스트 10건"
     files:
       - "Assets/Scripts/Network/PacketDefinitions.cs"
@@ -295,6 +283,19 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase15_currency_tcp.py"
+  - id: A30
+    desc: "S055 Phase 16 비경 탐험 — SecretRealmManager + SecretRealmPortalUI + SecretRealmUI + 패킷 5종(540-544) + TCP 테스트 10건"
+    files:
+      - "Assets/Scripts/Network/PacketDefinitions.cs"
+      - "Assets/Scripts/Network/PacketBuilder.cs"
+      - "Assets/Scripts/Network/NetworkManager.cs"
+      - "Assets/Scripts/Managers/SecretRealmManager.cs"
+      - "Assets/Scripts/UI/SecretRealmPortalUI.cs"
+      - "Assets/Scripts/UI/SecretRealmUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase16_secret_realm_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -402,10 +403,11 @@ pending_tasks:
     blocked_reason: "완료 (A22)"
     status: done
   - id: "gdd_task17_secret_dungeon_ui"
-    desc: "비경 UI — SecretDungeonUI (서버 TASK 17 MsgType 540-544)"
+    desc: "비경 UI — SecretRealmManager + SecretRealmPortalUI + SecretRealmUI (서버 TASK 17 MsgType 540-544)"
     priority: P2
-    blocked: true
-    blocked_reason: "서버 TASK 17 (비경 핸들러) 구현 대기 — S044 신규"
+    blocked: false
+    blocked_reason: "완료 (A30)"
+    status: done
   - id: "gdd_task18_mentor_ui"
     desc: "사제 시스템 UI — MentorUI (서버 TASK 18 MsgType 550-560)"
     priority: P2
@@ -465,8 +467,10 @@ recent_decisions:
   - "화폐 UI 단축키: F9=화폐패널, Shift+F9=토큰상점"
   - "silver 초기값 5000, gold max=999999999, silver max=99999999, token max=99999"
   - "TOKEN_SHOP_BUY_RESULT 코드: 0=SUCCESS, 1=INSUFFICIENT_TOKEN, 2=INVALID_ITEM, 3=CURRENCY_AT_MAX, 4=INVENTORY_FULL"
-  - "S043 패킷 포맷 변경: recipe_id ushort→string, CRAFT_LIST_REQ에 category 추가, GATHER_RESULT 가변 드롭, COOK/ENCHANT 조건부 필드"
-  - "S044 GDD 신규 4시스템: 비급(520-524), 현상금(530-537), 비경(540-544), 사제(550-560) — 전부 서버 대기"
+  - "Phase 16: 비경 탐험(540-544) SecretRealmManager+SecretRealmPortalUI+SecretRealmUI 클라 구현 완료 — S055 응답"
+  - "S055 TASK 17: 비경 5종(trial/wisdom/treasure/training/fortune) + 특수 4종(유령시련/뇌신수련/수정보물/운명정원) + unlock_lv20 + daily_limit3"
+  - "비경 UI 단축키: F12=비경내부UI, 포탈알림=자동팝업(8초)"
+  - "비경 등급: S/A/B/C, 위로보상 100골드, multiplier x100 포맷(100=1.0x)"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -521,6 +525,7 @@ processed_messages:
   - "S052"
   - "S053"
   - "S054"
+  - "S055"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

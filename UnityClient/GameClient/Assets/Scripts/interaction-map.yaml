@@ -627,46 +627,6 @@ managers:
       - LeaveRaid()
       - GetMechanicName(RaidMechanicId) → string
 
-  - name: SoundManager
-    namespace: (global)
-    singleton: true
-    dont_destroy_on_load: false
-    purpose: "프로시저럴 사운드 관리 — 타격/스킬/레벨업/UI 효과음 자동 생성 및 재생"
-    reads: []
-    writes:
-      - _sfxSource (AudioSource)
-      - _uiSource (AudioSource)
-    fires_events: []
-    subscribes_to:
-      - CombatManager.OnAttackFeedback → 타격음 재생
-      - CombatManager.OnEntityDied → 사망음 재생
-      - SkillManager.OnSkillUsed → 스킬 사용음 재생
-      - StatsManager.OnStatsChanged → 레벨업 감지 시 레벨업 사운드
-    public_api:
-      - PlayHit()
-      - PlayCritHit()
-      - PlayUIClick()
-      - PlayLevelUp()
-      - PlaySkillUse()
-      - PlayDeath()
-
-  - name: SkillVFXManager
-    namespace: (global)
-    singleton: true
-    dont_destroy_on_load: false
-    purpose: "스킬/레벨업 이펙트 파티클 관리 — Object Pool 방식 ParticleSystem"
-    reads: []
-    writes:
-      - _skillPool (Queue<ParticleSystem>)
-      - _levelUpPool (Queue<ParticleSystem>)
-    fires_events: []
-    subscribes_to:
-      - SkillManager.OnSkillUsed → 스킬 이펙트 재생
-      - StatsManager.OnStatsChanged → 레벨업 이펙트 재생
-    public_api:
-      - PlaySkillEffect(Vector3)
-      - PlayLevelUpEffect(Vector3)
-
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -711,7 +671,7 @@ managers:
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "제작/요리/인챈트 시스템 관리 — S043 TASK 2 (MsgType 380-383, 386-389)"
+    purpose: "제작/요리/인챈트 시스템 관리 — S041 TASK 2 (MsgType 380-383, 386-389)"
     reads: []
     writes:
       - _recipes (List<CraftRecipeInfo>)
@@ -731,17 +691,17 @@ managers:
     public_api:
       - OpenPanel()
       - ClosePanel()
-      - Craft(string)
-      - Cook(string)
+      - Craft(ushort)
+      - Cook(byte)
       - Enchant(byte, byte, byte)
-      - RefreshRecipes(byte)
-      - GetRecipe(string) → CraftRecipeInfo
+      - RefreshRecipes()
+      - GetRecipe(ushort) → CraftRecipeInfo
 
   - name: GatheringManager
     namespace: (global)
     singleton: true
     dont_destroy_on_load: false
-    purpose: "채집 시스템 관리 — S043 TASK 2 (MsgType 384-385) 에너지/진행바"
+    purpose: "채집 시스템 관리 — S041 TASK 2 (MsgType 384-385) 에너지/진행바"
     reads: []
     writes:
       - _energy (ushort)
@@ -759,10 +719,10 @@ managers:
       - OpenPanel()
       - ClosePanel()
       - Gather(byte)
-      - GetGatherName(byte) → string
+      - GetNodeName(byte) → string
     computed_properties:
-      - Energy (byte)
-      - MaxEnergy (byte)
+      - Energy (ushort)
+      - MaxEnergy (ushort)
       - IsGathering (bool)
       - GatherProgress (float)
 
@@ -1674,6 +1634,80 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: SecretRealmManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "비경 탐험 관리 — S055 TASK 17 (MsgType 540-544) 포탈 스폰/입장/클리어/실패"
+    reads: []
+    writes:
+      - _isInRealm (bool)
+      - _currentInstanceId (ushort)
+      - _currentRealmType (SecretRealmType)
+      - _timeLimit (float)
+      - _timeRemaining (float)
+      - _isSpecial (bool)
+      - _multiplier (float)
+      - _isRealmUIOpen (bool)
+      - _activePortals (Dictionary)
+    fires_events:
+      - OnPortalSpawned(SecretRealmSpawnData)
+      - OnEnterResult(SecretRealmEnterResultData)
+      - OnRealmCompleted(SecretRealmCompleteData)
+      - OnRealmFailed(SecretRealmFailData)
+      - OnRealmUIOpened()
+      - OnRealmUIClosed()
+      - OnTimerUpdated(float)
+    subscribes_to:
+      - NetworkManager.OnSecretRealmSpawn → 포탈 스폰 수신
+      - NetworkManager.OnSecretRealmEnterResult → 입장 결과 수신
+      - NetworkManager.OnSecretRealmComplete → 클리어 결과 수신
+      - NetworkManager.OnSecretRealmFail → 실패 결과 수신
+    public_api:
+      - EnterRealm(zoneId, autoSpawn)
+      - ReportComplete(scoreValue, extraData)
+      - ReportFail()
+      - CloseRealmUI()
+      - HasPortalInZone(zoneId)
+      - ClearPortal(zoneId)
+      - GetRealmTypeName(type)
+      - GetGradeName(grade)
+      - FormatTime(seconds)
+    computed_properties:
+      - IsInRealm, CurrentInstanceId, CurrentRealmType, TimeLimit, TimeRemaining
+      - IsSpecial, Multiplier, IsRealmUIOpen, ActivePortals
+
+  - name: SecretRealmPortalUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "비경 포탈 알림 UI — S055 TASK 17 (포탈 스폰 시 화면 중앙 팝업 + 입장 버튼)"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - SecretRealmManager.OnPortalSpawned → 포탈 스폰 알림 표시
+    public_api: []
+    computed_properties: []
+
+  - name: SecretRealmUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "비경 내부 UI — S055 TASK 17 (F12키 토글) 타이머/등급/보상 표시"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - SecretRealmManager.OnRealmUIOpened → 비경 UI 표시
+      - SecretRealmManager.OnRealmUIClosed → 비경 UI 숨김
+      - SecretRealmManager.OnTimerUpdated → 타이머 갱신
+      - SecretRealmManager.OnRealmCompleted → 클리어 결과 표시
+      - SecretRealmManager.OnRealmFailed → 실패 결과 표시
+      - SecretRealmManager.OnEnterResult → 입장 정보 갱신
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -2258,35 +2292,21 @@ data_flows:
     via: "C# events (OnTokenShopListReceived, OnTokenShopBuyComplete, OnTokenShopOpened, OnTokenShopClosed)"
     description: "토큰 상점 UI 갱신 (Shift+F9키 토글)"
 
-  - from: CombatManager
-    to: SoundManager
-    via: "C# events (OnAttackFeedback, OnEntityDied)"
-    description: "타격음/사망음 재생"
+  # S055: 비경 탐험 (TASK 17)
+  - from: NetworkManager
+    to: SecretRealmManager
+    via: "C# events (OnSecretRealmSpawn, OnSecretRealmEnterResult, OnSecretRealmComplete, OnSecretRealmFail)"
+    description: "비경 포탈/입장/클리어/실패 수신 (540-544)"
 
-  - from: SkillManager
-    to: SoundManager
-    via: "C# event (OnSkillUsed)"
-    description: "스킬 사용음 재생"
+  - from: SecretRealmManager
+    to: SecretRealmPortalUI
+    via: "C# events (OnPortalSpawned)"
+    description: "포탈 스폰 알림 표시"
 
-  - from: StatsManager
-    to: SoundManager
-    via: "C# event (OnStatsChanged)"
-    description: "레벨업 사운드 재생"
-
-  - from: SkillManager
-    to: SkillVFXManager
-    via: "C# event (OnSkillUsed)"
-    description: "스킬 이펙트 재생"
-
-  - from: StatsManager
-    to: SkillVFXManager
-    via: "C# event (OnStatsChanged)"
-    description: "레벨업 이펙트 재생"
-
-  - from: CombatManager
-    to: HitVFXManager
-    via: "C# event (OnAttackFeedback)"
-    description: "타격 위치에 파티클 이펙트 재생"
+  - from: SecretRealmManager
+    to: SecretRealmUI
+    via: "C# events (OnRealmUIOpened, OnRealmUIClosed, OnTimerUpdated, OnRealmCompleted, OnRealmFailed, OnEnterResult)"
+    description: "비경 내부 UI 갱신 (F12키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

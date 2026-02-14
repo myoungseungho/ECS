@@ -3304,5 +3304,78 @@ namespace Network
             d.RemainingCurrency = BitConverter.ToUInt32(payload, 3);
             return d;
         }
+
+        // ━━━ S055: 비경 탐험 (TASK 17, MsgType 540-544) ━━━
+
+        /// <summary>SECRET_REALM_ENTER 빌더: zone_id(1)+auto_spawn(1)</summary>
+        public static byte[] SecretRealmEnter(byte zoneId, byte autoSpawn)
+        {
+            return Build(MsgType.SECRET_REALM_ENTER, new byte[] { zoneId, autoSpawn });
+        }
+
+        /// <summary>SECRET_REALM_COMPLETE 빌더: score_value(2)+extra_data(1)</summary>
+        public static byte[] SecretRealmComplete(ushort scoreValue, byte extraData)
+        {
+            byte[] payload = new byte[3];
+            BitConverter.GetBytes(scoreValue).CopyTo(payload, 0);
+            payload[2] = extraData;
+            return Build(MsgType.SECRET_REALM_COMPLETE, payload);
+        }
+
+        /// <summary>SECRET_REALM_FAIL 빌더: 빈 페이로드</summary>
+        public static byte[] SecretRealmFail()
+        {
+            return Build(MsgType.SECRET_REALM_FAIL, new byte[0]);
+        }
+
+        /// <summary>SECRET_REALM_SPAWN 파싱: zone_id(1)+realm_type_idx(1)+is_special(1)+multiplier(2u16)+name_len(1)+name(utf8)</summary>
+        public static SecretRealmSpawnData ParseSecretRealmSpawn(byte[] payload)
+        {
+            var d = new SecretRealmSpawnData();
+            int off = 0;
+            d.ZoneId = payload[off]; off += 1;
+            d.RealmType = (SecretRealmType)payload[off]; off += 1;
+            d.IsSpecial = payload[off] != 0; off += 1;
+            ushort mulRaw = BitConverter.ToUInt16(payload, off); off += 2;
+            d.Multiplier = mulRaw / 100f;
+            byte nameLen = payload[off]; off += 1;
+            d.Name = System.Text.Encoding.UTF8.GetString(payload, off, nameLen);
+            return d;
+        }
+
+        /// <summary>SECRET_REALM_ENTER_RESULT 파싱: result(1)+instance_id(2)+realm_type(1)+time_limit(2)+is_special(1)+multiplier(2)</summary>
+        public static SecretRealmEnterResultData ParseSecretRealmEnterResult(byte[] payload)
+        {
+            var d = new SecretRealmEnterResultData();
+            int off = 0;
+            d.Result = (SecretRealmEnterResult)payload[off]; off += 1;
+            d.InstanceId = BitConverter.ToUInt16(payload, off); off += 2;
+            d.RealmType = (SecretRealmType)payload[off]; off += 1;
+            d.TimeLimit = BitConverter.ToUInt16(payload, off); off += 2;
+            d.IsSpecial = payload[off] != 0; off += 1;
+            ushort mulRaw = BitConverter.ToUInt16(payload, off); off += 2;
+            d.Multiplier = mulRaw / 100f;
+            return d;
+        }
+
+        /// <summary>SECRET_REALM_COMPLETE 파싱(서버응답): grade(1)+gold_reward(4)+bonus_info_len(1)+bonus_info(utf8)</summary>
+        public static SecretRealmCompleteData ParseSecretRealmComplete(byte[] payload)
+        {
+            var d = new SecretRealmCompleteData();
+            int off = 0;
+            d.Grade = (SecretRealmGrade)payload[off]; off += 1;
+            d.GoldReward = BitConverter.ToUInt32(payload, off); off += 4;
+            byte bonusLen = payload[off]; off += 1;
+            d.BonusInfo = bonusLen > 0 ? System.Text.Encoding.UTF8.GetString(payload, off, bonusLen) : "";
+            return d;
+        }
+
+        /// <summary>SECRET_REALM_FAIL 파싱(서버응답): consolation_gold(4)</summary>
+        public static SecretRealmFailData ParseSecretRealmFail(byte[] payload)
+        {
+            var d = new SecretRealmFailData();
+            d.ConsolationGold = BitConverter.ToUInt32(payload, 0);
+            return d;
+        }
     }
 }

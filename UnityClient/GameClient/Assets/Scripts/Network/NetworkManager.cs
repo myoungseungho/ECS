@@ -217,6 +217,11 @@ namespace Network
         public event Action<CurrencyInfoData> OnCurrencyInfo;
         public event Action<TokenShopData> OnTokenShop;
         public event Action<TokenShopBuyResultData> OnTokenShopBuyResult;
+        // S055: 비경 탐험
+        public event Action<SecretRealmSpawnData> OnSecretRealmSpawn;
+        public event Action<SecretRealmEnterResultData> OnSecretRealmEnterResult;
+        public event Action<SecretRealmCompleteData> OnSecretRealmComplete;
+        public event Action<SecretRealmFailData> OnSecretRealmFail;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -1165,6 +1170,26 @@ namespace Network
         public void RequestTokenShopBuy(ushort shopId, byte quantity)
         {
             _field?.Send(PacketBuilder.TokenShopBuy(shopId, quantity));
+        }
+
+        // ━━━ S055: 비경 탐험 API ━━━
+
+        /// <summary>비경 입장 요청</summary>
+        public void RequestSecretRealmEnter(byte zoneId, byte autoSpawn = 0)
+        {
+            _field?.Send(PacketBuilder.SecretRealmEnter(zoneId, autoSpawn));
+        }
+
+        /// <summary>비경 클리어 보고</summary>
+        public void RequestSecretRealmComplete(ushort scoreValue, byte extraData)
+        {
+            _field?.Send(PacketBuilder.SecretRealmComplete(scoreValue, extraData));
+        }
+
+        /// <summary>비경 실패 보고</summary>
+        public void RequestSecretRealmFail()
+        {
+            _field?.Send(PacketBuilder.SecretRealmFail());
         }
 
         /// <summary>연결 끊기</summary>
@@ -2479,6 +2504,37 @@ namespace Network
                     var data = PacketBuilder.ParseTokenShopBuyResult(payload);
                     Debug.Log($"[Net] TokenShopBuyResult: result={data.Result}, shopId={data.ShopId}, remaining={data.RemainingCurrency}");
                     OnTokenShopBuyResult?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S055: 비경 탐험 (TASK 17) ━━━
+
+                case MsgType.SECRET_REALM_SPAWN:
+                {
+                    var data = PacketBuilder.ParseSecretRealmSpawn(payload);
+                    Debug.Log($"[Net] SecretRealmSpawn: zone={data.ZoneId}, type={data.RealmType}, special={data.IsSpecial}, mul={data.Multiplier}, name={data.Name}");
+                    OnSecretRealmSpawn?.Invoke(data);
+                    break;
+                }
+                case MsgType.SECRET_REALM_ENTER_RESULT:
+                {
+                    var data = PacketBuilder.ParseSecretRealmEnterResult(payload);
+                    Debug.Log($"[Net] SecretRealmEnterResult: result={data.Result}, inst={data.InstanceId}, type={data.RealmType}, time={data.TimeLimit}, special={data.IsSpecial}, mul={data.Multiplier}");
+                    OnSecretRealmEnterResult?.Invoke(data);
+                    break;
+                }
+                case MsgType.SECRET_REALM_COMPLETE:
+                {
+                    var data = PacketBuilder.ParseSecretRealmComplete(payload);
+                    Debug.Log($"[Net] SecretRealmComplete: grade={data.Grade}, gold={data.GoldReward}, bonus={data.BonusInfo}");
+                    OnSecretRealmComplete?.Invoke(data);
+                    break;
+                }
+                case MsgType.SECRET_REALM_FAIL:
+                {
+                    var data = PacketBuilder.ParseSecretRealmFail(payload);
+                    Debug.Log($"[Net] SecretRealmFail: consolation={data.ConsolationGold}");
+                    OnSecretRealmFail?.Invoke(data);
                     break;
                 }
 

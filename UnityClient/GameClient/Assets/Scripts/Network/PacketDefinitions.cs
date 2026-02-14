@@ -424,6 +424,13 @@ namespace Network
         WEEKLY_QUEST            = 403,  // S→C: has_quest(1) + [wq_id(2)+type_len(1)+type(str)+name_len(1)+name(str)+target_id(2)+count(1)+progress(1)+completed(1)+reward_exp(4)+reward_gold(4)+reward_dungeon_token(1)+rep_faction_len(1)+rep_faction(str)+rep_amount(2)]
         REPUTATION_QUERY        = 404,  // C→S: empty
         REPUTATION_INFO         = 405,  // S→C: faction_count(1) + [faction_len(1)+faction(str)+name_kr_len(1)+name_kr(str)+points(4)+tier_name_len(1)+tier_name(str)+next_tier_min(4)]
+
+        // ━━━ S055: 비경 탐험 (TASK 17, MsgType 540-544) ━━━
+        SECRET_REALM_SPAWN          = 540,  // S→C(broadcast): zone_id(1)+realm_type_idx(1)+is_special(1)+multiplier(2u16)+name_len(1)+name(utf8)
+        SECRET_REALM_ENTER          = 541,  // C→S: zone_id(1)+auto_spawn(1)
+        SECRET_REALM_ENTER_RESULT   = 542,  // S→C: result(1)+instance_id(2u16)+realm_type(1)+time_limit(2u16)+is_special(1)+multiplier(2u16)
+        SECRET_REALM_COMPLETE       = 543,  // C→S: score_value(2u16)+extra_data(1) | S→C: grade(1)+gold_reward(4u32)+bonus_info_len(1)+bonus_info(utf8)
+        SECRET_REALM_FAIL           = 544,  // C→S: empty | S→C: consolation_gold(4u32)
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -2565,5 +2572,74 @@ namespace Network
         public TokenShopBuyResult Result;
         public ushort ShopId;
         public uint RemainingCurrency;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    //  S055: 비경 탐험 (TASK 17, MsgType 540-544)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    /// <summary>비경 타입 인덱스</summary>
+    public enum SecretRealmType : byte
+    {
+        TRIAL    = 0,  // 시련의 방
+        WISDOM   = 1,  // 지혜의 방
+        TREASURE = 2,  // 보물의 방
+        TRAINING = 3,  // 수련의 방
+        FORTUNE  = 4,  // 운명의 방
+    }
+
+    /// <summary>비경 입장 결과 코드</summary>
+    public enum SecretRealmEnterResult : byte
+    {
+        SUCCESS         = 0,
+        NO_PORTAL       = 1,
+        DAILY_LIMIT     = 2,
+        LEVEL_TOO_LOW   = 3,
+        ALREADY_IN_REALM = 4,
+        PARTY_TOO_LARGE = 5,
+    }
+
+    /// <summary>비경 등급</summary>
+    public enum SecretRealmGrade : byte
+    {
+        S = 0,
+        A = 1,
+        B = 2,
+        C = 3,
+    }
+
+    /// <summary>비경 포탈 스폰 데이터 (SECRET_REALM_SPAWN 파싱용)</summary>
+    public class SecretRealmSpawnData
+    {
+        public byte ZoneId;
+        public SecretRealmType RealmType;
+        public bool IsSpecial;
+        public float Multiplier;
+        public string Name;
+    }
+
+    /// <summary>비경 입장 결과 데이터 (SECRET_REALM_ENTER_RESULT 파싱용)</summary>
+    public class SecretRealmEnterResultData
+    {
+        public SecretRealmEnterResult Result;
+        public ushort InstanceId;
+        public SecretRealmType RealmType;
+        public ushort TimeLimit;
+        public bool IsSpecial;
+        public float Multiplier;
+    }
+
+    /// <summary>비경 클리어 결과 데이터 (SECRET_REALM_COMPLETE 서버→클라 파싱용)</summary>
+    public class SecretRealmCompleteData
+    {
+        public SecretRealmGrade Grade;
+        public uint GoldReward;
+        public string BonusInfo;
+    }
+
+    /// <summary>비경 실패 결과 데이터 (SECRET_REALM_FAIL 서버→클라 파싱용)</summary>
+    public class SecretRealmFailData
+    {
+        public uint ConsolationGold;
     }
 }
