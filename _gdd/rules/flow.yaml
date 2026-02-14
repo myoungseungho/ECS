@@ -1,0 +1,594 @@
+# ============================================================
+# GAME FLOW — 게임 전체 흐름 상태 머신
+# ============================================================
+# 유저가 게임을 켜는 순간부터 모든 화면 전환, 트리거, 해금을
+# 에이전트 AI가 그대로 구현할 수 있는 완전한 정의.
+#
+# 구조: state → trigger → next_state
+# 에이전트는 이 파일을 읽고 SceneFlowManager를 구현한다.
+# ============================================================
+
+# ──────────────────────────────────────────────────────────
+# 1. 앱 시작 ~ 게임 진입
+# ──────────────────────────────────────────────────────────
+app_launch:
+  sequence:
+    - state: "SPLASH"
+      scene: "SplashScene"
+      desc: "스튜디오 로고 표시"
+      duration: 2.5
+      actions:
+        - "studio_logo.png 페이드인 (0.5초)"
+        - "1.5초 유지"
+        - "페이드아웃 (0.5초)"
+      next: "TITLE"
+      skip: "아무 키 → 즉시 TITLE"
+
+    - state: "TITLE"
+      scene: "TitleScene"
+      desc: "타이틀 화면 (배경 + 로고 + Press Any Key)"
+      elements:
+        background: "title_background.png (판타지 풍경, 느리게 패닝)"
+        logo: "game_logo.png (상단 1/3, 살짝 위아래 바운스)"
+        text: "'아무 키를 누르세요' (sin 함수로 깜빡임, alpha 0.3~1.0)"
+        bgm: "bgm_title.mp3 (페이드인 2초)"
+      trigger: "아무 키 입력"
+      next: "LOGIN"
+
+    - state: "LOGIN"
+      scene: "LoginScene"
+      desc: "로그인 화면"
+      layout:
+        background: "TITLE 배경 재사용 (블러 처리)"
+        panel:
+          position: "화면 중앙"
+          size: "400x350"
+          elements:
+            - { type: "image", content: "game_logo_small.png", y: 20 }
+            - { type: "input", id: "id_input", placeholder: "아이디", y: 100 }
+            - { type: "input", id: "pw_input", placeholder: "비밀번호", y: 150, password: true }
+            - { type: "button", id: "btn_login", text: "로그인", y: 210, style: "primary" }
+            - { type: "button", id: "btn_register", text: "회원가입", y: 260, style: "secondary", enabled: false }
+            - { type: "text", id: "error_text", text: "", y: 300, color: "red", visible: false }
+      actions:
+        btn_login_click:
+          - "ID/PW 공백 체크 → 빈칸이면 error_text='아이디와 비밀번호를 입력하세요'"
+          - "LOGIN 패킷 전송 (MsgType.LOGIN)"
+          - "버튼 비활성화 + '로그인 중...' 표시"
+          - "LOGIN_RESULT 수신 대기"
+        on_login_result:
+          success: # result == 0
+            - "bgm 페이드아웃"
+            - "next: SERVER_SELECT"
+          fail: # result != 0
+            - "error_text = 에러 메시지 (코드별)"
+            - "버튼 재활성화"
+            - "pw_input 초기화"
+        error_codes:
+          1: "아이디 또는 비밀번호가 올바르지 않습니다"
+          2: "이미 접속 중인 계정입니다"
+          3: "서버 점검 중입니다"
+          4: "계정이 정지되었습니다"
+      keyboard:
+        tab: "id_input ↔ pw_input 포커스 전환"
+        enter: "btn_login 클릭"
+
+    - state: "SERVER_SELECT"
+      scene: "ServerSelectScene"
+      desc: "서버/채널 선택"
+      layout:
+        background: "server_select_bg.png (또는 TITLE 배경 블러)"
+        left_panel:
+          title: "서버 선택"
+          list:
+            - { name: "아르카디아", status: "원활", population: 342, recommended: true }
+          notes: "현재 서버 1개. 추후 확장."
+        right_panel:
+          title: "채널 선택"
+          visible: "서버 선택 후"
+          channels:
+            - { name: "채널 1", population: 120, status: "원활" }
+            - { name: "채널 2", population: 89, status: "원활" }
+          notes: "현재 채널 1개. 서버 클릭 시 바로 채널 선택으로."
+      actions:
+        server_click:
+          - "서버 하이라이트"
+          - "채널 패널 표시"
+        channel_click:
+          - "선택 확인 팝업: '[아르카디아] 채널1 접속하시겠습니까?'"
+          - "확인 → CHARACTER_LIST_REQ 전송"
+          - "CHARACTER_LIST 수신 → next: CHARACTER_SELECT"
+      shortcut: "서버 1개뿐이면 자동 선택 후 채널 패널 바로 표시"
+
+    - state: "CHARACTER_SELECT"
+      scene: "CharacterSelectScene"
+      desc: "캐릭터 선택/생성"
+      layout:
+        left_panel:
+          title: "캐릭터 선택"
+          slots: 6
+          per_slot:
+            filled: "Lv.{level} {class_name} {char_name} (마지막 접속: {date})"
+            empty: "[+ 새 캐릭터]"
+        center:
+          desc: "선택된 캐릭터 3D 프리뷰 (Idle 애니메이션, 천천히 회전)"
+          no_character: "'캐릭터를 선택하거나 새로 만드세요' 텍스트"
+        bottom:
+          - { button: "게임 시작", enabled: "캐릭터 선택 시", style: "primary_large" }
+          - { button: "캐릭터 삭제", enabled: "캐릭터 선택 시", style: "danger_small" }
+      actions:
+        empty_slot_click:
+          next: "CHARACTER_CREATE"
+        filled_slot_click:
+          - "캐릭터 선택 하이라이트"
+          - "중앙 3D 프리뷰 로드"
+          - "게임 시작 버튼 활성화"
+        game_start_click:
+          - "ENTER_GAME 패킷 전송"
+          - "ENTER_GAME 결과 수신"
+          - "success → 로딩 화면 → next: GAME_WORLD (마지막 위치 존)"
+        delete_click:
+          - "확인 팝업: '정말 삭제하시겠습니까? 이름을 입력하세요: [___]'"
+          - "이름 일치 → CHARACTER_DELETE 전송"
+          - "성공 → 슬롯 갱신"
+
+    - state: "CHARACTER_CREATE"
+      scene: "CharacterCreateScene"
+      desc: "신규 캐릭터 생성"
+      layout:
+        left_panel:
+          title: "직업 선택"
+          cards:
+            warrior:
+              icon: "class_warrior_icon.png"
+              name: "전사"
+              desc: "검과 방패를 든 근접 전투의 달인. 강인한 체력과 방어력."
+              preview_model: "warrior_idle.fbx"
+              tags: ["근접", "탱커", "물리"]
+            archer:
+              icon: "class_archer_icon.png"
+              name: "궁수"
+              desc: "화살로 먼 거리의 적을 정확히 꿰뚫는 사냥꾼."
+              preview_model: "archer_idle.fbx"
+              tags: ["원거리", "딜러", "물리"]
+            mage:
+              icon: "class_mage_icon.png"
+              name: "마법사"
+              desc: "강력한 원소 마법으로 다수의 적을 소멸시키는 현자."
+              preview_model: "mage_idle.fbx"
+              tags: ["원거리", "딜러/서포터", "마법"]
+          selected_highlight: "금색 테두리 + 카드 확대"
+        center:
+          desc: "선택된 직업 3D 모델 프리뷰 (회전 가능)"
+          animation: "Idle → 클릭 시 스킬 시연 애니메이션"
+        right_panel:
+          title: "캐릭터 정보"
+          elements:
+            - { type: "input", id: "name_input", placeholder: "이름 (2~8자)", max_length: 8 }
+            - { type: "text", id: "name_check", text: "", color: "gray" }
+            - { type: "stat_preview", stats: "직업 기본 스탯 표시" }
+            - { type: "skill_preview", skills: "시작 스킬 3개 아이콘+이름" }
+        bottom:
+          - { button: "생성", enabled: "직업 선택 + 이름 입력 시", style: "primary" }
+          - { button: "뒤로", style: "secondary" }
+      actions:
+        name_input_change:
+          - "2자 미만: name_check = '2자 이상 입력하세요' (빨강)"
+          - "2~8자: 중복 체크 요청 → '사용 가능' (초록) / '이미 사용 중' (빨강)"
+        create_click:
+          - "CHARACTER_CREATE 전송 (name + class_id)"
+          - "성공 → '캐릭터가 생성되었습니다!' 팝업"
+          - "자동으로 해당 캐릭터 선택 + 게임 시작"
+          - "next: LOADING → TUTORIAL_ZONE"
+        back_click:
+          next: "CHARACTER_SELECT"
+
+# ──────────────────────────────────────────────────────────
+# 2. 로딩 화면
+# ──────────────────────────────────────────────────────────
+loading:
+  scene: "LoadingScene"
+  elements:
+    background: "존별 아트워크 (없으면 기본 판타지 배경)"
+    progress_bar: "하단 가로 프로그레스 바 (0~100%)"
+    tip_text: "하단 '꿀팁: ...' 텍스트 (랜덤)"
+    zone_name: "중앙 존 이름 대형 텍스트"
+  tips:
+    - "파티 플레이 시 경험치가 20% 증가합니다."
+    - "Tab 키로 가장 가까운 적을 자동 타겟합니다."
+    - "대시(Space)로 적의 공격을 회피할 수 있습니다."
+    - "NPC 머리 위 ! 마크는 퀘스트가 있다는 뜻입니다."
+    - "장비 강화 +10까지는 실패해도 단계가 내려가지 않습니다."
+    - "야간에는 특수 몬스터가 출현합니다."
+    - "채집 시 에너지가 소모됩니다. 에너지는 시간이 지나면 회복됩니다."
+    - "길드에 가입하면 다양한 버프를 받을 수 있습니다."
+    - "포션은 공유 쿨다운이 있습니다."
+    - "강화 연속 실패 시 성공 확률이 누적됩니다."
+  minimum_display: 1.5  # 최소 1.5초 표시 (너무 빠르면 팁 못 읽음)
+
+# ──────────────────────────────────────────────────────────
+# 3. 튜토리얼 흐름 (신규 캐릭터 전용)
+# ──────────────────────────────────────────────────────────
+tutorial:
+  skip_option: false  # 첫 캐릭터는 스킵 불가
+  skip_on_alt: true   # 2번째 캐릭터부터 스킵 가능
+
+  steps:
+    - id: "T01_MOVEMENT"
+      trigger: "존 진입 즉시"
+      desc: "이동 학습"
+      overlay:
+        text: "WASD 키로 이동하세요"
+        visual: "WASD 키 이미지 + 화살표"
+        position: "화면 중앙 상단"
+        dim_background: true  # 배경 어둡게
+      complete_condition: "5유닛 이상 이동"
+      reward: null
+      on_complete:
+        - "overlay 제거"
+        - "'잘하셨습니다!' 텍스트 (1초)"
+        - "0.5초 후 → T02"
+
+    - id: "T02_CAMERA"
+      trigger: "T01 완료"
+      desc: "카메라 조작"
+      overlay:
+        text: "마우스 휠로 카메라를 확대/축소하세요"
+        visual: "마우스 휠 이미지"
+      complete_condition: "줌 인 또는 줌 아웃 1회"
+      on_complete: "→ T03"
+
+    - id: "T03_ATTACK"
+      trigger: "T02 완료"
+      desc: "기본 공격"
+      setup:
+        - "허수아비 1마리 스폰 (앞쪽 10유닛)"
+        - "허수아비 위에 화살표 마커"
+      overlay:
+        text: "허수아비를 클릭하여 공격하세요"
+        visual: "마우스 좌클릭 이미지"
+        highlight: "허수아비 주변 빛나는 원"
+      complete_condition: "허수아비 HP 0"
+      on_complete:
+        - "타격감 연출 (화면 흔들림 + 이펙트)"
+        - "'기본 공격을 배웠습니다!' 텍스트"
+        - "→ T04"
+
+    - id: "T04_SKILL"
+      trigger: "T03 완료"
+      desc: "스킬 사용"
+      setup:
+        - "스킬바에 기본 스킬 자동 배치 (Q 슬롯)"
+        - "슬라임 2마리 스폰 (앞쪽 15유닛)"
+      overlay:
+        text: "Q키를 눌러 스킬을 사용하세요"
+        visual: "Q키 이미지 + 스킬바 Q슬롯 하이라이트(반짝)"
+      complete_condition: "스킬 1회 사용"
+      on_complete:
+        - "스킬 이펙트 (첫 스킬답게 화려하게)"
+        - "'새 스킬: {skill_name}' 팝업 (아이콘 + 설명)"
+        - "→ T05"
+
+    - id: "T05_KILL_MONSTERS"
+      trigger: "T04 완료"
+      desc: "몬스터 처치"
+      setup:
+        - "슬라임 3마리 추가 스폰"
+      overlay:
+        text: "슬라임 3마리를 처치하세요"
+        tracker: "슬라임 처치 0/3 (화면 우측)"
+      complete_condition: "슬라임 3마리 처치"
+      on_complete:
+        - "레벨업 연출!! (LEVEL UP! + 금빛 파티클 + 사운드)"
+        - "'레벨 2 달성! 스탯 포인트 5점을 획득했습니다'"
+        - "→ T06"
+
+    - id: "T06_STAT_POINT"
+      trigger: "T05 완료"
+      desc: "스탯 분배"
+      overlay:
+        text: "K키를 눌러 캐릭터 정보를 열고 스탯을 배분하세요"
+        visual: "K키 이미지"
+        highlight: "스탯 창 + 배분 버튼"
+      auto_open: "캐릭터 정보 창 자동 열기"
+      complete_condition: "스탯 포인트 1점 이상 배분"
+      on_complete: "→ T07"
+
+    - id: "T07_POTION"
+      trigger: "T06 완료"
+      desc: "포션 사용"
+      setup:
+        - "HP 포션 5개 인벤토리에 지급"
+        - "플레이어 HP를 50%로 감소"
+      overlay:
+        text: "1키를 눌러 HP 포션을 사용하세요"
+        visual: "1키 이미지 + 스킬바 1슬롯(포션) 하이라이트"
+      complete_condition: "포션 1회 사용"
+      on_complete:
+        - "HP 회복 연출 (초록 숫자 + 파티클)"
+        - "→ T08"
+
+    - id: "T08_NPC_TALK"
+      trigger: "T07 완료"
+      desc: "NPC 대화"
+      setup:
+        - "NPC '마을 장로' 스폰 (앞쪽 20유닛)"
+        - "NPC 위에 ! 마크 + 네비게이션 화살표"
+        - "미니맵에 NPC 위치 표시"
+      overlay:
+        text: "NPC에게 다가가 F키를 눌러 대화하세요"
+        visual: "F키 이미지"
+      complete_condition: "NPC와 대화 시작"
+      on_complete: "→ T09 (대화 중)"
+
+    - id: "T09_QUEST_ACCEPT"
+      trigger: "T08 완료 (대화 시작)"
+      desc: "퀘스트 수락"
+      dialog:
+        speaker: "마을 장로"
+        portrait: "npc_elder_portrait.png"
+        lines:
+          - "모험가여, 잘 왔소."
+          - "마을 근처에 슬라임이 들끓고 있어 주민들이 불안해하고 있소."
+          - "슬라임 5마리를 처치해주면 보상을 주겠소."
+        choices:
+          - { text: "[수락] 맡겨주세요!", action: "accept_quest", quest_id: "tutorial_01" }
+          - { text: "[거절] 좀 더 준비하겠습니다.", action: "decline", note: "거절해도 재대화 가능" }
+      on_accept:
+        - "퀘스트 수락 사운드"
+        - "화면 우측에 퀘스트 트래커 등장 (슬라임 처치 0/5)"
+        - "'새 퀘스트: 슬라임 토벌' 알림"
+        - "→ T10"
+
+    - id: "T10_QUEST_COMPLETE"
+      trigger: "퀘스트 목표 달성 (슬라임 5마리)"
+      desc: "퀘스트 완료"
+      setup:
+        - "슬라임 5마리 필드에 배치 (근처 30유닛 이내)"
+      on_5_kills:
+        - "퀘스트 트래커 완료 표시 (체크마크)"
+        - "'퀘스트 완료! NPC에게 보고하세요' 알림"
+        - "NPC 마커 ! → ? 변경"
+      on_npc_talk:
+        dialog:
+          speaker: "마을 장로"
+          lines:
+            - "오, 벌써 해치웠소? 대단하군!"
+            - "약속대로 보상을 주겠소. 마을로 가면 더 많은 일이 있을 거요."
+        reward_popup:
+          exp: 500
+          gold: 200
+          item: { name: "가죽 갑옷", rarity: "uncommon" }
+          animation: "보상 아이템이 하나씩 뿅뿅 나타나는 연출"
+      on_complete: "→ T11"
+
+    - id: "T11_EQUIP"
+      trigger: "T10 완료"
+      desc: "장비 장착"
+      overlay:
+        text: "I키를 눌러 인벤토리를 열고, 방금 받은 갑옷을 장착하세요"
+        visual: "I키 이미지"
+      auto_open: "인벤토리 자동 열기"
+      highlight: "새 아이템 반짝임 + '우클릭으로 장착' 툴팁"
+      complete_condition: "장비 1개 장착"
+      on_complete:
+        - "캐릭터 외형 변경 (갑옷 적용)"
+        - "'방어력이 올랐습니다!' 알림"
+        - "→ T12"
+
+    - id: "T12_DASH"
+      trigger: "T11 완료"
+      desc: "대시 (회피)"
+      setup:
+        - "엘리트 슬라임 1마리 스폰 (큰 슬라임, HP 높음)"
+        - "엘리트가 범위 공격 준비 (빨간 원 표시)"
+      overlay:
+        text: "Space를 눌러 대시로 회피하세요!"
+        visual: "Space바 이미지 + 빨간 원에서 벗어나는 화살표"
+        urgent: true  # 긴박한 UI (빨간 테두리)
+      complete_condition: "대시 1회 사용"
+      on_complete:
+        - "'훌륭합니다! 대시로 적의 공격을 회피할 수 있습니다'"
+        - "엘리트 슬라임 처치 → 레벨 3"
+        - "→ T13"
+
+    - id: "T13_MINIMAP"
+      trigger: "T12 완료"
+      desc: "미니맵 안내"
+      overlay:
+        text: "우상단 미니맵을 확인하세요. M키로 세계지도를 열 수 있습니다."
+        highlight: "미니맵 영역 반짝"
+      complete_condition: "M키로 세계지도 열기"
+      on_complete:
+        - "세계지도에 마을 위치 + 화살표 표시"
+        - "'마을로 이동하세요!'"
+        - "→ TUTORIAL_END"
+
+    - id: "TUTORIAL_END"
+      trigger: "T13 완료"
+      desc: "튜토리얼 완료"
+      actions:
+        - "'튜토리얼 완료!' 대형 텍스트 (금색, 2초)"
+        - "보상: 스킬 포인트 3점, 골드 500, 칭호 '초보 모험가'"
+        - "마을 포털 활성화 (빛나는 게이트)"
+        - "TUTORIAL_PROGRESS 서버에 완료 기록 (재접속 시 스킵)"
+      next: "포털 진입 → LOADING → VILLAGE"
+
+# ──────────────────────────────────────────────────────────
+# 4. 마을 첫 진입 이벤트
+# ──────────────────────────────────────────────────────────
+village_first_entry:
+  trigger: "튜토리얼 완료 후 마을 첫 입장"
+  sequence:
+    - action: "카메라 시네마틱 (마을 전경 3초 패닝)"
+    - action: "'바람의 마을에 도착했습니다' 대형 텍스트"
+    - action: "NPC 3명 위치에 ! 마크 활성화"
+    - action: "시스템 메시지: '다양한 NPC와 대화해보세요!'"
+    - action: "BGM 전환 → village_bgm.mp3"
+
+  guide_arrow:
+    desc: "처음에 상점 NPC 쪽으로 안내 화살표"
+    target: "상점 NPC"
+    remove_after: "상점 NPC와 대화 1회"
+
+  first_npc_interactions:
+    shopkeeper:
+      trigger: "첫 대화"
+      dialog: "어서오게! 물약이나 장비가 필요하면 말만 하게."
+      unlock: "상점 UI 해금 안내"
+      tutorial_popup: "'상점에서 포션과 장비를 구매할 수 있습니다'"
+
+    blacksmith:
+      trigger: "레벨 10 이후 첫 대화"
+      dialog: "음... 자네 장비가 좀 약해 보이는군. 내가 강화해줄까?"
+      unlock: "강화 시스템 해금"
+      tutorial_popup: "'장비를 강화하면 더 강해집니다. +10까지는 실패해도 안전합니다!'"
+
+    quest_board:
+      trigger: "마을 입장 시"
+      desc: "퀘스트 게시판 — 일일/서브 퀘스트 확인"
+      tutorial_popup: "'퀘스트 게시판에서 다양한 의뢰를 확인하세요'"
+
+# ──────────────────────────────────────────────────────────
+# 5. 컨텐츠 해금 타이밍 (레벨 기준)
+# ──────────────────────────────────────────────────────────
+content_unlock:
+  # 레벨 도달 시 자동 팝업 + 시스템 안내
+  triggers:
+    - level: 1
+      unlocks: ["기본 공격", "이동", "인벤토리"]
+      popup: false  # 튜토리얼에서 커버
+
+    - level: 5
+      unlocks: ["퀘스트 게시판 (일일 퀘스트)"]
+      popup: "일일 퀘스트가 해금되었습니다! 매일 퀘스트를 완료하면 보상을 받을 수 있습니다."
+      npc_marker: "퀘스트 게시판에 NEW 마커"
+
+    - level: 10
+      unlocks: ["강화 시스템", "거래소", "파티 매칭"]
+      popup: "강화, 거래소, 파티 시스템이 해금되었습니다!"
+      tutorial_chain:
+        - "대장장이 NPC에게 안내 화살표"
+        - "강화 1회 무료 체험 이벤트"
+
+    - level: 15
+      unlocks: ["파티 던전: 고블린 동굴"]
+      popup: "첫 파티 던전 '고블린 동굴'이 해금되었습니다!"
+      cutscene: "던전 입구 발견 시네마틱 (2초)"
+      guide: "던전 입장 게시판 위치 안내"
+
+    - level: 20
+      unlocks: ["2차 전직", "PvP 투기장", "탈것"]
+      popup: "2차 전직이 가능합니다! 직업 마스터를 찾아가세요."
+      quest_auto_accept: "2차 전직 퀘스트 자동 수락"
+      second_job_flow:
+        - "직업 마스터 NPC에게 안내"
+        - "전직 퀘스트 (시련의 던전 솔로 클리어)"
+        - "전직 선택 화면 (버서커/가디언, 샤프슈터/레인저, 아크메이지/프리스트)"
+        - "전직 연출 (빛 + 새 스킬 습득)"
+        - "축하 시스템 메시지 전체 공지"
+
+    - level: 25
+      unlocks: ["파티 던전: 얼어붙은 신전", "보석 시스템"]
+      popup: "새 던전과 보석 시스템이 해금되었습니다!"
+
+    - level: 30
+      unlocks: ["길드 가입", "궁극기", "주간 퀘스트"]
+      popup: "길드에 가입할 수 있습니다! 궁극기도 해금되었습니다!"
+      ultimate_tutorial:
+        - "궁극기 슬롯 안내 (R키)"
+        - "게이지 충전 방법 설명"
+        - "1회 무료 사용 체험"
+
+    - level: 40
+      unlocks: ["어비스 던전: 마왕의 요새", "초월 시스템", "월드 보스"]
+      popup: "엔드게임 컨텐츠가 해금되었습니다!"
+
+    - level: 50
+      unlocks: ["레이드: 고대 용의 둥지", "각인 시스템"]
+      popup: "8인 레이드가 해금되었습니다! 강력한 동료를 모아 도전하세요!"
+
+    - level: 60
+      unlocks: ["카오스 던전", "하드모드 던전", "파라곤 레벨"]
+      popup: "만렙 달성! 초월의 길이 열렸습니다."
+      cutscene: "만렙 축하 시네마틱"
+      system_announce: "'[{name}]님이 만렙에 도달했습니다!' 전체 공지"
+
+# ──────────────────────────────────────────────────────────
+# 6. 일일/주간 루틴 (엔드게임 흐름)
+# ──────────────────────────────────────────────────────────
+daily_routine:
+  desc: "만렙 유저의 전형적인 일일 플레이 루프"
+  recommended_order:
+    1: "접속 → 출석 체크 (보상 팝업)"
+    2: "카오스 던전 2회 (골드+재료 파밍)"
+    3: "일일 퀘스트 3개 (경험치+골드)"
+    4: "길드 퀘스트 3개 (기여도)"
+    5: "필드 보스 (타이머 체크)"
+    6: "강화/보석 세팅 (파밍 재료 소비)"
+    7: "거래소 체크 (매물 확인/등록)"
+    8: "PvP 투기장 (선택)"
+    9: "배틀패스 진행 확인"
+
+  weekly_routine:
+    reset_day: "수요일 06:00"
+    1: "주간 레이드 (1회, 최고 보상)"
+    2: "어비스 던전 (1회)"
+    3: "주간 퀘스트 (1개)"
+    4: "길드전 (일정에 따라)"
+
+  login_sequence:
+    - "서버 접속"
+    - "출석 체크 팝업 (보상 수령)"
+    - "배틀패스 진행 알림"
+    - "오늘의 이벤트 안내"
+    - "일일 초기화 알림 (던전 횟수, 퀘스트 등)"
+    - "우편함 알림 (미수령 우편 있으면)"
+
+# ──────────────────────────────────────────────────────────
+# 7. UI 키 바인딩 (전체)
+# ──────────────────────────────────────────────────────────
+keybindings:
+  movement:
+    W: "위로 이동"
+    A: "왼쪽 이동"
+    S: "아래로 이동"
+    D: "오른쪽 이동"
+    Space: "대시 (회피)"
+    left_click: "기본 공격 / 이동 (클릭 이동 모드 시)"
+    right_click: "타겟 선택"
+    Tab: "가까운 적 타겟 순환"
+
+  skills:
+    Q: "스킬 슬롯 1"
+    W: "스킬 슬롯 2 (이동과 겹침 → 전투 모드에서만)"
+    E: "스킬 슬롯 3"
+    R: "궁극기"
+    1: "퀵슬롯 1 (포션)"
+    2: "퀵슬롯 2"
+    3: "퀵슬롯 3"
+    4: "퀵슬롯 4"
+
+  ui:
+    I: "인벤토리"
+    K: "캐릭터 정보 (스탯)"
+    J: "퀘스트 목록"
+    L: "스킬 창"
+    G: "길드"
+    M: "세계 지도"
+    N: "미니맵 확대/축소"
+    P: "파티 정보"
+    U: "우편함"
+    H: "도움말"
+    Enter: "채팅 입력"
+    Escape: "메뉴 / 현재 창 닫기"
+    F: "NPC 상호작용"
+    T: "거래소"
+    Y: "PvP 매칭"
+
+  shortcuts:
+    F1: "자기 HP바 선택"
+    F2-F4: "파티원 선택"
+    F5: "숨기기 모드 (UI 전체 숨김, 스크린샷용)"
+    PrintScreen: "스크린샷"
+    Alt+1~4: "감정 표현"
