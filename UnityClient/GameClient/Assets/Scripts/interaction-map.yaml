@@ -2,7 +2,7 @@
 # AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
 # Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_phase5_attendance_story
+version: session_phase7_tripod
 
 # ━━━ Manager 목록 및 의존 관계 ━━━
 
@@ -1009,6 +1009,35 @@ managers:
       - TotalPages (byte)
       - IsPanelOpen (bool)
 
+  - name: TripodManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "비급 & 트라이포드 관리 — 목록 조회, 장착, 비급 사용(해금)"
+    reads: []
+    writes:
+      - _skills (List<TripodSkillInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnTripodListChanged()
+      - OnEquipResult(TripodEquipResult)
+      - OnDiscoverResult(ScrollDiscoverResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnTripodList → 트라이포드 목록 수신
+      - NetworkManager.OnTripodEquipResult → 장착 결과
+      - NetworkManager.OnScrollDiscoverResult → 비급 발견 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshList()
+      - EquipTripod(ushort, byte, byte)
+      - UseScroll(byte)
+    computed_properties:
+      - Skills (IReadOnlyList<TripodSkillInfo>)
+      - IsPanelOpen (bool)
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -1430,6 +1459,16 @@ data_flows:
     to: AuctionUI
     via: "C# events (OnListingChanged, OnRegisterResult, OnBuyResult, OnBidResult, OnPanelOpened, OnPanelClosed)"
     description: "거래소 UI 갱신 (Y키 토글)"
+
+  - from: NetworkManager
+    to: TripodManager
+    via: "C# events (OnTripodList, OnTripodEquipResult, OnScrollDiscoverResult)"
+    description: "트라이포드 목록/장착 결과/비급 발견 결과 수신 (520-524)"
+
+  - from: TripodManager
+    to: TripodUI
+    via: "C# events (OnTripodListChanged, OnEquipResult, OnDiscoverResult, OnPanelOpened, OnPanelClosed)"
+    description: "트라이포드 UI 갱신 (T키 토글)"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 

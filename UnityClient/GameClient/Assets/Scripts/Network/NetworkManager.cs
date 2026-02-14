@@ -176,6 +176,10 @@ namespace Network
         public event Action<ushort> OnCutsceneEnd;
         public event Action<StoryProgressData> OnStoryProgress;
         public event Action<MainQuestDataInfo> OnMainQuestData;
+        // S046: 비급 & 트라이포드
+        public event Action<TripodListData> OnTripodList;
+        public event Action<TripodEquipResult> OnTripodEquipResult;
+        public event Action<ScrollDiscoverResultData> OnScrollDiscoverResult;
         // 공통
         public event Action<string> OnError;
         public event Action OnDisconnected;
@@ -902,6 +906,26 @@ namespace Network
         public void RequestStoryProgress()
         {
             _field?.Send(PacketBuilder.StoryProgressReq());
+        }
+
+        // ━━━ S046: 비급 & 트라이포드 API ━━━
+
+        /// <summary>트라이포드 목록 요청</summary>
+        public void RequestTripodList()
+        {
+            _field?.Send(PacketBuilder.TripodListReq());
+        }
+
+        /// <summary>트라이포드 장착 요청</summary>
+        public void RequestTripodEquip(ushort skillId, byte tier, byte optionIdx)
+        {
+            _field?.Send(PacketBuilder.TripodEquip(skillId, tier, optionIdx));
+        }
+
+        /// <summary>비급 사용 (인벤토리 비급 아이템 → 트라이포드 해금)</summary>
+        public void RequestScrollDiscover(byte scrollSlot)
+        {
+            _field?.Send(PacketBuilder.ScrollDiscover(scrollSlot));
         }
 
         /// <summary>연결 끊기</summary>
@@ -1960,6 +1984,32 @@ namespace Network
                     var data = PacketBuilder.ParseMainQuestData(payload);
                     Debug.Log($"[Net] MainQuestData: id={data.QuestId}, name={data.Name}, objectives={data.Objectives.Length}");
                     OnMainQuestData?.Invoke(data);
+                    break;
+                }
+
+                // ━━━ S046: 비급 & 트라이포드 ━━━
+
+                case MsgType.TRIPOD_LIST:
+                {
+                    var data = PacketBuilder.ParseTripodList(payload);
+                    Debug.Log($"[Net] TripodList: skills={data.Skills.Length}");
+                    OnTripodList?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.TRIPOD_EQUIP_RESULT:
+                {
+                    var data = PacketBuilder.ParseTripodEquipResult(payload);
+                    Debug.Log($"[Net] TripodEquip: result={data}");
+                    OnTripodEquipResult?.Invoke(data);
+                    break;
+                }
+
+                case MsgType.SCROLL_DISCOVER:
+                {
+                    var data = PacketBuilder.ParseScrollDiscoverResult(payload);
+                    Debug.Log($"[Net] ScrollDiscover: result={data.Result}, skill={data.SkillId}, tier={data.Tier}, opt={data.OptionIdx}");
+                    OnScrollDiscoverResult?.Invoke(data);
                     break;
                 }
 

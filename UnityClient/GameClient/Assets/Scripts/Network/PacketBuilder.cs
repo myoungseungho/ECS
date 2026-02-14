@@ -2341,5 +2341,80 @@ namespace Network
             }
             return d;
         }
+
+        // ━━━ S046: 비급 & 트라이포드 (TASK 15) ━━━
+
+        /// <summary>TRIPOD_LIST_REQ 빌드: empty</summary>
+        public static byte[] TripodListReq()
+        {
+            return Build(MsgType.TRIPOD_LIST_REQ);
+        }
+
+        /// <summary>TRIPOD_EQUIP 빌드: skill_id(2) tier(1) option_idx(1) = 4B</summary>
+        public static byte[] TripodEquip(ushort skillId, byte tier, byte optionIdx)
+        {
+            byte[] payload = new byte[4];
+            BitConverter.GetBytes(skillId).CopyTo(payload, 0);
+            payload[2] = tier;
+            payload[3] = optionIdx;
+            return Build(MsgType.TRIPOD_EQUIP, payload);
+        }
+
+        /// <summary>SCROLL_DISCOVER 빌드: scroll_slot(1)</summary>
+        public static byte[] ScrollDiscover(byte scrollSlot)
+        {
+            return Build(MsgType.SCROLL_DISCOVER, new byte[] { scrollSlot });
+        }
+
+        /// <summary>TRIPOD_LIST 파싱: skill_count(1) {skill_id(2) tier_count(1) {tier(1) unlocked_count(1) {option_idx(1)}*N equipped_idx(1)}*N}*N</summary>
+        public static TripodListData ParseTripodList(byte[] payload)
+        {
+            var d = new TripodListData();
+            int off = 0;
+            byte skillCount = payload[off]; off += 1;
+            d.Skills = new TripodSkillInfo[skillCount];
+            for (int i = 0; i < skillCount; i++)
+            {
+                var skill = new TripodSkillInfo();
+                skill.SkillId = BitConverter.ToUInt16(payload, off); off += 2;
+                byte tierCount = payload[off]; off += 1;
+                skill.Tiers = new TripodTierInfo[tierCount];
+                for (int j = 0; j < tierCount; j++)
+                {
+                    var tier = new TripodTierInfo();
+                    tier.Tier = payload[off]; off += 1;
+                    byte unlockedCount = payload[off]; off += 1;
+                    tier.UnlockedOptions = new byte[unlockedCount];
+                    for (int k = 0; k < unlockedCount; k++)
+                    {
+                        tier.UnlockedOptions[k] = payload[off]; off += 1;
+                    }
+                    tier.EquippedIdx = payload[off]; off += 1;
+                    skill.Tiers[j] = tier;
+                }
+                d.Skills[i] = skill;
+            }
+            return d;
+        }
+
+        /// <summary>TRIPOD_EQUIP_RESULT 파싱: result(1)</summary>
+        public static TripodEquipResult ParseTripodEquipResult(byte[] payload)
+        {
+            return (TripodEquipResult)payload[0];
+        }
+
+        /// <summary>SCROLL_DISCOVER RESP 파싱: result(1) [+ skill_id(2) tier(1) option_idx(1) if success]</summary>
+        public static ScrollDiscoverResultData ParseScrollDiscoverResult(byte[] payload)
+        {
+            var d = new ScrollDiscoverResultData();
+            d.Result = (ScrollDiscoverResult)payload[0];
+            if (d.Result == ScrollDiscoverResult.SUCCESS && payload.Length >= 5)
+            {
+                d.SkillId = BitConverter.ToUInt16(payload, 1);
+                d.Tier = payload[3];
+                d.OptionIdx = payload[4];
+            }
+            return d;
+        }
     }
 }

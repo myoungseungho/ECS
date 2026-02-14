@@ -342,6 +342,13 @@ namespace Network
         STORY_PROGRESS_REQ      = 515,  // C→S: empty
         STORY_PROGRESS          = 516,  // S→C: chapter(1) quest_id(4) quest_state(1) = 6B
         MAIN_QUEST_DATA         = 517,  // S→C: quest_id(4) name(32) desc_len(2) desc(N) objective_count(1) {type(1) target(4) current(4) required(4)}*N
+
+        // ━━━ S046: 비급 & 트라이포드 (TASK 15, MsgType 520-524) ━━━
+        TRIPOD_LIST_REQ         = 520,  // C→S: empty
+        TRIPOD_LIST             = 521,  // S→C: skill_count(1) {skill_id(2) tier_count(1) {tier(1) unlocked_count(1) {option_idx(1)}*N equipped_idx(1)}*N}*N
+        TRIPOD_EQUIP            = 522,  // C→S: skill_id(2) tier(1) option_idx(1) = 4B
+        TRIPOD_EQUIP_RESULT     = 523,  // S→C: result(1)
+        SCROLL_DISCOVER         = 524,  // C→S: scroll_slot(1) | S→C: result(1) [+ skill_id(2) tier(1) option_idx(1) if success]
     }
 
     /// <summary>패킷 헤더 크기: 4(length) + 2(type) = 6바이트</summary>
@@ -1852,5 +1859,58 @@ namespace Network
         public string Name;
         public string Description;
         public MainQuestObjective[] Objectives;
+    }
+
+    // ━━━ S046: 비급 & 트라이포드 (TASK 15) ━━━
+
+    /// <summary>트라이포드 장착 결과 코드</summary>
+    public enum TripodEquipResult : byte
+    {
+        SUCCESS          = 0,
+        NOT_LOGGED_IN    = 1,
+        INVALID_SKILL    = 2,
+        TIER_LEVEL_LOW   = 3,
+        NOT_UNLOCKED     = 4,
+        LOWER_TIER_REQUIRED = 5,
+    }
+
+    /// <summary>비급 발견 결과 코드</summary>
+    public enum ScrollDiscoverResult : byte
+    {
+        SUCCESS          = 0,
+        NOT_LOGGED_IN    = 1,
+        ITEM_NOT_FOUND   = 2,
+        ALREADY_UNLOCKED = 3,
+        CLASS_MISMATCH   = 4,
+    }
+
+    /// <summary>트라이포드 티어 정보 (TRIPOD_LIST 파싱용)</summary>
+    public class TripodTierInfo
+    {
+        public byte Tier;
+        public byte[] UnlockedOptions;
+        public byte EquippedIdx;    // 0xFF = 미장착
+    }
+
+    /// <summary>스킬별 트라이포드 정보 (TRIPOD_LIST 파싱용)</summary>
+    public class TripodSkillInfo
+    {
+        public ushort SkillId;
+        public TripodTierInfo[] Tiers;
+    }
+
+    /// <summary>트라이포드 목록 데이터 (TRIPOD_LIST 파싱용)</summary>
+    public class TripodListData
+    {
+        public TripodSkillInfo[] Skills;
+    }
+
+    /// <summary>비급 발견 결과 데이터 (SCROLL_DISCOVER RESP 파싱용)</summary>
+    public class ScrollDiscoverResultData
+    {
+        public ScrollDiscoverResult Result;
+        public ushort SkillId;
+        public byte Tier;
+        public byte OptionIdx;
     }
 }
