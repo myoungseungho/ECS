@@ -430,6 +430,10 @@ public static class ProjectSetup
         var shopManagerGo = CreateManagerObject("ShopManager", typeof(ShopManager));
         var bossManagerGo = CreateManagerObject("BossManager", typeof(BossManager));
 
+        // --- GameBootstrap (auto-connect on Play) ---
+        var bootstrapGo = new GameObject("GameBootstrap");
+        bootstrapGo.AddComponent<GameBootstrap>();
+
         // --- UI Canvas ---
         CreateUICanvas(scene);
 
