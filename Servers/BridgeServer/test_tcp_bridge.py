@@ -19,7 +19,9 @@ from tcp_bridge import (
     ENCHANT_ELEMENTS, ENCHANT_LEVELS,
     GATHER_ENERGY_MAX, GATHER_ENERGY_COST,
     AUCTION_TAX_RATE, AUCTION_LISTING_FEE,
-    AUCTION_MAX_LISTINGS, DAILY_GOLD_CAPS
+    AUCTION_MAX_LISTINGS, DAILY_GOLD_CAPS,
+    TRIPOD_TABLE, TRIPOD_TIER_UNLOCK,
+    SCROLL_DROP_RATES, SKILL_CLASS_MAP, CLASS_SKILLS
 )
 
 
@@ -1560,6 +1562,106 @@ async def run_tests(port: int):
         c.close()
 
     await test("AUCTION_BID: 존재하지 않는 경매 입찰", test_auction_bid())
+
+
+    # ---- TASK 15: Tripod & Scroll Tests (S046) ----
+
+    async def test_scroll_discover_and_unlock():
+        """비급 사용: 스크롤 아이템으로 트라이포드 해금."""
+        c = await login_and_enter(port)
+        # Generate a scroll item_id for warrior skill 2 (slash), tier 1, option 0
+        # skill_pos for skill_id=2: sorted keys = [2,3,4,5,6,7,8,9,21,...] -> pos=0
+        # item_id = 9000 + 0*100 + 1*10 + 0 = 9010
+        scroll_item_id = 9010
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', scroll_item_id, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        # Use scroll from slot 0
+        await c.send(MsgType.SCROLL_DISCOVER, struct.pack('<B', 0))
+        msg_type, resp = await c.recv_expect(MsgType.SCROLL_DISCOVER)
+        assert msg_type == MsgType.SCROLL_DISCOVER, f"Expected SCROLL_DISCOVER, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        skill_id = struct.unpack_from('<H', resp, 1)[0]
+        assert skill_id == 2, f"Expected skill_id=2, got {skill_id}"
+        tier = resp[3]
+        assert tier == 1, f"Expected tier=1, got {tier}"
+        c.close()
+
+    await test("SCROLL_DISCOVER: 비급 사용 -> 트라이포드 해금", test_scroll_discover_and_unlock())
+
+    async def test_scroll_already_unlocked():
+        """비급 중복 사용: 이미 해금된 옵션은 실패."""
+        c = await login_and_enter(port)
+        scroll_item_id = 9010
+        # 첫 사용: 해금
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', scroll_item_id, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c.send(MsgType.SCROLL_DISCOVER, struct.pack('<B', 0))
+        await c.recv_expect(MsgType.SCROLL_DISCOVER)
+        # 두 번째 사용: 중복
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', scroll_item_id, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c.send(MsgType.SCROLL_DISCOVER, struct.pack('<B', 0))
+        msg_type, resp = await c.recv_expect(MsgType.SCROLL_DISCOVER)
+        assert msg_type == MsgType.SCROLL_DISCOVER
+        result = resp[0]
+        assert result == 3, f"Expected ALREADY_UNLOCKED(3), got {result}"
+        c.close()
+
+    await test("SCROLL_DISCOVER: 중복 해금 차단", test_scroll_already_unlocked())
+
+    async def test_tripod_equip():
+        """트라이포드 장착: 해금 후 장착."""
+        c = await login_and_enter(port)
+        # 먼저 해금
+        scroll_item_id = 9010  # skill=2, tier=1, option=0
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', scroll_item_id, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c.send(MsgType.SCROLL_DISCOVER, struct.pack('<B', 0))
+        await c.recv_expect(MsgType.SCROLL_DISCOVER)
+        # 장착: skill_id=2, tier=1, option_idx=0
+        await c.send(MsgType.TRIPOD_EQUIP, struct.pack('<HBB', 2, 1, 0))
+        msg_type, resp = await c.recv_expect(MsgType.TRIPOD_EQUIP_RESULT)
+        assert msg_type == MsgType.TRIPOD_EQUIP_RESULT, f"Expected TRIPOD_EQUIP_RESULT, got {msg_type}"
+        result = resp[0]
+        assert result == 0, f"Expected SUCCESS(0), got {result}"
+        c.close()
+
+    await test("TRIPOD_EQUIP: 트라이포드 장착 성공", test_tripod_equip())
+
+    async def test_tripod_equip_not_unlocked():
+        """트라이포드 장착 실패: 미해금 옵션."""
+        c = await login_and_enter(port)
+        # 해금 없이 바로 장착 시도: skill=2, tier=1, option=2 (미해금)
+        await c.send(MsgType.TRIPOD_EQUIP, struct.pack('<HBB', 2, 1, 2))
+        msg_type, resp = await c.recv_expect(MsgType.TRIPOD_EQUIP_RESULT)
+        assert msg_type == MsgType.TRIPOD_EQUIP_RESULT
+        result = resp[0]
+        assert result == 4, f"Expected NOT_UNLOCKED(4), got {result}"
+        c.close()
+
+    await test("TRIPOD_EQUIP_FAIL: 미해금 옵션 장착 시도", test_tripod_equip_not_unlocked())
+
+    async def test_tripod_list():
+        """트라이포드 목록 조회."""
+        c = await login_and_enter(port)
+        # 먼저 하나 해금 + 장착
+        scroll_item_id = 9010
+        await c.send(MsgType.ITEM_ADD, struct.pack('<IH', scroll_item_id, 1))
+        await c.recv_expect(MsgType.ITEM_ADD_RESULT)
+        await c.send(MsgType.SCROLL_DISCOVER, struct.pack('<B', 0))
+        await c.recv_expect(MsgType.SCROLL_DISCOVER)
+        await c.send(MsgType.TRIPOD_EQUIP, struct.pack('<HBB', 2, 1, 0))
+        await c.recv_expect(MsgType.TRIPOD_EQUIP_RESULT)
+        # 목록 조회
+        await c.send(MsgType.TRIPOD_LIST_REQ, b'')
+        msg_type, resp = await c.recv_expect(MsgType.TRIPOD_LIST)
+        assert msg_type == MsgType.TRIPOD_LIST, f"Expected TRIPOD_LIST, got {msg_type}"
+        skill_count = resp[0]
+        assert skill_count >= 1, f"Expected at least 1 skill with tripod data, got {skill_count}"
+        c.close()
+
+    await test("TRIPOD_LIST: 트라이포드 목록 조회", test_tripod_list())
 
     # ━━━ 결과 ━━━
     print(f"\n{'='*50}")
