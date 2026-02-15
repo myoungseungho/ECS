@@ -40,6 +40,7 @@ MAX_CLAUDE_TIMEOUT = 900   # 15분
 IDLE_LONG_SLEEP = 1800     # 30분 — 극단적으로 할 일 없을 때만
 COLLAB_INTERVAL = 5        # 5세션마다 협업 라운드
 MAX_CONSECUTIVE_IDLE = 2   # 연속 idle 횟수 제한
+MAX_MSG_RETRIES = 3        # 같은 메시지 최대 재시도 횟수
 
 ROLES = {
     "server": {
@@ -235,13 +236,14 @@ def git_pull(root):
                 else:
                     git_run(["merge", "--abort"], root)
 
-    # 4. stash pop (실패해도 무시 - 대부분 log 파일 충돌)
+    # 4. stash pop (실패 시 stash 보존 — 수동 복구 가능하도록)
     if has_changes:
         pop_code, _, pop_err = git_run(["stash", "pop"], root)
         if pop_code != 0:
-            log(f"  [WARN] stash pop failed, dropping stash")
-            git_run(["checkout", "--", "."], root)
-            git_run(["stash", "drop"], root)
+            # 충돌 파일만 theirs로 해결하고 stash는 유지
+            log(f"  [WARN] stash pop conflict, resolving with checkout")
+            git_run(["checkout", "--theirs", "."], root)
+            git_run(["reset", "HEAD"], root)
 
     return code == 0
 
@@ -628,8 +630,10 @@ class Action:
         return f"{self.mode}({self.role})"
 
 
-def schedule(root, session_count, consecutive_idle):
+def schedule(root, session_count, consecutive_idle, failed_messages=None):
     """다음 액션 결정 — 우선순위 기반"""
+    if failed_messages is None:
+        failed_messages = {}
 
     # Priority 1: 유저 질문 대기 중이면 건너뛰기
     if check_ask_user_pending(root):
@@ -642,6 +646,9 @@ def schedule(root, session_count, consecutive_idle):
     role_order = [my_role, "server" if my_role == "client" else "client"]
     for role in role_order:
         msgs = scan_new_messages(role, root)
+        # 실패 횟수 초과 메시지 필터링
+        msgs = [m for m in msgs
+                if failed_messages.get((role, m[0]), 0) < MAX_MSG_RETRIES]
         if msgs:
             msg_ids = [m[0] for m in msgs]
             return Action("RESPOND", role, msg_ids)
@@ -684,6 +691,7 @@ class Hub:
         self.session_count = 0
         self.consecutive_idle = 0
         self.start_time = time.time()
+        self.failed_messages = {}  # {(role, msg_id): fail_count}
         self.stats = {
             "total_sessions": 0,
             "respond": 0,
@@ -693,6 +701,7 @@ class Hub:
             "collab": 0,
             "pushes": 0,
             "errors": 0,
+            "skipped_messages": 0,
         }
 
     def run(self):
@@ -711,7 +720,11 @@ class Hub:
                         self.force_creative()
                         self.consecutive_idle = 0
                     else:
-                        wait = 60  # 유저 답변 대기 등
+                        # ask_user 대기 중이면 더 길게 대기
+                        if check_ask_user_pending(self.root):
+                            wait = 300  # 5분 — 유저 답변 올 때까지
+                        else:
+                            wait = 60
                         log(f"  [WAIT] {wait}s...")
                         time.sleep(wait)
 
@@ -741,7 +754,8 @@ class Hub:
                 return None
 
         # 2. 스케줄
-        action = schedule(self.root, self.session_count, self.consecutive_idle)
+        action = schedule(self.root, self.session_count, self.consecutive_idle,
+                          self.failed_messages)
         if not action:
             return None
 
@@ -775,6 +789,16 @@ class Hub:
             trigger = f"new messages: {', '.join(msg_ids)}"
             prompt = build_agent_prompt(action.role, trigger, self.root)
             ok, _ = run_claude(prompt, self.root, f"{action.role}/RESPOND")
+            if not ok:
+                for mid in msg_ids:
+                    key = (action.role, mid)
+                    self.failed_messages[key] = self.failed_messages.get(key, 0) + 1
+                    count = self.failed_messages[key]
+                    if count >= MAX_MSG_RETRIES:
+                        log(f"  [SKIP] {action.role}/{mid} failed {count} times, skipping")
+            else:
+                for mid in msg_ids:
+                    self.failed_messages.pop((action.role, mid), None)
             return ok
 
         elif action.mode == "WORK":
@@ -838,6 +862,11 @@ class Hub:
 
     def force_creative(self):
         """연속 idle 시 강제 창의 모드"""
+        # ask_user pending이면 creative 모드 진입 금지
+        if check_ask_user_pending(self.root):
+            log("  [WAIT] ask_user pending -- skipping creative mode")
+            return
+
         log("  [FORCE] consecutive idle -> creative mode")
 
         # 먼저 분해 시도
