@@ -193,6 +193,8 @@ public static class SceneValidator
         Check("GameScene: MentorManager 존재", objectNames.Contains("MentorManager"));
         Check("GameScene: MentorUI 존재", objectNames.Contains("MentorUI"));
         Check("GameScene: MentorShopUI 존재", objectNames.Contains("MentorShopUI"));
+        Check("GameScene: EventManager 존재", objectNames.Contains("EventManager"));
+        Check("GameScene: EventUI 존재", objectNames.Contains("EventUI"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인

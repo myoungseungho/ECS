@@ -519,6 +519,8 @@ public static class ProjectSetup
         var mentorManagerGo = CreateManagerObject("MentorManager", typeof(MentorManager));
         var mentorUIGo = CreateManagerObject("MentorUI", typeof(MentorUI));
         var mentorShopUIGo = CreateManagerObject("MentorShopUI", typeof(MentorShopUI));
+        var eventManagerGo = CreateManagerObject("EventManager", typeof(EventManager));
+        var eventUIGo = CreateManagerObject("EventUI", typeof(EventUI));
 
         // 신규 매니저
         var soundManagerGo = CreateManagerObject("SoundManager", typeof(SoundManager));

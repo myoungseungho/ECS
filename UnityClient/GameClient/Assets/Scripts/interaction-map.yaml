@@ -943,13 +943,12 @@ managers:
       - _activeCutsceneId (ushort)
       - _isPanelOpen (bool)
     fires_events:
-      - OnDialogWithChoices(DialogChoiceResultData)
+      - OnDialogReceived(DialogChoiceResultData)
+      - OnDialogClosed()
       - OnCutsceneStarted(CutsceneTriggerData)
-      - OnCutsceneFinished(ushort)
-      - OnStoryUpdated(StoryProgressData)
-      - OnMainQuestUpdated(MainQuestDataInfo)
-      - OnPanelOpened()
-      - OnPanelClosed()
+      - OnCutsceneEnded(ushort)
+      - OnProgressUpdated(StoryProgressData)
+      - OnMainQuestLoaded(MainQuestDataInfo)
     subscribes_to:
       - NetworkManager.OnDialogChoiceResult → 대화 선택지 결과
       - NetworkManager.OnCutsceneTrigger → 컷씬 트리거
@@ -957,15 +956,41 @@ managers:
       - NetworkManager.OnStoryProgress → 스토리 진행 갱신
       - NetworkManager.OnMainQuestData → 메인 퀘스트 데이터
     public_api:
-      - OpenPanel()
-      - ClosePanel()
       - SelectChoice(ushort, byte)
       - SkipCutscene()
       - RefreshProgress()
+      - CloseDialog()
     computed_properties:
-      - CurrentChapter (byte)
-      - MainQuest (MainQuestDataInfo)
-      - IsCutscenePlaying (bool)
+      - Progress (StoryProgressData)
+      - CurrentQuest (MainQuestDataInfo)
+      - IsInCutscene (bool)
+      - IsDialogOpen (bool)
+      - Chapter (byte)
+
+  - name: EventManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "이벤트 시스템 관리 — 이벤트 목록/보상 수령 (14일출석/2배EXP/보스러시) S042 TASK 11 (MsgType 484-487)"
+    reads: []
+    writes:
+      - _events (List<GameEventInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnEventListChanged()
+      - OnClaimResult(EventClaimResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnEventList → 이벤트 목록 수신
+      - NetworkManager.OnEventClaimResult → 이벤트 보상 수령 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - ClaimReward(ushort)
+      - RefreshEvents()
+    computed_properties:
+      - Events (IReadOnlyList<GameEventInfo>)
       - IsPanelOpen (bool)
 
   - name: AuctionManager
@@ -1796,6 +1821,22 @@ managers:
     public_api: []
     computed_properties: []
 
+  - name: EventUI
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "이벤트 UI — Shift+E 토글 이벤트 목록 + 보상 수령"
+    reads: []
+    writes: []
+    fires_events: []
+    subscribes_to:
+      - EventManager.OnEventListChanged → 이벤트 목록 갱신
+      - EventManager.OnClaimResult → 보상 수령 결과 표시
+      - EventManager.OnPanelOpened → UI 표시
+      - EventManager.OnPanelClosed → UI 숨김
+    public_api: []
+    computed_properties: []
+
 # ━━━ Entity 컴포넌트 ━━━
 
 entities:
@@ -2205,8 +2246,18 @@ data_flows:
 
   - from: StoryManager
     to: StoryUI
-    via: "C# events (OnDialogWithChoices, OnCutsceneStarted, OnCutsceneFinished, OnStoryUpdated, OnMainQuestUpdated, OnPanelOpened, OnPanelClosed)"
-    description: "스토리 UI 갱신 (대화 선택지 + 컷씬 오버레이 + 퀘스트 진행)"
+    via: "C# events (OnDialogReceived, OnCutsceneStarted, OnCutsceneEnded, OnProgressUpdated, OnMainQuestLoaded)"
+    description: "스토리 UI 갱신 (대화 선택지 + 컷씬 오버레이 + 퀘스트 진행, J키 토글)"
+
+  - from: NetworkManager
+    to: EventManager
+    via: "C# events (OnEventList, OnEventClaimResult)"
+    description: "이벤트 목록/보상 수령 결과 수신 (484-487)"
+
+  - from: EventManager
+    to: EventUI
+    via: "C# events (OnEventListChanged, OnClaimResult, OnPanelOpened, OnPanelClosed)"
+    description: "이벤트 UI 갱신 (Shift+E 토글)"
 
   - from: NetworkManager
     to: AuctionManager

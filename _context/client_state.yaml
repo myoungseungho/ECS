@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T08:15:00"
+last_session: "2026-02-15T09:55:00"
 
 # ── 현재 상태 ──
-current_status: "Phase 17 사제 시스템 구현 완료 — MentorManager + MentorUI + MentorShopUI + 패킷 11종(550-560) + TCP 테스트 10건 | 113 PASS 0 FAIL"
+current_status: "GDD 서버+클라 17개 TASK 100% COMPLETE — S057 검증 + StoryUI 버그 수정 + EventManager/EventUI 등록 | 115 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -309,6 +309,16 @@ completed:
       - "Assets/Editor/SceneValidator.cs"
       - "Assets/Scripts/interaction-map.yaml"
       - "UnityClient/GameClient/test_phase17_mentor_tcp.py"
+  - id: A32
+    desc: "S057 GDD 100% 검증 — StoryUI 이벤트 버그 수정 + EventManager/EventUI 등록 + interaction-map 동기화 + TCP 테스트 22건"
+    files:
+      - "Assets/Scripts/UI/StoryUI.cs"
+      - "Assets/Scripts/Managers/EventManager.cs"
+      - "Assets/Scripts/UI/EventUI.cs"
+      - "Assets/Editor/ProjectSetup.cs"
+      - "Assets/Editor/SceneValidator.cs"
+      - "Assets/Scripts/interaction-map.yaml"
+      - "UnityClient/GameClient/test_phase18_s057_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
 blocked: []
@@ -490,7 +500,12 @@ recent_decisions:
   - "사제 UI 단축키: Shift+M=사제패널, 기여도상점=패널 내 버튼"
   - "사제 요청 결과코드: 0=SENT/1=LV_LOW/2=LV_HIGH/3=HAS_MASTER/4=FULL/5=NOT_FOUND/6=SELF/7=ALREADY"
   - "졸업 보상: 사부 기여도500+골드10000, 제자 골드5000+EXP10000"
-  - "S056이 마지막 브레인스토밍 TASK — 이후 남은 TASK 11/12/13/14는 서버측 미완료 상태"
+  - "S057: GDD 서버 TASK 100% COMPLETE — TASK 11~14 한방 완료 (142/142 ALL PASS)"
+  - "S057 검증: StoryUI 이벤트 바인딩 4건 수정 (OnDialogWithChoices→OnDialogReceived 등)"
+  - "S057 검증: EventManager+EventUI ProjectSetup/SceneValidator/interaction-map 누락 등록"
+  - "S057 검증: interaction-map StoryManager 이벤트명 동기화"
+  - "GDD 서버+클라 17개 TASK 전부 양쪽 DONE — 마일스톤 달성"
+  - "이벤트 UI 단축키: Shift+E=이벤트패널, 스토리 UI: J=스토리진행패널 토글"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -547,6 +562,7 @@ processed_messages:
   - "S054"
   - "S055"
   - "S056"
+  - "S057"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:

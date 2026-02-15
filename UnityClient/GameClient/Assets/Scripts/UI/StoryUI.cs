@@ -53,13 +53,11 @@ public class StoryUI : MonoBehaviour
 
         if (StoryManager.Instance != null)
         {
-            StoryManager.Instance.OnDialogWithChoices += HandleDialogChoices;
+            StoryManager.Instance.OnDialogReceived += HandleDialogChoices;
             StoryManager.Instance.OnCutsceneStarted += HandleCutsceneStarted;
-            StoryManager.Instance.OnCutsceneFinished += HandleCutsceneFinished;
-            StoryManager.Instance.OnStoryUpdated += HandleStoryUpdated;
-            StoryManager.Instance.OnMainQuestUpdated += HandleMainQuestUpdated;
-            StoryManager.Instance.OnPanelOpened += ShowProgressPanel;
-            StoryManager.Instance.OnPanelClosed += HideProgressPanel;
+            StoryManager.Instance.OnCutsceneEnded += HandleCutsceneFinished;
+            StoryManager.Instance.OnProgressUpdated += HandleStoryUpdated;
+            StoryManager.Instance.OnMainQuestLoaded += HandleMainQuestUpdated;
         }
 
         // 초기 비활성
@@ -72,13 +70,11 @@ public class StoryUI : MonoBehaviour
     {
         if (StoryManager.Instance != null)
         {
-            StoryManager.Instance.OnDialogWithChoices -= HandleDialogChoices;
+            StoryManager.Instance.OnDialogReceived -= HandleDialogChoices;
             StoryManager.Instance.OnCutsceneStarted -= HandleCutsceneStarted;
-            StoryManager.Instance.OnCutsceneFinished -= HandleCutsceneFinished;
-            StoryManager.Instance.OnStoryUpdated -= HandleStoryUpdated;
-            StoryManager.Instance.OnMainQuestUpdated -= HandleMainQuestUpdated;
-            StoryManager.Instance.OnPanelOpened -= ShowProgressPanel;
-            StoryManager.Instance.OnPanelClosed -= HideProgressPanel;
+            StoryManager.Instance.OnCutsceneEnded -= HandleCutsceneFinished;
+            StoryManager.Instance.OnProgressUpdated -= HandleStoryUpdated;
+            StoryManager.Instance.OnMainQuestLoaded -= HandleMainQuestUpdated;
         }
     }
 
@@ -262,6 +258,15 @@ public class StoryUI : MonoBehaviour
         _objectivesText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         _objectivesText.horizontalOverflow = HorizontalWrapMode.Wrap;
         _objectivesText.verticalOverflow = VerticalWrapMode.Truncate;
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.J))
+        {
+            if (_progressPanel != null)
+                _progressPanel.SetActive(!_progressPanel.activeSelf);
+        }
     }
 
     // ━━━ 버튼 핸들러 ━━━
