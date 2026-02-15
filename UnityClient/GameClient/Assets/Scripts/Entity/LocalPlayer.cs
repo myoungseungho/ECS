@@ -212,6 +212,9 @@ public class LocalPlayer : MonoBehaviour
 
         transform.position += dir * moveSpeed * Time.deltaTime;
 
+        // 터레인 높이 적용
+        ApplyTerrainHeight();
+
         if (dir.sqrMagnitude > 0.01f)
         {
             Quaternion targetRot = Quaternion.LookRotation(dir);
@@ -418,6 +421,18 @@ public class LocalPlayer : MonoBehaviour
         Vector3 pos = monster.transform.position;
         pos.y = 0.02f;
         _targetHighlight.transform.position = pos;
+    }
+
+    // ━━━ Terrain Height ━━━
+
+    private void ApplyTerrainHeight()
+    {
+        var terrain = Terrain.activeTerrain;
+        if (terrain == null) return;
+
+        Vector3 pos = transform.position;
+        pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y;
+        transform.position = pos;
     }
 
     // ━━━ Callbacks ━━━

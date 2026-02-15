@@ -1,5 +1,6 @@
 // ━━━ SkillBarUI.cs ━━━
-// 하단 스킬바 — 스킬 슬롯 4개 (키보드 1~4), 쿨다운 오버레이
+// 하단 스킬바 — 13슬롯 (LMB + QWER + V + ASDF + 1,2)
+// ui.yaml hud.skill_bar 스펙: 하단중앙 (0, 20), 700x80
 // SkillManager.OnSkillListChanged, OnCooldownStarted 구독
 
 using UnityEngine;
@@ -9,10 +10,34 @@ using Network;
 
 public class SkillBarUI : MonoBehaviour
 {
-    [Header("Skill Slots")]
-    [SerializeField] private Text[] slotNameTexts;   // 4개
-    [SerializeField] private Text[] slotKeyTexts;    // "1" "2" "3" "4"
+    [Header("Skill Slots (13개: LMB,Q,W,E,R,V,A,S,D,F,1,2)")]
+    [SerializeField] private Text[] slotNameTexts;   // 13개
+    [SerializeField] private Text[] slotKeyTexts;    // 키 레이블
     [SerializeField] private Image[] cooldownOverlays; // 쿨다운 시 fillAmount
+
+    // 슬롯 키 매핑 (순서: LMB, Q, W, E, R, V, A, S, D, F, 1, 2)
+    private static readonly KeyCode[] SlotKeys =
+    {
+        KeyCode.Mouse0,     // 0: LMB
+        KeyCode.Q,          // 1: Q
+        KeyCode.W,          // 2: W (이동과 충돌 — 전투 모드에서만)
+        KeyCode.E,          // 3: E
+        KeyCode.R,          // 4: R
+        KeyCode.V,          // 5: V (궁극기)
+        KeyCode.A,          // 6: A (이동과 충돌 — 전투 모드에서만)
+        KeyCode.S,          // 7: S (이동과 충돌 — 전투 모드에서만)
+        KeyCode.D,          // 8: D (이동과 충돌 — 전투 모드에서만)
+        KeyCode.F,          // 9: F
+        KeyCode.Alpha1,     // 10: 물약1
+        KeyCode.Alpha2,     // 11: 물약2
+    };
+
+    private static readonly string[] SlotLabels =
+    {
+        "LMB", "Q", "W", "E", "R", "V", "A", "S", "D", "F", "1", "2"
+    };
+
+    public const int SlotCount = 12;
 
     private readonly List<uint> _slotSkillIds = new List<uint>();
 
@@ -50,10 +75,7 @@ public class SkillBarUI : MonoBehaviour
 
     private void Update()
     {
-        // 쿨다운 오버레이 갱신
         UpdateCooldowns();
-
-        // 키보드 입력 (1~4키)
         HandleKeyInput();
     }
 
@@ -66,7 +88,7 @@ public class SkillBarUI : MonoBehaviour
         foreach (var kvp in sm.Skills)
             _slotSkillIds.Add(kvp.Key);
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < SlotCount; i++)
         {
             if (i < _slotSkillIds.Count)
             {
@@ -87,7 +109,7 @@ public class SkillBarUI : MonoBehaviour
         var sm = SkillManager.Instance;
         if (sm == null || cooldownOverlays == null) return;
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < SlotCount; i++)
         {
             if (i >= cooldownOverlays.Length || cooldownOverlays[i] == null) continue;
 
@@ -110,10 +132,22 @@ public class SkillBarUI : MonoBehaviour
 
     private void HandleKeyInput()
     {
-        if (Input.GetKeyDown(KeyCode.Alpha1)) TryUseSlot(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) TryUseSlot(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) TryUseSlot(2);
-        if (Input.GetKeyDown(KeyCode.Alpha4)) TryUseSlot(3);
+        // LMB (Mouse0) — 기본 공격은 LocalPlayer에서 처리하므로 스킬 슬롯으로만 동작
+        // QWER ASDF는 전투 스킬 전용
+        for (int i = 0; i < SlotKeys.Length; i++)
+        {
+            // Mouse0은 GetMouseButtonDown으로 처리
+            if (SlotKeys[i] == KeyCode.Mouse0)
+            {
+                if (Input.GetMouseButtonDown(0))
+                    TryUseSlot(i);
+            }
+            else
+            {
+                if (Input.GetKeyDown(SlotKeys[i]))
+                    TryUseSlot(i);
+            }
+        }
     }
 
     private void TryUseSlot(int slotIndex)
@@ -131,7 +165,6 @@ public class SkillBarUI : MonoBehaviour
 
     private void HandleSkillUsed(SkillResultData data)
     {
-        // 스킬 사용 피드백 (추후 이펙트 확장 가능)
         if (data.Result == 0)
             Debug.Log($"[SkillBarUI] Skill {data.SkillId} hit for {data.Damage} dmg");
     }

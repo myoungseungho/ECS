@@ -1,36 +1,1466 @@
-# System 간 상호작용 맵
-# AI 에이전트가 "이 System을 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
-# System 추가/수정 시 반드시 이 파일도 갱신
+# Unity Client — Manager 간 상호작용 맵
+# AI 에이전트가 "이 Manager를 수정하면 어디에 영향을 주는지" 즉시 파악하기 위한 문서
+# Manager 추가/수정 시 반드시 이 파일도 갱신
 
-version: session_2
+version: session_phase5_attendance_story
 
-# 현재 등록된 System과 실행 순서
-systems_execution_order:
-  - name: NetworkSystem
-    order: 1
-    purpose: "IOCP 이벤트 → ECS Entity/Component 변환"
+# ━━━ Manager 목록 및 의존 관계 ━━━
+
+managers:
+
+  - name: NetworkManager
+    namespace: Network
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "Gate→Field TCP 연결 관리 + 패킷 수신/발송 + 이벤트 디스패치"
+    reads:
+      - TCPClient._recvQueue (메인 스레드에서 DequeueAll)
+    writes:
+      - ConnectionState (State 프로퍼티)
+      - MyEntityId, CurrentZone, CurrentChannel
+    fires_events:
+      - OnLoginResult(LoginResult, uint)
+      - OnCharacterList(CharacterInfo[])
+      - OnEnterGame(EnterGameResult)
+      - OnEntityAppear(ulong, float, float, float)
+      - OnEntityDisappear(ulong)
+      - OnEntityMove(ulong, float, float, float)
+      - OnZoneChanged(int)
+      - OnChannelChanged(int)
+      - OnStatSync(StatSyncData)
+      - OnAttackResult(AttackResultData)
+      - OnCombatDied(CombatDiedData)
+      - OnRespawnResult(RespawnResultData)
+      - OnError(string)
+      - OnDisconnected()
+    subscribes_to: []
+    public_api:
+      - ConnectToGate()
+      - ConnectDirect(string, int)
+      - Login(string, string)
+      - RequestCharList()
+      - SelectCharacter(uint)
+      - JoinChannel(int)
+      - SendMove(float, float, float)
+      - EnterZone(int)
+      - RequestStatSync()
+      - SendAttack(ulong)
+      - RequestRespawn()
+      - DisconnectAll()
+
+  - name: GameManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "게임 상태 머신 (Login → CharSelect → InGame)"
     reads: []
-    writes: [SessionComponent, RecvBufferComponent]
-    side_effects: ["Entity 생성 (접속)", "Entity 파괴 (끊김)"]
+    writes:
+      - CurrentState (GameState enum)
+    fires_events: []
+    subscribes_to:
+      - NetworkManager.OnLoginResult → CharSelect 전이
+      - NetworkManager.OnEnterGame → InGame 전이
+      - NetworkManager.OnDisconnected → Login 리셋
 
-  - name: MessageDispatchSystem
-    order: 2
-    purpose: "RecvBuffer에서 완성 패킷 조립 → 타입별 핸들러 호출"
-    reads: [SessionComponent, RecvBufferComponent]
-    writes: []
-    side_effects: ["핸들러 콜백 호출", "잘못된 패킷 시 연결 끊기"]
+  - name: EntityManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "엔티티 생명주기 관리 (생성/파괴/이동)"
+    reads:
+      - EntityPool.Instance (오브젝트 풀 접근)
+    writes:
+      - _entityMap (Dictionary<ulong, GameObject>)
+      - _localPlayer (GameObject)
+    fires_events: []
+    subscribes_to:
+      - NetworkManager.OnEnterGame → 로컬 플레이어 생성
+      - NetworkManager.OnEntityAppear → 리모트 플레이어 생성
+      - NetworkManager.OnEntityDisappear → 리모트 플레이어 제거
+      - NetworkManager.OnEntityMove → 리모트 플레이어 위치 업데이트
+      - NetworkManager.OnDisconnected → 전체 엔티티 정리
+    serialized_fields:
+      - localPlayerPrefab: GameObject (LocalPlayer.prefab)
+      - remotePlayerPrefab: GameObject (RemotePlayer.prefab)
+      - usePooling: bool (default true)
 
-# System 간 데이터 흐름
+  - name: EntityPool
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "RemotePlayer 오브젝트 풀링"
+    reads: []
+    writes:
+      - _pool (Queue<GameObject>)
+    fires_events: []
+    subscribes_to: []
+    serialized_fields:
+      - prefab: GameObject (RemotePlayer.prefab)
+      - preloadCount: int (default 50)
+
+  - name: MonsterManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "몬스터 엔티티 생명주기 관리 (스폰/사망/리스폰/이동/HP 갱신/어그로)"
+    reads:
+      - CoordConverter (서버→Unity 좌표 변환)
+    writes:
+      - _monsterMap (Dictionary<ulong, MonsterEntity>)
+    fires_events:
+      - OnMonsterSpawned(MonsterEntity)
+      - OnMonsterDied(ulong)
+      - OnMonsterUpdated(MonsterEntity)
+      - OnMonsterAggroChanged(ulong, ulong)
+    subscribes_to:
+      - NetworkManager.OnMonsterSpawn → 몬스터 생성
+      - NetworkManager.OnMonsterRespawn → 몬스터 리스폰 (HP 리셋 + 재배치)
+      - NetworkManager.OnCombatDied → 몬스터 사망 처리
+      - NetworkManager.OnEntityMove → 몬스터 위치 업데이트
+      - NetworkManager.OnAttackResult → 몬스터 HP 갱신
+      - NetworkManager.OnDisconnected → 전체 몬스터 정리
+      - NetworkManager.OnMonsterMove → 몬스터 이동 (서버 AI)
+      - NetworkManager.OnMonsterAggro → 몬스터 어그로 변경
+    public_api:
+      - GetMonster(ulong) → MonsterEntity
+      - IsMonster(ulong) → bool
+    serialized_fields:
+      - monsterPrefab: GameObject (Monster.prefab, optional)
+
+  - name: StatsManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "내 캐릭터 스탯 동기화 및 관리"
+    reads: []
+    writes:
+      - Level, HP, MaxHP, MP, MaxMP, ATK, DEF, EXP, EXPNext
+    fires_events:
+      - OnStatsChanged()
+    subscribes_to:
+      - NetworkManager.OnStatSync → 스탯 데이터 갱신
+      - NetworkManager.OnEnterGame → 자동 STAT_QUERY 전송
+    public_api: []
+    computed_properties:
+      - IsAlive (HP > 0)
+      - HpRatio (HP / MaxHP)
+      - MpRatio (MP / MaxMP)
+      - ExpRatio (EXP / EXPNext)
+
+  - name: CombatManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "전투 관리 — 공격, 사망, 부활 처리"
+    reads:
+      - NetworkManager.Instance.MyEntityId (사망 판정)
+    writes:
+      - IsDead, SelectedTarget
+    fires_events:
+      - OnAttackFeedback(AttackResultData)
+      - OnEntityDied(CombatDiedData)
+      - OnRespawnComplete(RespawnResultData)
+    subscribes_to:
+      - NetworkManager.OnAttackResult → 공격 결과 전달
+      - NetworkManager.OnCombatDied → 사망 처리
+      - NetworkManager.OnRespawnResult → 부활 처리
+    public_api:
+      - SelectTarget(ulong)
+      - Attack(ulong)
+      - Respawn()
+
+  - name: SkillManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스킬 시스템 관리 — 스킬 목록, 쿨다운, 사용, 레벨업"
+    reads: []
+    writes:
+      - _skills (Dictionary<uint, SkillInfo>)
+      - _cooldowns (Dictionary<uint, float>)
+      - _skillPoints (uint)
+    fires_events:
+      - OnSkillListChanged()
+      - OnSkillUsed(SkillResultData)
+      - OnCooldownStarted(uint)
+      - OnSkillLeveledUp(SkillLevelUpResultData)
+      - OnSkillPointsChanged(uint)
+    subscribes_to:
+      - NetworkManager.OnSkillList → 스킬 목록 갱신
+      - NetworkManager.OnSkillResult → 스킬 결과 + 쿨다운 시작
+      - NetworkManager.OnEnterGame → 자동 SKILL_LIST_REQ
+      - NetworkManager.OnSkillLevelUpResult → 스킬 레벨업 결과
+      - NetworkManager.OnSkillPointInfo → 스킬 포인트 갱신
+    public_api:
+      - UseSkill(uint, ulong)
+      - IsOnCooldown(uint) → bool
+      - GetCooldownRemaining(uint) → float
+      - GetSkill(uint) → SkillInfo
+      - LevelUpSkill(uint)
+    computed_properties:
+      - SkillPoints (uint)
+
+  - name: InventoryManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "인벤토리 관리 — 아이템 목록, 사용, 장착/해제"
+    reads: []
+    writes:
+      - _items (Dictionary<byte, InventoryItemInfo>)
+    fires_events:
+      - OnInventoryChanged()
+      - OnItemAdded(ItemAddResultData)
+      - OnItemUsed(ItemUseResultData)
+      - OnItemEquipped(ItemEquipResultData)
+    subscribes_to:
+      - NetworkManager.OnInventoryResp → 인벤토리 목록 갱신
+      - NetworkManager.OnItemAddResult → 아이템 추가 결과
+      - NetworkManager.OnItemUseResult → 아이템 사용 결과
+      - NetworkManager.OnItemEquipResult → 아이템 장착 결과
+      - NetworkManager.OnEnterGame → 자동 INVENTORY_REQ
+    public_api:
+      - UseItem(byte)
+      - EquipItem(byte)
+      - UnequipItem(byte)
+      - GetItem(byte) → InventoryItemInfo
+
+  - name: PartyManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "파티 시스템 관리 — 생성, 초대, 수락, 탈퇴, 추방"
+    reads:
+      - NetworkManager.Instance.MyEntityId (리더 판정)
+    writes:
+      - PartyId, LeaderId, Members
+    fires_events:
+      - OnPartyChanged()
+    subscribes_to:
+      - NetworkManager.OnPartyInfo → 파티 정보 갱신
+    public_api:
+      - CreateParty()
+      - InviteToParty(ulong)
+      - AcceptParty(uint)
+      - LeaveParty()
+      - KickMember(ulong)
+    computed_properties:
+      - InParty (PartyId != 0)
+      - IsLeader (LeaderId == MyEntityId)
+
+  - name: BuffManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "버프 시스템 관리 — 목록, 적용, 제거, 타이머"
+    reads: []
+    writes:
+      - _buffs (Dictionary<uint, BuffInfo>)
+    fires_events:
+      - OnBuffListChanged()
+      - OnBuffApplied(BuffResultData)
+      - OnBuffRemoved(uint)
+    subscribes_to:
+      - NetworkManager.OnBuffList → 버프 목록 갱신
+      - NetworkManager.OnBuffResult → 버프 적용 결과
+      - NetworkManager.OnBuffRemoveResp → 버프 제거 결과
+      - NetworkManager.OnEnterGame → 자동 BUFF_LIST_REQ
+    public_api:
+      - ApplyBuff(uint)
+      - RemoveBuff(uint)
+      - HasBuff(uint) → bool
+      - GetBuff(uint) → BuffInfo
+
+  - name: ChatManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "채팅 시스템 관리 — Zone/Party/Whisper/System 메시지 송수신"
+    reads: []
+    writes:
+      - _messages (List<ChatEntry>)
+    fires_events:
+      - OnNewMessage(ChatEntry)
+    subscribes_to:
+      - NetworkManager.OnChatMessage → 채팅 메시지 수신
+      - NetworkManager.OnWhisperResult → 귓속말 결과
+      - NetworkManager.OnSystemMessage → 시스템 메시지
+    public_api:
+      - SendZoneChat(string)
+      - SendPartyChat(string)
+      - SendWhisper(string, string)
+    computed_properties:
+      - Messages (IReadOnlyList<ChatEntry>)
+
+  - name: ShopManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "NPC 상점 관리 — 아이템 목록, 구매/판매, 골드 추적"
+    reads: []
+    writes:
+      - _isShopOpen (bool)
+      - _currentNpcId (uint)
+      - _currentItems (ShopItemInfo[])
+      - _gold (uint)
+    fires_events:
+      - OnShopOpened(ShopListData)
+      - OnShopClosed()
+      - OnTransactionResult(ShopResultData)
+      - OnGoldChanged(uint)
+    subscribes_to:
+      - NetworkManager.OnShopList → 상점 아이템 목록 수신
+      - NetworkManager.OnShopResult → 거래 결과
+    public_api:
+      - OpenShop(uint)
+      - BuyItem(uint, byte)
+      - SellItem(byte)
+      - CloseShop()
+    computed_properties:
+      - IsShopOpen (bool)
+      - CurrentNpcId (uint)
+      - CurrentItems (ShopItemInfo[])
+      - Gold (uint)
+
+  - name: BossManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "보스 시스템 관리 — HP 추적, 페이즈 전환, 특수 공격, 인레이지"
+    reads: []
+    writes:
+      - _bosses (Dictionary<ulong, BossState>)
+    fires_events:
+      - OnBossAppeared(BossState)
+      - OnBossPhaseChanged(BossState)
+      - OnBossSpecialAttacked(BossSpecialAttackData)
+      - OnBossEnraged(BossState)
+      - OnBossKilled(BossDefeatedData)
+      - OnBossHPChanged(BossState)
+    subscribes_to:
+      - NetworkManager.OnBossSpawn → 보스 출현
+      - NetworkManager.OnBossPhaseChange → 페이즈 전환
+      - NetworkManager.OnBossSpecialAttack → 특수 공격
+      - NetworkManager.OnBossEnrage → 인레이지
+      - NetworkManager.OnBossDefeated → 보스 처치
+      - NetworkManager.OnAttackResult → 보스 HP 갱신
+    public_api:
+      - GetBoss(ulong) → BossState
+      - IsBoss(ulong) → bool
+
+  - name: SceneFlowManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: true
+    purpose: "씬 전환 매니저 — 페이드인/아웃 트랜지션 + 씬 흐름 순서 관리"
+    reads: []
+    writes:
+      - CurrentScene (GameScene enum)
+    fires_events:
+      - OnSceneChanged(GameScene)
+    subscribes_to: []
+    public_api:
+      - TransitionTo(GameScene)
+      - TransitionToNext()
+    serialized_fields:
+      - fadeDuration: float (default 0.5)
+
+  - name: NpcManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "NPC 인터랙션 관리 — F키로 NPC 대화, 대화 데이터 관리"
+    reads: []
+    writes:
+      - _currentDialog (NpcDialogData)
+      - _isDialogOpen (bool)
+    fires_events:
+      - OnDialogOpened(NpcDialogData)
+      - OnDialogClosed()
+    subscribes_to:
+      - NetworkManager.OnNpcDialog → NPC 대화 데이터 수신
+    public_api:
+      - InteractWith(uint)
+      - CloseDialog()
+    computed_properties:
+      - IsDialogOpen (bool)
+      - CurrentDialog (NpcDialogData)
+
+  - name: EnhanceManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "장비 강화 관리 — 대장장이 NPC 연동, 강화 요청/결과"
+    reads: []
+    writes:
+      - _isEnhancePanelOpen (bool)
+    fires_events:
+      - OnEnhanceComplete(EnhanceResultData)
+      - OnEnhancePanelOpened()
+      - OnEnhancePanelClosed()
+    subscribes_to:
+      - NetworkManager.OnEnhanceResult → 강화 결과 수신
+    public_api:
+      - Enhance(byte)
+      - OpenPanel()
+      - ClosePanel()
+    computed_properties:
+      - IsEnhancePanelOpen (bool)
+
+  - name: TutorialManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "튜토리얼 진행 관리 — 5스텝 보상 시스템"
+    reads: []
+    writes:
+      - _completedSteps (HashSet<byte>)
+      - _currentStep (byte)
+    fires_events:
+      - OnStepCompleted(byte)
+      - OnRewardReceived(TutorialRewardData)
+      - OnTutorialFinished()
+    subscribes_to:
+      - NetworkManager.OnTutorialReward → 튜토리얼 보상 수신
+    public_api:
+      - CompleteCurrentStep()
+      - CompleteStep(byte)
+      - IsStepCompleted(byte) → bool
+    computed_properties:
+      - CurrentStep (byte)
+      - IsComplete (bool)
+
+  - name: GuildManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "문파(길드) 시스템 관리 — 생성/해산/초대/수락/탈퇴/추방/정보/목록"
+    reads: []
+    writes:
+      - InGuild (bool)
+      - GuildId (uint)
+      - GuildName (string)
+      - LeaderId (ulong)
+      - Members (GuildMemberInfo[])
+    fires_events:
+      - OnGuildInfoUpdated(GuildInfoData)
+      - OnGuildListReceived(GuildListEntry[])
+      - OnGuildLeft()
+    subscribes_to:
+      - NetworkManager.OnGuildInfo → 문파 정보 갱신
+      - NetworkManager.OnGuildList → 문파 목록 수신
+    public_api:
+      - CreateGuild(string)
+      - DisbandGuild()
+      - InviteMember(ulong)
+      - AcceptInvite()
+      - LeaveGuild()
+      - KickMember(ulong)
+      - RequestGuildInfo()
+      - RequestGuildList()
+    computed_properties:
+      - IsLeader (bool)
+
+  - name: TradeManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "거래 시스템 관리 — 요청/수락/거절/아이템·골드 추가/확정/취소"
+    reads: []
+    writes:
+      - IsTrading (bool)
+      - TradePartner (ulong)
+    fires_events:
+      - OnTradeCompleted(TradeResultData)
+      - OnTradeStarted()
+      - OnTradeCancelled()
+    subscribes_to:
+      - NetworkManager.OnTradeResult → 거래 결과
+    public_api:
+      - RequestTrade(ulong)
+      - AcceptTrade()
+      - DeclineTrade()
+      - AddItem(byte)
+      - AddGold(uint)
+      - ConfirmTrade()
+      - CancelTrade()
+
+  - name: MailManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "우편 시스템 관리 — 발송/목록/읽기/수령/삭제"
+    reads: []
+    writes:
+      - _mails (List<MailListEntry>)
+      - IsMailboxOpen (bool)
+    fires_events:
+      - OnMailListChanged()
+      - OnMailOpened(MailReadData)
+      - OnClaimResult(MailClaimResultData)
+      - OnDeleteResult(MailDeleteResultData)
+    subscribes_to:
+      - NetworkManager.OnMailList → 우편 목록 갱신
+      - NetworkManager.OnMailRead → 우편 내용 수신
+      - NetworkManager.OnMailClaimResult → 수령 결과
+      - NetworkManager.OnMailDeleteResult → 삭제 결과
+    public_api:
+      - SendMail(string, string, string, uint, uint, ushort)
+      - OpenMailbox()
+      - CloseMailbox()
+      - ReadMail(uint)
+      - ClaimMail(uint)
+      - DeleteMail(uint)
+      - RefreshMailbox()
+    computed_properties:
+      - Mails (IReadOnlyList<MailListEntry>)
+
+  - name: DungeonManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "던전 인스턴스 + 매칭 시스템 관리 — 생성/입장/퇴장/매칭 큐"
+    reads: []
+    writes:
+      - InDungeon (bool)
+      - CurrentInstanceId (uint)
+      - CurrentDungeonType (uint)
+      - PlayerCount (byte)
+      - MonsterCount (byte)
+      - CurrentMatchState (MatchState)
+      - QueuePosition (uint)
+    fires_events:
+      - OnDungeonEntered(InstanceEnterData)
+      - OnDungeonLeft()
+      - OnDungeonInfoUpdated(InstanceInfoData)
+      - OnMatchFound(MatchFoundData)
+      - OnMatchStateChanged(MatchState)
+    subscribes_to:
+      - NetworkManager.OnInstanceEnter → 던전 입장 결과
+      - NetworkManager.OnInstanceLeaveResult → 던전 퇴장 결과
+      - NetworkManager.OnInstanceInfo → 던전 정보 갱신
+      - NetworkManager.OnMatchFound → 매칭 발견
+      - NetworkManager.OnMatchStatus → 매칭 상태 갱신
+    public_api:
+      - CreateDungeon(uint)
+      - LeaveDungeon()
+      - EnqueueMatch(uint)
+      - DequeueMatch()
+      - AcceptMatch()
+
+  - name: PvPManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "PvP 아레나 관리 — S036 전용 패킷(350-359) 기반 매칭/전투/레이팅"
+    reads: []
+    writes:
+      - CurrentState (PvPState)
+      - CurrentMode (PvPMode)
+      - QueueCount (ushort)
+      - Rating (ushort)
+      - Tier (string)
+      - Wins (ushort)
+      - Losses (ushort)
+    fires_events:
+      - OnStateChanged(PvPState)
+      - OnMatchFound(PvPMatchFoundData)
+      - OnMatchStarted(PvPMatchStartData)
+      - OnAttackResult(PvPAttackResultData)
+      - OnMatchEnded(PvPMatchEndData)
+      - OnRatingUpdated(PvPRatingInfoData)
+    subscribes_to:
+      - NetworkManager.OnPvPQueueStatus → 큐 상태
+      - NetworkManager.OnPvPMatchFound → PvP 매칭 발견
+      - NetworkManager.OnPvPMatchStart → 매치 시작
+      - NetworkManager.OnPvPAttackResult → 공격 결과
+      - NetworkManager.OnPvPMatchEnd → 매치 종료
+      - NetworkManager.OnPvPRatingInfo → 레이팅 정보
+    public_api:
+      - QueueForMatch(PvPMode)
+      - CancelQueue()
+      - AcceptMatch()
+      - Attack(byte, byte, ushort, ushort)
+      - LeaveMatch()
+
+  - name: RaidManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "레이드 보스 관리 — S036 패킷(370-379) 기반 3페이즈/기믹6종/스태거/인레이지"
+    reads: []
+    writes:
+      - CurrentState (RaidState)
+      - InstanceId (uint)
+      - BossName (string)
+      - BossMaxHP (uint)
+      - BossCurrentHP (uint)
+      - CurrentPhase (byte)
+      - MaxPhases (byte)
+      - EnrageTimer (ushort)
+      - StaggerGauge (byte)
+      - IsEnraged (bool)
+    fires_events:
+      - OnBossSpawned(RaidBossSpawnData)
+      - OnPhaseChanged(RaidPhaseChangeData)
+      - OnMechanicStarted(RaidMechanicData)
+      - OnMechanicResult(RaidMechanicResultData)
+      - OnStaggerUpdated(byte)
+      - OnEnraged()
+      - OnWiped(RaidWipeData)
+      - OnCleared(RaidClearData)
+      - OnAttackResult(RaidAttackResultData)
+    subscribes_to:
+      - NetworkManager.OnRaidBossSpawn → 보스 스폰
+      - NetworkManager.OnRaidPhaseChange → 페이즈 변경
+      - NetworkManager.OnRaidMechanic → 기믹 발동
+      - NetworkManager.OnRaidMechanicResult → 기믹 결과
+      - NetworkManager.OnRaidStagger → 스태거 게이지
+      - NetworkManager.OnRaidEnrage → 인레이지
+      - NetworkManager.OnRaidWipe → 와이프
+      - NetworkManager.OnRaidClear → 클리어
+      - NetworkManager.OnRaidAttackResult → 공격 결과
+      - NetworkManager.OnInstanceEnter → 레이드 인스턴스 입장
+      - NetworkManager.OnInstanceLeaveResult → 퇴장
+    public_api:
+      - AttackBoss(ushort, uint)
+      - LeaveRaid()
+      - GetMechanicName(RaidMechanicId) → string
+
+  - name: SoundManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "프로시저럴 사운드 관리 — 타격/스킬/레벨업/UI 효과음 자동 생성 및 재생"
+    reads: []
+    writes:
+      - _sfxSource (AudioSource)
+      - _uiSource (AudioSource)
+    fires_events: []
+    subscribes_to:
+      - CombatManager.OnAttackFeedback → 타격음 재생
+      - CombatManager.OnEntityDied → 사망음 재생
+      - SkillManager.OnSkillUsed → 스킬 사용음 재생
+      - StatsManager.OnStatsChanged → 레벨업 감지 시 레벨업 사운드
+    public_api:
+      - PlayHit()
+      - PlayCritHit()
+      - PlayUIClick()
+      - PlayLevelUp()
+      - PlaySkillUse()
+      - PlayDeath()
+
+  - name: SkillVFXManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스킬/레벨업 이펙트 파티클 관리 — Object Pool 방식 ParticleSystem"
+    reads: []
+    writes:
+      - _skillPool (Queue<ParticleSystem>)
+      - _levelUpPool (Queue<ParticleSystem>)
+    fires_events: []
+    subscribes_to:
+      - SkillManager.OnSkillUsed → 스킬 이펙트 재생
+      - StatsManager.OnStatsChanged → 레벨업 이펙트 재생
+    public_api:
+      - PlaySkillEffect(Vector3)
+      - PlayLevelUpEffect(Vector3)
+
+  - name: HitVFXManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "타격 이펙트 파티클 관리 — Object Pool 방식 ParticleSystem 스폰"
+    reads: []
+    writes:
+      - _normalPool (Queue<ParticleSystem>)
+      - _critPool (Queue<ParticleSystem>)
+    fires_events: []
+    subscribes_to:
+      - CombatManager.OnAttackFeedback → 피격 위치에 이펙트 재생
+    public_api:
+      - PlayNormalHit(Vector3)
+      - PlayCriticalHit(Vector3)
+
+  - name: QuestManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "퀘스트 시스템 관리 — 목록, 수락, 진행, 완료"
+    reads: []
+    writes:
+      - _quests (Dictionary<uint, QuestInfo>)
+    fires_events:
+      - OnQuestListChanged()
+      - OnQuestAccepted(QuestAcceptResultData)
+      - OnQuestCompleted(QuestCompleteResultData)
+    subscribes_to:
+      - NetworkManager.OnQuestList → 퀘스트 목록 갱신
+      - NetworkManager.OnQuestAcceptResult → 퀘스트 수락 결과
+      - NetworkManager.OnQuestCompleteResult → 퀘스트 완료 결과
+      - NetworkManager.OnEnterGame → 자동 QUEST_LIST_REQ
+    public_api:
+      - AcceptQuest(uint)
+      - CheckProgress(uint)
+      - CompleteQuest(uint)
+      - GetQuest(uint) → QuestInfo
+      - HasQuest(uint) → bool
+
+  - name: CraftingManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "제작/요리/인챈트 시스템 관리 — S043 TASK 2 (MsgType 380-383, 386-389)"
+    reads: []
+    writes:
+      - _recipes (List<CraftRecipeInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnRecipeListChanged()
+      - OnCraftComplete(CraftResultData)
+      - OnCookComplete(CookResultData)
+      - OnEnchantComplete(EnchantResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnCraftList → 레시피 목록 수신
+      - NetworkManager.OnCraftResult → 제작 결과
+      - NetworkManager.OnCookResult → 요리 결과
+      - NetworkManager.OnEnchantResultResp → 인챈트 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Craft(string)
+      - Cook(string)
+      - Enchant(byte, byte, byte)
+      - RefreshRecipes(byte)
+      - GetRecipe(string) → CraftRecipeInfo
+
+  - name: GatheringManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "채집 시스템 관리 — S043 TASK 2 (MsgType 384-385) 에너지/진행바"
+    reads: []
+    writes:
+      - _energy (ushort)
+      - _isGathering (bool)
+      - _gatherTimer (float)
+    fires_events:
+      - OnGatherComplete(GatherResultData)
+      - OnGatherStarted()
+      - OnEnergyChanged()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnGatherResult → 채집 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Gather(byte)
+      - GetGatherName(byte) → string
+    computed_properties:
+      - Energy (byte)
+      - MaxEnergy (byte)
+      - IsGathering (bool)
+      - GatherProgress (float)
+
+  - name: GemManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "보석 장착/합성 관리 — S041 TASK 8 (MsgType 450-453)"
+    reads: []
+    writes:
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnGemEquipped(GemEquipResultData)
+      - OnGemFused(GemFuseResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnGemEquipResult → 보석 장착 결과
+      - NetworkManager.OnGemFuseResult → 보석 합성 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - EquipGem(byte, byte, uint)
+      - FuseGems(byte, byte)
+      - GetGemTypeName(byte) → string
+      - GetTierName(byte) → string
+
+  - name: WeatherManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "날씨/시간 시스템 관리 — 날씨 전환 보간, 게임 시간 추적, 시간대 계산"
+    reads: []
+    writes:
+      - _currentWeather (WeatherType)
+      - _gameTimeSec (uint)
+      - _transitionTimer (float)
+    fires_events:
+      - OnWeatherChanged(WeatherType, byte)
+      - OnTimeChanged(uint)
+    subscribes_to:
+      - NetworkManager.OnWeatherUpdate → 날씨 변경
+      - NetworkManager.OnTimeUpdate → 게임 시간 갱신
+    public_api:
+      - GetTimeOfDay() → TimeOfDay
+    computed_properties:
+      - CurrentWeather (WeatherType)
+      - GameTime (uint)
+      - TimeOfDay (TimeOfDay)
+      - DayProgress (float 0~1)
+      - WeatherBlend (float 0~1)
+
+  - name: TeleportManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "텔레포트(워프포인트) 시스템 관리 — 목록 요청/텔레포트 실행/패널 토글"
+    reads: []
+    writes:
+      - _waypoints (List<WaypointInfo>)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnWaypointsLoaded(WaypointInfo[])
+      - OnTeleportComplete(TeleportResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnTeleportList → 워프포인트 목록 수신
+      - NetworkManager.OnTeleportResult → 텔레포트 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshWaypoints()
+      - Teleport(ushort)
+    computed_properties:
+      - Waypoints (IReadOnlyList<WaypointInfo>)
+      - IsPanelOpen (bool)
+
+  - name: MountManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "탈것 시스템 관리 — 소환/해제, 이동 속도 배율 추적"
+    reads: []
+    writes:
+      - _isMounted (bool)
+      - _currentMountId (uint)
+      - _speedMultiplier (float)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnMounted(MountResultData)
+      - OnDismounted()
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnMountResult → 탈것 소환 결과
+      - NetworkManager.OnMountDismountResult → 탈것 해제 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - Summon(uint)
+      - Dismount()
+    computed_properties:
+      - IsMounted (bool)
+      - CurrentMountId (uint)
+      - SpeedMultiplier (float)
+      - IsPanelOpen (bool)
+
+  - name: CashShopManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "캐시샵 시스템 관리 — S042 TASK 11 (MsgType 474-477, 488-489) 아이템 목록/구매/크리스탈/월정액"
+    reads: []
+    writes:
+      - _items (List<CashShopItemInfo>)
+      - _crystals (uint)
+      - _isPanelOpen (bool)
+      - _subscription (SubscriptionInfoData)
+    fires_events:
+      - OnShopListChanged()
+      - OnPurchaseResult(CashShopBuyResultData)
+      - OnSubscriptionUpdated(SubscriptionInfoData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnCashShopList → 캐시샵 아이템 목록 수신
+      - NetworkManager.OnCashShopBuyResult → 구매 결과
+      - NetworkManager.OnSubscriptionInfo → 월정액 정보
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RequestItems(byte)
+      - BuyItem(uint, byte)
+      - RequestSubscription()
+    computed_properties:
+      - Items (IReadOnlyList<CashShopItemInfo>)
+      - Crystals (uint)
+      - IsPanelOpen (bool)
+      - Subscription (SubscriptionInfoData)
+
+  - name: BattlePassManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "배틀패스 시스템 관리 — S042 TASK 11 (MsgType 478-483) 시즌 정보/보상 수령/프리미엄 구매"
+    reads: []
+    writes:
+      - _info (BattlePassInfoData)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnInfoUpdated(BattlePassInfoData)
+      - OnRewardClaimed(BattlePassRewardResultData)
+      - OnPremiumPurchased(BattlePassBuyResultData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnBattlePassInfo → 배틀패스 정보 수신
+      - NetworkManager.OnBattlePassRewardResult → 보상 수령 결과
+      - NetworkManager.OnBattlePassBuyResult → 프리미엄 구매 결과
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - RefreshInfo()
+      - ClaimReward(byte, byte)
+      - BuyPremium()
+    computed_properties:
+      - Info (BattlePassInfoData)
+      - IsPanelOpen (bool)
+      - IsPremium (bool)
+      - Level (byte)
+      - ExpRatio (float)
+
+  - name: AttendanceManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "출석 시스템 관리 — 출석 정보, 보상 수령, 일일/주간 리셋, 로그인 보상"
+    reads: []
+    writes:
+      - _info (AttendanceInfoData)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnInfoUpdated(AttendanceInfoData)
+      - OnRewardClaimed(AttendanceClaimResultData)
+      - OnDailyReset(DailyResetNotifyData)
+      - OnLoginReward(LoginRewardNotifyData)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnAttendanceInfo → 출석 정보 수신
+      - NetworkManager.OnAttendanceClaimResult → 보상 수령 결과
+      - NetworkManager.OnDailyResetNotify → 일일/주간 리셋 알림
+      - NetworkManager.OnLoginRewardNotify → 로그인 보상 알림
+      - NetworkManager.OnEnterGame → 자동 ATTENDANCE_INFO_REQ
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - ClaimDay(byte)
+      - RefreshInfo()
+    computed_properties:
+      - Info (AttendanceInfoData)
+      - IsPanelOpen (bool)
+      - CurrentDay (byte)
+      - TotalDays (byte)
+
+  - name: StoryManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스토리/대화/컷씬 관리 — 대화 선택지, 컷씬 재생/스킵, 스토리 진행, 메인 퀘스트"
+    reads: []
+    writes:
+      - _currentChapter (byte)
+      - _currentQuestId (uint)
+      - _mainQuest (MainQuestDataInfo)
+      - _isCutscenePlaying (bool)
+      - _activeCutsceneId (ushort)
+      - _isPanelOpen (bool)
+    fires_events:
+      - OnDialogWithChoices(DialogChoiceResultData)
+      - OnCutsceneStarted(CutsceneTriggerData)
+      - OnCutsceneFinished(ushort)
+      - OnStoryUpdated(StoryProgressData)
+      - OnMainQuestUpdated(MainQuestDataInfo)
+      - OnPanelOpened()
+      - OnPanelClosed()
+    subscribes_to:
+      - NetworkManager.OnDialogChoiceResult → 대화 선택지 결과
+      - NetworkManager.OnCutsceneTrigger → 컷씬 트리거
+      - NetworkManager.OnCutsceneEnd → 컷씬 종료
+      - NetworkManager.OnStoryProgress → 스토리 진행 갱신
+      - NetworkManager.OnMainQuestData → 메인 퀘스트 데이터
+    public_api:
+      - OpenPanel()
+      - ClosePanel()
+      - SelectChoice(ushort, byte)
+      - SkipCutscene()
+      - RefreshProgress()
+    computed_properties:
+      - CurrentChapter (byte)
+      - MainQuest (MainQuestDataInfo)
+      - IsCutscenePlaying (bool)
+      - IsPanelOpen (bool)
+
+# ━━━ Entity 컴포넌트 ━━━
+
+entities:
+
+  - name: LocalPlayer
+    namespace: (global)
+    attached_to: LocalPlayer.prefab
+    purpose: "내 캐릭터 — 입력 처리 + 카메라 추적 + 이동 전송"
+    reads:
+      - Input (WASD / GetAxis)
+      - Camera.main
+    writes:
+      - transform.position, transform.rotation
+      - Camera.main.transform (카메라 추적)
+    calls:
+      - NetworkManager.Instance.SendMove() (sendInterval 간격)
+      - CoordConverter.UnityToServer()
+    serialized_fields:
+      - moveSpeed: float (default 5)
+      - sendInterval: float (default 0.1)
+      - cameraOffset: Vector3 (default 0,15,-10)
+      - cameraSmoothSpeed: float (default 5)
+
+  - name: RemotePlayer
+    namespace: (global)
+    attached_to: RemotePlayer.prefab
+    purpose: "다른 플레이어 — 서버 위치로 보간 이동"
+    reads:
+      - _targetPos (SetTargetPosition으로 설정됨)
+    writes:
+      - transform.position, transform.rotation
+    calls: []
+    serialized_fields:
+      - lerpSpeed: float (default 10)
+
+  - name: MonsterEntity
+    namespace: (global)
+    attached_to: Monster.prefab (또는 런타임 생성 Cube)
+    purpose: "몬스터 — 서버 위치로 보간 이동 + HP 추적"
+    reads:
+      - _targetPos (SetTargetPosition으로 설정됨)
+    writes:
+      - transform.position
+    calls: []
+    serialized_fields:
+      - lerpSpeed: float (default 10)
+
+# ━━━ 유틸리티 ━━━
+
+utilities:
+
+  - name: TCPClient
+    namespace: Network
+    purpose: "TCP 소켓 래퍼 — 백그라운드 수신 + 메인 스레드 디큐"
+    threading: "수신=백그라운드 스레드, 디큐=메인 스레드(Update)"
+    used_by: [NetworkManager]
+
+  - name: PacketBuilder
+    namespace: Network
+    purpose: "패킷 직렬화/역직렬화 (static 유틸리티)"
+    packet_format: "[4B Length LE][2B MsgType LE][Payload]"
+    used_by: [NetworkManager]
+
+  - name: CoordConverter
+    namespace: (global)
+    purpose: "서버↔Unity 좌표 변환"
+    conversion:
+      server_to_unity: "Vector3(sx * 0.1, 0, sy * 0.1)"
+      unity_to_server: "(pos.x * 10, pos.z * 10)"
+      server_range: "0~1000 x 0~1000 (2D)"
+      unity_range: "0~100 x 0~100 (3D, y=0)"
+    used_by: [EntityManager, LocalPlayer]
+
+  - name: ConnectionTest
+    namespace: (global)
+    purpose: "자동화된 접속 테스트 (Gate→Login→CharSelect→InGame)"
+    test_flow:
+      - ConnectToGate
+      - Login("hero", "pass123") after 1s
+      - SelectCharacter(1) on login success
+      - JoinChannel(1) on enter game
+      - Spacebar → random SendMove
+
+# ━━━ 데이터 흐름 ━━━
+
 data_flows:
-  - from: NetworkSystem
-    to: MessageDispatchSystem
-    via: RecvBufferComponent
-    description: "NetworkSystem이 IOCP 수신 데이터를 RecvBuffer에 적재 → MessageDispatchSystem이 꺼내서 패킷으로 조립"
 
-# 향후 추가 예정 (커리큘럼 기반)
-# Session 3: MovementSystem, BroadcastSystem
-# Session 4: InterestSystem
-# Session 5: ChannelSystem
-# Session 6: ZoneSystem
-# Session 7: HandoffSystem
-# Session 8: GhostSystem
+  - from: Server (TCP)
+    to: TCPClient
+    via: "TCP socket (background thread)"
+    description: "서버 바이트 스트림 수신 → ReceivedPacket 큐에 적재"
+
+  - from: TCPClient
+    to: NetworkManager
+    via: "DequeueAll() in Update()"
+    description: "메인 스레드에서 패킷 디큐 → 타입별 핸들러 호출"
+
+  - from: NetworkManager
+    to: GameManager
+    via: "C# events (OnLoginResult, OnEnterGame, OnDisconnected)"
+    description: "게임 상태 전이 트리거"
+
+  - from: NetworkManager
+    to: EntityManager
+    via: "C# events (OnEnterGame, OnEntityAppear/Disappear/Move)"
+    description: "엔티티 생명주기 관리"
+
+  - from: EntityManager
+    to: EntityPool
+    via: "Get()/Return() 직접 호출"
+    description: "RemotePlayer 오브젝트 풀링"
+
+  - from: NetworkManager
+    to: StatsManager
+    via: "C# events (OnStatSync, OnEnterGame)"
+    description: "스탯 동기화 + 게임 진입 시 자동 STAT_QUERY"
+
+  - from: NetworkManager
+    to: MonsterManager
+    via: "C# events (OnMonsterSpawn, OnMonsterRespawn, OnCombatDied, OnEntityMove, OnAttackResult, OnMonsterMove, OnMonsterAggro)"
+    description: "몬스터 스폰/리스폰/사망/이동/HP 갱신/어그로"
+
+  - from: MonsterManager
+    to: MonsterEntity
+    via: "Initialize(), SetTargetPosition() 직접 호출"
+    description: "몬스터 데이터 초기화 + 위치 보간 타겟 설정"
+
+  - from: NetworkManager
+    to: CombatManager
+    via: "C# events (OnAttackResult, OnCombatDied, OnRespawnResult)"
+    description: "전투 결과, 사망, 부활 이벤트 전달"
+
+  - from: StatsManager
+    to: HUDManager
+    via: "C# event (OnStatsChanged)"
+    description: "HP/MP/EXP/Level UI 갱신"
+
+  - from: CombatManager
+    to: CombatUI
+    via: "C# event (OnAttackFeedback)"
+    description: "데미지 텍스트 + 타겟 HP바 갱신"
+
+  - from: CombatManager
+    to: DeathUI
+    via: "C# events (OnEntityDied, OnRespawnComplete)"
+    description: "사망 패널 표시/숨김"
+
+  - from: SkillManager
+    to: SkillBarUI
+    via: "C# events (OnSkillListChanged, OnSkillUsed)"
+    description: "스킬 목록 변경 → 슬롯 이름 갱신, 쿨다운 오버레이"
+
+  - from: InventoryManager
+    to: InventoryUI
+    via: "C# event (OnInventoryChanged)"
+    description: "인벤토리 변경 → 아이템 슬롯 리스트 갱신"
+
+  - from: PartyManager
+    to: PartyUI
+    via: "C# event (OnPartyChanged)"
+    description: "파티 상태 변경 → 멤버 리스트/버튼 갱신"
+
+  - from: BuffManager
+    to: BuffUI
+    via: "C# event (OnBuffListChanged)"
+    description: "버프 변경 → 아이콘 리스트 + 타이머 갱신"
+
+  - from: QuestManager
+    to: QuestUI
+    via: "C# event (OnQuestListChanged)"
+    description: "퀘스트 변경 → 리스트 + 진행 상황 갱신"
+
+  - from: NetworkManager
+    to: ChatManager
+    via: "C# events (OnChatMessage, OnWhisperResult, OnSystemMessage)"
+    description: "채팅/귓속말/시스템 메시지 수신"
+
+  - from: ChatManager
+    to: ChatUI
+    via: "C# event (OnNewMessage)"
+    description: "새 메시지 → 채팅 창 갱신"
+
+  - from: NetworkManager
+    to: ShopManager
+    via: "C# events (OnShopList, OnShopResult)"
+    description: "상점 아이템 목록/거래 결과"
+
+  - from: ShopManager
+    to: ShopUI
+    via: "C# events (OnShopOpened, OnShopClosed, OnTransactionResult, OnGoldChanged)"
+    description: "상점 패널 토글 + 아이템/골드 갱신"
+
+  - from: NetworkManager
+    to: BossManager
+    via: "C# events (OnBossSpawn, OnBossPhaseChange, OnBossSpecialAttack, OnBossEnrage, OnBossDefeated, OnAttackResult)"
+    description: "보스 출현/페이즈/특수공격/인레이지/처치/HP 갱신"
+
+  - from: BossManager
+    to: BossUI
+    via: "C# events (OnBossAppeared, OnBossPhaseChanged, OnBossSpecialAttacked, OnBossEnraged, OnBossKilled, OnBossHPChanged)"
+    description: "보스 HP바, 페이즈 표시, 알림 팝업"
+
+  - from: NetworkManager
+    to: NpcManager
+    via: "C# event (OnNpcDialog)"
+    description: "NPC 대화 데이터 수신"
+
+  - from: NpcManager
+    to: NpcDialogUI
+    via: "C# events (OnDialogOpened, OnDialogClosed)"
+    description: "NPC 대화 패널 표시/숨김"
+
+  - from: NetworkManager
+    to: EnhanceManager
+    via: "C# event (OnEnhanceResult)"
+    description: "강화 결과 수신"
+
+  - from: EnhanceManager
+    to: EnhanceUI
+    via: "C# events (OnEnhanceComplete, OnEnhancePanelOpened, OnEnhancePanelClosed)"
+    description: "강화 패널 UI 갱신"
+
+  - from: NetworkManager
+    to: TutorialManager
+    via: "C# event (OnTutorialReward)"
+    description: "튜토리얼 보상 수신"
+
+  - from: NetworkManager
+    to: ServerSelectUI
+    via: "C# event (OnServerList)"
+    description: "서버 목록 수신 → UI 갱신"
+
+  - from: NetworkManager
+    to: CharacterSelectUI
+    via: "C# events (OnCharacterDataList, OnCharacterCreateResult, OnCharacterDeleteResult)"
+    description: "캐릭터 목록/생성/삭제 결과 UI 갱신"
+
+  - from: SceneFlowManager
+    to: SceneManager (Unity)
+    via: "LoadSceneAsync() 직접 호출"
+    description: "페이드 아웃 → 씬 로드 → 페이드 인 (0.5초 트랜지션)"
+
+  - from: LocalPlayer
+    to: NetworkManager
+    via: "SendMove() 직접 호출"
+    description: "WASD 입력 → 서버 이동 패킷 전송 (0.1초 간격)"
+
+  - from: EntityManager
+    to: RemotePlayer
+    via: "SetTargetPosition() 직접 호출"
+    description: "서버 위치 → 보간 타겟 설정"
+
+  - from: NetworkManager
+    to: GuildManager
+    via: "C# events (OnGuildInfo, OnGuildList)"
+    description: "문파 정보/목록 수신"
+
+  - from: GuildManager
+    to: GuildUI
+    via: "C# events (OnGuildInfoUpdated, OnGuildListReceived, OnGuildLeft)"
+    description: "문파 UI 갱신 (G키 토글)"
+
+  - from: NetworkManager
+    to: TradeManager
+    via: "C# event (OnTradeResult)"
+    description: "거래 결과 수신"
+
+  - from: TradeManager
+    to: TradeUI
+    via: "C# events (OnTradeStarted, OnTradeCancelled, OnTradeCompleted)"
+    description: "거래 UI 패널 표시/숨김"
+
+  - from: NetworkManager
+    to: MailManager
+    via: "C# events (OnMailList, OnMailRead, OnMailClaimResult, OnMailDeleteResult)"
+    description: "우편 목록/내용/수령/삭제 결과 수신"
+
+  - from: MailManager
+    to: MailUI
+    via: "C# events (OnMailListChanged, OnMailOpened, OnClaimResult, OnDeleteResult)"
+    description: "우편함 UI 갱신 (M키 토글)"
+
+  - from: NetworkManager
+    to: DungeonManager
+    via: "C# events (OnInstanceEnter, OnInstanceLeaveResult, OnInstanceInfo, OnMatchFound, OnMatchStatus)"
+    description: "던전 입장/퇴장/정보/매칭 이벤트 수신"
+
+  - from: DungeonManager
+    to: DungeonUI
+    via: "C# events (OnDungeonEntered, OnDungeonLeft, OnDungeonInfoUpdated, OnMatchFound, OnMatchStateChanged)"
+    description: "던전 UI 갱신 (J키 토글)"
+
+  - from: NetworkManager
+    to: PvPManager
+    via: "C# events (OnPvPQueueStatus, OnPvPMatchFound, OnPvPMatchStart, OnPvPAttackResult, OnPvPMatchEnd, OnPvPRatingInfo)"
+    description: "PvP 전용 패킷(350-359) 큐/매칭/전투/레이팅 수신"
+
+  - from: PvPManager
+    to: PvPUI
+    via: "C# events (OnStateChanged, OnMatchFound, OnMatchEnded, OnRatingUpdated)"
+    description: "PvP UI 갱신 (K키 토글)"
+
+  - from: NetworkManager
+    to: RaidManager
+    via: "C# events (OnRaidBossSpawn, OnRaidPhaseChange, OnRaidMechanic, OnRaidMechanicResult, OnRaidStagger, OnRaidEnrage, OnRaidWipe, OnRaidClear, OnRaidAttackResult, OnInstanceEnter, OnInstanceLeaveResult)"
+    description: "레이드 보스 패킷(370-379) + 인스턴스 입장/퇴장"
+
+  - from: RaidManager
+    to: RaidUI
+    via: "C# events (OnBossSpawned, OnPhaseChanged, OnMechanicStarted, OnMechanicResult, OnStaggerUpdated, OnEnraged, OnWiped, OnCleared, OnAttackResult)"
+    description: "레이드 보스 UI (HP바/페이즈/기믹/스태거/보상)"
+
+  - from: NetworkManager
+    to: CraftingManager
+    via: "C# events (OnCraftList, OnCraftResult, OnCookResult, OnEnchantResultResp)"
+    description: "제작/요리/인챈트 결과 수신 (380-389)"
+
+  - from: CraftingManager
+    to: CraftingUI
+    via: "C# events (OnRecipeListChanged, OnCraftComplete, OnCookComplete, OnEnchantComplete, OnPanelOpened, OnPanelClosed)"
+    description: "제작 UI 갱신 (N키 토글)"
+
+  - from: NetworkManager
+    to: GatheringManager
+    via: "C# event (OnGatherResult)"
+    description: "채집 결과 수신 (384-385)"
+
+  - from: GatheringManager
+    to: GatheringUI
+    via: "C# events (OnGatherComplete, OnGatherStarted, OnEnergyChanged, OnPanelOpened, OnPanelClosed)"
+    description: "채집 UI 갱신 (진행바+에너지)"
+
+  - from: NetworkManager
+    to: GemManager
+    via: "C# events (OnGemEquipResult, OnGemFuseResult)"
+    description: "보석 장착/합성 결과 수신 (450-453)"
+
+  - from: GemManager
+    to: GemUI
+    via: "C# events (OnGemEquipped, OnGemFused, OnPanelOpened, OnPanelClosed)"
+    description: "보석 UI 갱신"
+
+  - from: NetworkManager
+    to: WeatherManager
+    via: "C# events (OnWeatherUpdate, OnTimeUpdate)"
+    description: "날씨 변경/게임 시간 갱신 수신 (490-491)"
+
+  - from: NetworkManager
+    to: TeleportManager
+    via: "C# events (OnTeleportList, OnTeleportResult)"
+    description: "워프포인트 목록/텔레포트 결과 수신 (492-495)"
+
+  - from: TeleportManager
+    to: TeleportUI
+    via: "C# events (OnWaypointsLoaded, OnTeleportComplete, OnPanelOpened, OnPanelClosed)"
+    description: "텔레포트 UI 갱신 (;키 토글)"
+
+  - from: NetworkManager
+    to: MountManager
+    via: "C# events (OnMountResult, OnMountDismountResult)"
+    description: "탈것 소환/해제 결과 수신 (498-501)"
+
+  - from: MountManager
+    to: MountUI
+    via: "C# events (OnMounted, OnDismounted, OnPanelOpened, OnPanelClosed)"
+    description: "탈것 UI 갱신 (소환/해제 버튼 토글)"
+
+  - from: NetworkManager
+    to: CashShopManager
+    via: "C# events (OnCashShopList, OnCashShopBuyResult, OnSubscriptionInfo)"
+    description: "캐시샵 아이템 목록/구매 결과/월정액 정보 수신 (474-477, 488-489)"
+
+  - from: CashShopManager
+    to: CashShopUI
+    via: "C# events (OnShopListChanged, OnPurchaseResult, OnSubscriptionUpdated, OnPanelOpened, OnPanelClosed)"
+    description: "캐시샵 UI 갱신 ($키 토글)"
+
+  - from: NetworkManager
+    to: BattlePassManager
+    via: "C# events (OnBattlePassInfo, OnBattlePassRewardResult, OnBattlePassBuyResult)"
+    description: "배틀패스 정보/보상/프리미엄 구매 결과 수신 (478-483)"
+
+  - from: BattlePassManager
+    to: BattlePassUI
+    via: "C# events (OnInfoUpdated, OnRewardClaimed, OnPremiumPurchased, OnPanelOpened, OnPanelClosed)"
+    description: "배틀패스 UI 갱신 (F5키 토글)"
+
+  - from: NetworkManager
+    to: AttendanceManager
+    via: "C# events (OnAttendanceInfo, OnAttendanceClaimResult, OnDailyResetNotify, OnLoginRewardNotify, OnEnterGame)"
+    description: "출석 정보/보상/리셋/로그인 보상 수신 + 게임 진입 시 자동 요청 (502-509)"
+
+  - from: AttendanceManager
+    to: AttendanceUI
+    via: "C# events (OnInfoUpdated, OnRewardClaimed, OnPanelOpened, OnPanelClosed)"
+    description: "출석 UI 갱신 (14일 그리드 + 보상 수령)"
+
+  - from: NetworkManager
+    to: ContentUnlockUI
+    via: "C# event (OnContentUnlockNotify)"
+    description: "컨텐츠 해금 알림 → 풀스크린 팝업 (매니저 없이 직접 구독, 507-508)"
+
+  - from: NetworkManager
+    to: StoryManager
+    via: "C# events (OnDialogChoiceResult, OnCutsceneTrigger, OnCutsceneEnd, OnStoryProgress, OnMainQuestData)"
+    description: "대화 선택지/컷씬/스토리 진행/메인 퀘스트 수신 (510-517)"
+
+  - from: StoryManager
+    to: StoryUI
+    via: "C# events (OnDialogWithChoices, OnCutsceneStarted, OnCutsceneFinished, OnStoryUpdated, OnMainQuestUpdated, OnPanelOpened, OnPanelClosed)"
+    description: "스토리 UI 갱신 (대화 선택지 + 컷씬 오버레이 + 퀘스트 진행)"
+
+  - from: CombatManager
+    to: SoundManager
+    via: "C# events (OnAttackFeedback, OnEntityDied)"
+    description: "타격음/사망음 재생"
+
+  - from: SkillManager
+    to: SoundManager
+    via: "C# event (OnSkillUsed)"
+    description: "스킬 사용음 재생"
+
+  - from: StatsManager
+    to: SoundManager
+    via: "C# event (OnStatsChanged)"
+    description: "레벨업 사운드 재생"
+
+  - from: SkillManager
+    to: SkillVFXManager
+    via: "C# event (OnSkillUsed)"
+    description: "스킬 이펙트 재생"
+
+  - from: StatsManager
+    to: SkillVFXManager
+    via: "C# event (OnStatsChanged)"
+    description: "레벨업 이펙트 재생"
+
+  - from: CombatManager
+    to: HitVFXManager
+    via: "C# event (OnAttackFeedback)"
+    description: "타격 위치에 파티클 이펙트 재생"
+
+# ━━━ 좌표 변환 파이프라인 ━━━
+
+coordinate_pipeline:
+  description: "서버(2D 0~1000) ↔ Unity(3D 0~100) 변환"
+  steps:
+    - name: "서버 → Unity (수신)"
+      trigger: "OnEntityAppear, OnEntityMove, OnEnterGame"
+      function: "CoordConverter.ServerToUnity(sx, sy)"
+      mapping: "x=sx*0.1, y=0, z=sy*0.1"
+    - name: "Unity → 서버 (송신)"
+      trigger: "LocalPlayer.HandleMovement()"
+      function: "CoordConverter.UnityToServer(pos)"
+      mapping: "sx=pos.x*10, sy=pos.z*10"
+  warning: "서버 Y축 → Unity Z축 매핑에 주의"

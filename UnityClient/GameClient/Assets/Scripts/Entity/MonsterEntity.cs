@@ -57,6 +57,15 @@ public class MonsterEntity : MonoBehaviour
                 transform.position, _targetPos, Time.deltaTime * lerpSpeed);
         }
 
+        // 터레인 높이 적용
+        var terrain = Terrain.activeTerrain;
+        if (terrain != null)
+        {
+            Vector3 pos = transform.position;
+            pos.y = terrain.SampleHeight(pos) + terrain.transform.position.y;
+            transform.position = pos;
+        }
+
         UpdateHitFlash();
     }
 

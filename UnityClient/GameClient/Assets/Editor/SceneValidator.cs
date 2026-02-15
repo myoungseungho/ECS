@@ -187,6 +187,9 @@ public static class SceneValidator
         Check("GameScene: CurrencyManager 존재", objectNames.Contains("CurrencyManager"));
         Check("GameScene: CurrencyUI 존재", objectNames.Contains("CurrencyUI"));
         Check("GameScene: TokenShopUI 존재", objectNames.Contains("TokenShopUI"));
+        Check("GameScene: HitVFXManager 존재", objectNames.Contains("HitVFXManager"));
+        Check("GameScene: SoundManager 존재", objectNames.Contains("SoundManager"));
+        Check("GameScene: SkillVFXManager 존재", objectNames.Contains("SkillVFXManager"));
         Check("GameScene: Canvas 존재", objectNames.Contains("Canvas"));
 
         // EntityManager Prefab 참조 확인

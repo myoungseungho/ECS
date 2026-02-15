@@ -627,6 +627,46 @@ managers:
       - LeaveRaid()
       - GetMechanicName(RaidMechanicId) → string
 
+  - name: SoundManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "프로시저럴 사운드 관리 — 타격/스킬/레벨업/UI 효과음 자동 생성 및 재생"
+    reads: []
+    writes:
+      - _sfxSource (AudioSource)
+      - _uiSource (AudioSource)
+    fires_events: []
+    subscribes_to:
+      - CombatManager.OnAttackFeedback → 타격음 재생
+      - CombatManager.OnEntityDied → 사망음 재생
+      - SkillManager.OnSkillUsed → 스킬 사용음 재생
+      - StatsManager.OnStatsChanged → 레벨업 감지 시 레벨업 사운드
+    public_api:
+      - PlayHit()
+      - PlayCritHit()
+      - PlayUIClick()
+      - PlayLevelUp()
+      - PlaySkillUse()
+      - PlayDeath()
+
+  - name: SkillVFXManager
+    namespace: (global)
+    singleton: true
+    dont_destroy_on_load: false
+    purpose: "스킬/레벨업 이펙트 파티클 관리 — Object Pool 방식 ParticleSystem"
+    reads: []
+    writes:
+      - _skillPool (Queue<ParticleSystem>)
+      - _levelUpPool (Queue<ParticleSystem>)
+    fires_events: []
+    subscribes_to:
+      - SkillManager.OnSkillUsed → 스킬 이펙트 재생
+      - StatsManager.OnStatsChanged → 레벨업 이펙트 재생
+    public_api:
+      - PlaySkillEffect(Vector3)
+      - PlayLevelUpEffect(Vector3)
+
   - name: HitVFXManager
     namespace: (global)
     singleton: true
@@ -2217,6 +2257,36 @@ data_flows:
     to: TokenShopUI
     via: "C# events (OnTokenShopListReceived, OnTokenShopBuyComplete, OnTokenShopOpened, OnTokenShopClosed)"
     description: "토큰 상점 UI 갱신 (Shift+F9키 토글)"
+
+  - from: CombatManager
+    to: SoundManager
+    via: "C# events (OnAttackFeedback, OnEntityDied)"
+    description: "타격음/사망음 재생"
+
+  - from: SkillManager
+    to: SoundManager
+    via: "C# event (OnSkillUsed)"
+    description: "스킬 사용음 재생"
+
+  - from: StatsManager
+    to: SoundManager
+    via: "C# event (OnStatsChanged)"
+    description: "레벨업 사운드 재생"
+
+  - from: SkillManager
+    to: SkillVFXManager
+    via: "C# event (OnSkillUsed)"
+    description: "스킬 이펙트 재생"
+
+  - from: StatsManager
+    to: SkillVFXManager
+    via: "C# event (OnStatsChanged)"
+    description: "레벨업 이펙트 재생"
+
+  - from: CombatManager
+    to: HitVFXManager
+    via: "C# event (OnAttackFeedback)"
+    description: "타격 위치에 파티클 이펙트 재생"
 
 # ━━━ 좌표 변환 파이프라인 ━━━
 
