@@ -897,8 +897,10 @@ AUCTION_TAX_RATE = 0.05       # 5% seller tax
 AUCTION_LISTING_FEE = 100     # 100 gold listing fee (non-refundable)
 AUCTION_MAX_LISTINGS = 20     # max concurrent listings per player
 AUCTION_DURATION_HOURS = 48   # 48h auto-expire
+AUCTION_LISTING_DURATION = 48 * 3600  # 48 hours in seconds
 AUCTION_MIN_PRICE = 1
 AUCTION_MAX_PRICE = 99999999
+AUCTION_PAGE_SIZE = 20           # items per page
 
 # Daily gold caps (economy.yaml inflation_control)
 DAILY_GOLD_CAPS = {
@@ -1993,6 +1995,10 @@ class BridgeServer:
         self.enchantments = {}
         self.pvp_ratings: Dict[str, dict] = {}  # username -> {rating, wins, losses, matches}
         self.raid_instances: Dict[int, dict] = {}  # instance_id -> raid data
+        # S045: Auction House
+        self.auction_listings: Dict[int, dict] = {}  # listing_id -> listing data
+        self.next_auction_id = 1
+        self.daily_gold_earned: Dict[int, dict] = {}  # account_id -> {monster:X, dungeon:X, ...}
 
     def log(self, msg: str, level: str = "INFO"):
         ts = time.strftime("%H:%M:%S")
@@ -2207,7 +2213,7 @@ class BridgeServer:
             MsgType.GATHER_START: self._on_gather_start,
             MsgType.COOK_EXECUTE: self._on_cook_execute,
             MsgType.ENCHANT_REQ: self._on_enchant_req,
-
+            # Auction House
             MsgType.AUCTION_LIST_REQ: self._on_auction_list_req,
             MsgType.AUCTION_REGISTER: self._on_auction_register,
             MsgType.AUCTION_BUY: self._on_auction_buy,
