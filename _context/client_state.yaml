@@ -6,10 +6,10 @@
 
 agent: client
 project_root: "C:\\Users\\명승호\\Desktop\\ECS"
-last_session: "2026-02-15T09:55:00"
+last_session: "2026-02-15T14:00:00"
 
 # ── 현재 상태 ──
-current_status: "GDD 서버+클라 17개 TASK 100% COMPLETE — S057 검증 + StoryUI 버그 수정 + EventManager/EventUI 등록 | 115 PASS 0 FAIL"
+current_status: "GDD 100% 마일스톤 완료 — S058 확인 + 다음 단계 대표님 Q002 결정 대기 | 115 PASS 0 FAIL"
 
 # ── 완료된 작업 ──
 completed:
@@ -321,20 +321,26 @@ completed:
       - "UnityClient/GameClient/test_phase18_s057_tcp.py"
 
 # ── 대기 중 (서버 응답 필요) ──
-blocked: []
+blocked:
+  - "Q002 대표님 다음 단계 방향 결정 대기"
 
 # ── 다음 할 일 (blocked 아닌 것부터) ──
 pending_tasks:
   - id: "phase3_raid_ui"
     desc: "레이드 전용 UI — 레이드 보스 페이즈/기믹 가이드 패널"
     priority: P2
-    blocked: false
-    blocked_reason: ""
+    blocked: true
+    blocked_reason: "대표님 Q002 방향 결정 대기"
   - id: "unity_play_integration"
     desc: "Unity Play 모드 실연동 — ConnectionTest.cs 전체 시퀀스 자동화"
     priority: P2
-    blocked: false
-    blocked_reason: ""
+    blocked: true
+    blocked_reason: "대표님 Q002 방향 결정 대기"
+  - id: "next_sprint_direction"
+    desc: "다음 스프린트 방향 결정 — Q002 대표님 응답 후 착수"
+    priority: P0
+    blocked: true
+    blocked_reason: "대표님 Q002 응답 대기"
   - id: "gdd_task2_crafting_ui"
     desc: "제작/채집 UI — CraftingUI + GatheringUI (서버 TASK 2 MsgType 380-389)"
     priority: P1
@@ -506,6 +512,8 @@ recent_decisions:
   - "S057 검증: interaction-map StoryManager 이벤트명 동기화"
   - "GDD 서버+클라 17개 TASK 전부 양쪽 DONE — 마일스톤 달성"
   - "이벤트 UI 단축키: Shift+E=이벤트패널, 스토리 UI: J=스토리진행패널 토글"
+  - "S058: GDD 100% 마일스톤 서버 확인 — 서버 87핸들러+142테스트, 클라 40매니저+30UI+115테스트"
+  - "다음 단계 대표님 결정 대기 (Q002): A통합테스트/B리팩토링/C밸런싱/D추가컨텐츠/E레이드UI/F엔티티파이프라인"
 
 # ── 처리된 서버 메시지 ──
 processed_messages:
@@ -563,6 +571,7 @@ processed_messages:
   - "S055"
   - "S056"
   - "S057"
+  - "S058"
 
 # ── 핵심 규칙 (매 세션 리마인드) ──
 rules:
